@@ -6,22 +6,25 @@ stops a run, and it stops it *at the run's start*, with one message listing ever
 missing; never at edit time.
 
 * **I-1** the scalars the engine's *declared read list* requires and the configuration lacks:
-  engine parameters, formula coefficients, urgency levels (the ones the engine names, the
-  one the opening batch names, and the level every codelet pattern entry names).
+  engine parameters and formula coefficients; and the urgency levels the configuration itself
+  names: a codelet body that reads a tier (``meta.get_urgency('low')``), every parameter whose
+  ``refers_to`` is ``urgency_level``, every posting rule, clamp type and codelet pattern entry
+  that names one.  The engine names no tier, so a tier renamed in the rows and in the code that
+  names it still runs.
 * **I-2** the opening Coderack cannot be filled: ``initial_codelet_types`` names no codelet
   type the configuration has, and no posting rule exists to post one.
 
-``REQUIRED_ENGINE_PARAMETERS``, ``REQUIRED_FORMULA_COEFFICIENTS`` and
-``REQUIRED_URGENCY_LEVELS`` are the declared read list: every name the engine reads from the
+``REQUIRED_ENGINE_PARAMETERS`` and ``REQUIRED_FORMULA_COEFFICIENTS`` are the declared read list: every name the engine reads from the
 configuration, with no code default (a code default would hide a missing key and bury a second
 copy of the value in the code: bug B12).  ``tests/architecture/test_declared_read_list.py``
-holds the list to the code: every literal name passed to ``get_param``, ``get_formula_coeff``
-or ``get_urgency`` is declared here (a ``RunConstants`` field declared ``formula()`` or ``param()``,
-in ``run_binding.py``, is a read of the name it carries), and every declared name is in the Metacat
-Standard Configuration.  The converse holds too: every name stored in ``engine_params``,
-``formula_coefficients`` and ``urgency_levels`` is read (an urgency level also by being named by
-a posting rule's ``urgency_level``, a codelet pattern, a level-naming parameter or the clamp
-background), so a stored number is the only copy of its value.  A new read adds its name here.
+holds the list to the code: every literal name passed to ``get_param`` or ``get_formula_coeff``
+is declared here (a ``RunConstants`` field declared ``formula()`` or ``param()``, in
+``run_binding.py``, is a read of the name it carries), no engine module reads a tier by a literal
+name (``get_urgency``), and every declared name is in the Metacat Standard Configuration.  The
+converse holds too: every name stored in ``engine_params``, ``formula_coefficients`` and
+``urgency_levels`` is read (an urgency level also by being named by a codelet body, a posting
+rule's ``urgency_level``, a codelet pattern, a level-naming parameter or the clamp background),
+so a stored number is the only copy of its value.  A new read adds its name here.
 
 ``OPTIONAL_ENGINE_PARAMETERS`` are read with their absence defined (no menu, no labels),
 so a configuration without them still runs.
@@ -31,13 +34,19 @@ The check reads a handful of dictionary keys and builds nothing, so it costs mic
 
 from __future__ import annotations
 
+import ast
+import functools
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any
+
+from server.engine.roles import VOCABULARY
 
 #: Engine parameters read by ``meta.get_param`` with a literal name, and where.
 REQUIRED_ENGINE_PARAMETERS: tuple[tuple[str, str], ...] = (
     ("concept_activation_importance_threshold", "runner.py, builtins.py, trace.py"),
     ("concept_mapping_importance_threshold", "builtins.py"),
+    ("default_urgency_level", "posting.py, runner.py"),
     ("distance_threshold", "builtins.py"),
     ("dominant_theme_margin", "themes.py, builtins.py, serialization.py, capture_projection.py"),
     ("flip_first_probability_equal_spanning", "run_binding.py (RunConstants); read in themes.py"),
@@ -55,6 +64,8 @@ REQUIRED_ENGINE_PARAMETERS: tuple[tuple[str, str], ...] = (
     ("initially_clamped_slipnodes", "runner.py, slipnet.py"),
     ("intrinsic_link_lengths", "slipnet.py"),
     ("jootsing_count_scale", "jootsing.py (clamps and snags)"),
+    ("manual_clamp_background_level", "run_service.py (a codelet pattern the person clamps)"),
+    ("manual_clamp_background_patterns", "run_service.py (which clampable patterns hold a background)"),
     ("max_activation", "numeric/layout.py, jootsing.py, justify.py, run_service.py"),
     ("max_clamp_period", "jootsing.py, runner.py, update_cycle.py"),
     ("max_coderack_size", "coderack.py"),
@@ -74,6 +85,7 @@ REQUIRED_ENGINE_PARAMETERS: tuple[tuple[str, str], ...] = (
     ("theme_decay_amount", "themes.py, numeric/layout.py"),
     ("theme_spread_amount", "themes.py, numeric/layout.py"),
     ("top_down_slipnodes", "runner.py, update_cycle.py"),
+    ("unlisted_clamp_jootsing_factor", "jootsing.py (a clamp type the table lacks)"),
     ("update_cycle_length", "runner.py, slipnet.py, run_service.py, parallel"),
     ("verbatim_rule_probability", "codelet body rule-scout"),
     ("workspace_activation", "themes.py, numeric/layout.py"),
@@ -303,19 +315,61 @@ REQUIRED_FORMULA_COEFFICIENTS: tuple[tuple[str, str], ...] = (
     ("coderack_removal_penalty_offset", "coderack.py"),
 )
 
-#: Engine parameters whose value is the name of an urgency level, which must exist.
-LEVEL_NAMING_PARAMETERS: tuple[str, ...] = (
-    "initial_codelet_urgency",  # runner.py: the opening batch
-    "bridge_recruit_urgency_level",  # bridges.py: the bridge-recruiting codelet
-)
+@functools.lru_cache(maxsize=512)
+def _tiers_read_by(source: str) -> tuple[str, ...]:
+    """The tiers named by ``get_urgency('x')`` calls in one body's source (cached: a body is
+    parsed once however often a configuration is checked)."""
+    try:
+        tree = ast.parse(source or "")
+    except SyntaxError:
+        return ()
+    found: list[str] = []
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "get_urgency"
+            and node.args
+            and isinstance(node.args[0], ast.Constant)
+            and isinstance(node.args[0].value, str)
+            and node.args[0].value not in found
+        ):
+            found.append(node.args[0].value)
+    return tuple(found)
 
-#: Urgency levels read by ``meta.get_urgency`` with a literal name, and where.
-REQUIRED_URGENCY_LEVELS: tuple[tuple[str, str], ...] = (
-    ("extremely_high", "codelet bodies rule-builder, thematic-bridge-scout, jootser"),
-    ("high", "codelet bodies rule-scout, rule-evaluator"),
-    ("low", "posting.py (a rule naming no tier), runner.py, codelet body rule-scout"),
-    ("very_high", "codelet body thematic-bridge-scout"),
-    ("very_low", "run_service.py, trace.py (the rule-codelet clamp's background)"),
+
+def urgency_levels_read_by_bodies(bodies: Iterable[tuple[str, str]]) -> dict[str, list[str]]:
+    """``{tier: [codelet type, ...]}`` for every tier a codelet body reads by a literal name
+    (``meta.get_urgency('low')``), from ``(codelet type, body source)`` pairs.
+
+    The configuration's own code names its tiers, so the run-start check derives the names from
+    the bodies in force and no list of them stands in the engine.  A body that does not parse is
+    left to fail when it runs."""
+    named: dict[str, list[str]] = {}
+    for codelet_type, source in bodies:
+        for tier in _tiers_read_by(source or ""):
+            users = named.setdefault(tier, [])
+            if codelet_type not in users:
+                users.append(codelet_type)
+    return named
+
+
+#: Vocabulary roles (``roles.VOCABULARY``) the engine cannot run without, and why.  Every
+#: other role may be unbound: the concept is then absent, as an absent node is, and a
+#: comparison against its ``AbsentName`` is simply false.
+REQUIRED_VOCABULARY_ROLES: tuple[tuple[str, str], ...] = (
+    tuple(
+        (spec.name, "the Trace records events of this type, under the name the run's vocabulary gives it")
+        for spec in VOCABULARY
+        if spec.name.startswith("event_type.")
+    )
+    + (
+        ("proposal_level.proposed", "a structure is made at this level"),
+        ("proposal_level.built", "a structure is built when it reaches this level"),
+        ("posting_direction.bottom_up", "the bottom-up posting loop"),
+        ("posting_direction.top_down", "the top-down posting loop"),
+        ("posting_direction.thematic", "the thematic posting loop"),
+    )
 )
 
 
@@ -360,10 +414,15 @@ def check_run_start(meta: Any) -> tuple[StartProblem, ...]:
             problems.append(StartProblem("I-1", "formula coefficient", name, where))
 
     levels = meta.urgency_levels
-    for name, where in REQUIRED_URGENCY_LEVELS:
+    named_by_bodies = urgency_levels_read_by_bodies(
+        (spec.name, spec.execute_body) for spec in meta.codelet_specs.values()
+    )
+    for name, users in named_by_bodies.items():
         if name not in levels:
-            problems.append(StartProblem("I-1", "urgency level", name, where))
-    for parameter in LEVEL_NAMING_PARAMETERS:
+            problems.append(StartProblem(
+                "I-1", "urgency level", name,
+                ("codelet body " if len(users) == 1 else "codelet bodies ") + ", ".join(users)))
+    for parameter in meta.params_referring_to("urgency_level"):
         level = meta.get_param(parameter)
         if level is not None and level not in levels:
             problems.append(StartProblem("I-1", "urgency level", level, parameter))
@@ -373,12 +432,23 @@ def check_run_start(meta: Any) -> tuple[StartProblem, ...]:
                 StartProblem("I-1", "urgency level", rule.urgency_level,
                              f"posting rule '{rule.rule_key or rule.codelet_type}'")
             )
+    for clamp_type in meta.clamp_types:
+        level = clamp_type.codelet_background_level
+        if level is not None and level not in levels:
+            problems.append(
+                StartProblem("I-1", "urgency level", level, f"clamp type '{clamp_type.name}'")
+            )
     for pattern, entries in meta.codelet_patterns.items():
         for _codelet_type, level in entries:
             if level not in levels:
                 problems.append(
                     StartProblem("I-1", "urgency level", level, f"codelet pattern '{pattern}'")
                 )
+
+    bound = {b.role for b in meta.vocabulary_bindings}
+    for role_name, where in REQUIRED_VOCABULARY_ROLES:
+        if role_name not in bound:
+            problems.append(StartProblem("I-1", "vocabulary role", role_name, where))
 
     opening_types = meta.get_param("initial_codelet_types") or []
     if not any(t in meta.codelet_specs for t in opening_types) and not meta.posting_rules:

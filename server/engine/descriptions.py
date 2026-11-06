@@ -10,11 +10,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from server.engine.themes import (
-    THEME_BOTTOM_BRIDGE,
-    THEME_TOP_BRIDGE,
-    THEME_VERTICAL_BRIDGE,
-)
 from server.engine.run_binding import constants
 from server.engine.workspace_structures import WorkspaceStructure
 
@@ -144,23 +139,29 @@ class Description(WorkspaceStructure):
         told the mode at ``init_mcat``, rather than stored: a description outlives the
         moment it was made and the mode belongs to the run.
         """
+        voc = constants().vocab
+        top, vertical, bottom = (
+            voc.theme_type_top_bridge,
+            voc.theme_type_vertical_bridge,
+            voc.theme_type_bottom_bridge,
+        )
         role = getattr(getattr(self.object, "string", None), "string_type", None)
-        if role == "initial":
-            return [THEME_TOP_BRIDGE, THEME_VERTICAL_BRIDGE]
-        if role == "modified":
-            return [THEME_TOP_BRIDGE]
-        if role == "target":
+        if role == voc.string_kind_initial:
+            return [top, vertical]
+        if role == voc.string_kind_modified:
+            return [top]
+        if role == voc.string_kind_target:
             themespace = WorkspaceStructure.get_themespace()
             justify = bool(
                 themespace is not None
-                and THEME_BOTTOM_BRIDGE in themespace.possible_theme_types
+                and bottom in themespace.possible_theme_types
             )
             if justify:
-                return [THEME_VERTICAL_BRIDGE, THEME_BOTTOM_BRIDGE]
-            return [THEME_VERTICAL_BRIDGE]
-        if role == "answer":
-            return [THEME_BOTTOM_BRIDGE]
-        return [THEME_TOP_BRIDGE, THEME_VERTICAL_BRIDGE, THEME_BOTTOM_BRIDGE]
+                return [vertical, bottom]
+            return [vertical]
+        if role == voc.string_kind_answer:
+            return [bottom]
+        return [top, vertical, bottom]
 
     def get_thematic_compatibility(self) -> float:
         """Max support from active themes sharing this description's dimension.

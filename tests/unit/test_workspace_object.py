@@ -16,6 +16,7 @@ from server.engine.slipnet import SlipnetNode
 
 from tests.unit._fakes import FakeNode, FakeString
 from tests.support.standard_configuration import make_node
+from tests.support import standard_names
 
 
 class _FakeSlipnet:
@@ -359,7 +360,7 @@ def _string_with_rr_group():
         objects=[string.objects[1], string.objects[2]],
         bonds=[],
     )
-    rr.proposal_level = Group.BUILT
+    rr.proposal_level = standard_names.BUILT
     string.add_group(rr)
     return string, rr
 

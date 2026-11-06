@@ -38,6 +38,7 @@ from server.engine.rules import (
 )
 from server.engine.runner import EngineRunner
 from server.engine.workspace_objects import distinguishing_descriptor
+from tests.support import standard_names
 
 # Every test here reaches the numeric seam through ``init_mcat``'s first
 # ``update-workspace-values``, so each runs once per backend. See tests/conftest.py.
@@ -166,7 +167,7 @@ def test_letter_category_names_a_letter_but_not_a_successor_group(meta):
         objects=list(letters),
         bonds=[],
     )
-    succ_group.proposal_level = succ_group.BUILT
+    succ_group.proposal_level = standard_names.BUILT
     from server.engine.descriptions import Description
 
     succ_group.add_description(Description(succ_group, letcat, node["plato-a"]))

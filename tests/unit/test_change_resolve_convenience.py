@@ -364,13 +364,19 @@ def test_removing_a_link_posting_rule_theme_relation_or_layout_row_cascades_noth
     for op in (
         {"op": "remove_link", "key": {"from_node": "plato-a", "to_node": "plato-b", "link_type": "lateral", "label_node": "plato-successor"}},
         {"op": "remove_posting_rule", "rule_key": "rule-scout"},
-        dele("theme_relations", {"name": "identity"}),
         dele("slipnet_layout", {"node_name": "plato-a"}),
         dele("theme_dimension_defs", {"slipnet_node": "plato-letter-category"}),
         dele("slipnet_node_roles", {"role": "dimension.length", "ordinal": 0}),
     ):
         ops, report = run(cfg, op)
         assert len(ops) == 1 and report["cascaded"] == [] and report["dangling"] == [], op
+
+    # A theme relation the engine's vocabulary binds (``theme_relation.identity``) is unbound
+    # first, like every bound row (``role_bound``); then deleting it cascades nothing.
+    unbound_ops, _ = run(cfg, upd("theme_relations", {"name": "identity"}, role=None))
+    unbound = cd.apply_resolved(cfg, unbound_ops)
+    ops, report = run(unbound, dele("theme_relations", {"name": "identity"}))
+    assert len(ops) == 1 and report["cascaded"] == [] and report["dangling"] == []
 
 
 def test_remove_node_splice_joins_the_neighbours_by_the_named_relation(cfg):

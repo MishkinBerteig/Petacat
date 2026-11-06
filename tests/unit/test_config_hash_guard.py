@@ -33,7 +33,7 @@ def meta():
 
 
 def test_the_exclusion_set_is_exactly_the_decided_one():
-    assert HASH_EXCLUDED_FIELDS == {"demo_problems", "slipnet_layout", "enum_values"}
+    assert HASH_EXCLUDED_FIELDS == {"demo_problems", "slipnet_layout"}
 
 
 def test_every_provider_field_is_hashed_or_excluded(meta):

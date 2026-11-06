@@ -15,7 +15,8 @@ import os
 import pytest
 
 from server.engine.bonds import Bond
-from server.engine.bridges import BRIDGE_VERTICAL, Bridge
+from server.engine.bridges import Bridge
+from tests.support.standard_names import BRIDGE_VERTICAL
 from server.engine.codelet_dsl.builtins import build_structure, get_builtins
 from server.engine.codelet_dsl.interpreter import CodeletInterpreter, CodeletRegistry
 from server.engine.concept_mappings import ConceptMapping
@@ -24,11 +25,9 @@ from server.engine.groups import Group
 from server.engine.metadata import MetadataProvider
 from server.engine.rng import RNG
 from server.engine.runner import EngineRunner
-from server.engine.themes import (
-    THEME_VERTICAL_BRIDGE,
-    look_for_auxiliary_slippages,
-    pick_theme_conjunction,
-)
+from server.engine.themes import look_for_auxiliary_slippages, pick_theme_conjunction
+from tests.support.standard_names import THEME_VERTICAL_BRIDGE
+from tests.support import standard_names
 
 # Every test here executes arithmetic the numeric substrate owns, so each one runs
 # once per backend in the matrix. See tests/conftest.py.
@@ -113,7 +112,7 @@ def _build_whole_string_group(ctx, string, category: str, direction: str):
             right.letter_category,
             node[f"plato-{direction}"],
         )
-        bond.proposal_level = bond.BUILT
+        bond.proposal_level = standard_names.BUILT
         string.add_bond(bond)
         bonds.append(bond)
     group = Group(
@@ -124,7 +123,7 @@ def _build_whole_string_group(ctx, string, category: str, direction: str):
         objects=list(letters),
         bonds=bonds,
     )
-    group.proposal_level = group.BUILT
+    group.proposal_level = standard_names.BUILT
     string.add_group(group)
     return group
 
@@ -433,7 +432,7 @@ def test_coattail_slippage_is_added_once_both_ends_can_be_described(meta):
         description = Description(
             obj, node["plato-alphabetic-position-category"], descriptor
         )
-        description.proposal_level = description.BUILT
+        description.proposal_level = standard_names.BUILT
         obj.descriptions.append(description)
 
     assert look_for_auxiliary_slippages(bridge, ctx.slipnet, _AlwaysRNG(1)) is None

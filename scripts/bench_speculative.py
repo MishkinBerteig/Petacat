@@ -110,7 +110,7 @@ def main() -> None:
             for s in p["seeds"]:
                 t = s["spec"][str(w)]["telemetry"]
                 spec_n = max(1, t["speculated"])
-                ab.append((t["aborted_conflict"] + t["aborted_step"] + t["aborted_exception"]) / spec_n)
+                ab.append((t["aborted_write_conflict"] + t["aborted_step"] + t["aborted_exception"]) / spec_n)
         summary[str(w)] = {"median_speedup_vs_ssr": statistics.median(sp),
                            "median_abort_rate": statistics.median(ab)}
     out["summary"] = summary

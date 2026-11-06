@@ -955,7 +955,10 @@ async def test_admin_list_enum_tables(app_client):
     resp = await app_client.get("/api/admin/enums")
     assert resp.status_code == 200
     data = resp.json()
-    assert len(data["tables"]) == 13
+    # Every enum table of the registry: the 13 of the first vocabulary and the 5 stage 4 added.
+    from server.services.config_registry import ENUM_REGISTRY
+
+    assert sorted(data["tables"]) == sorted(ENUM_REGISTRY) and len(data["tables"]) == 18
     assert "run_statuses" in data["tables"]
     assert "event_types" in data["tables"]
 
@@ -978,8 +981,8 @@ async def test_admin_enum_values_event_types(app_client):
     assert resp.status_code == 200
     data = resp.json()
     # 15: the 14 types the engine records plus concept_activation, one of the seven
-    # Temporal Trace event types of §4.4.  trace_events.event_type is a foreign
-    # key onto this table, so every type the engine emits must appear here.
+    # Temporal Trace event types of §4.4.  Every type the engine emits has a role, and
+    # a row here.
     assert len(data) == 15
     names = {v["name"] for v in data}
     assert "bond_built" in names

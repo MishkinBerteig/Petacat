@@ -31,7 +31,8 @@ def _next_after_last(table_name: str, column_name: str = "sort_order"):
 
 
 # ──────────────────────────────────────────────────────────────────
-# Enum lookup tables (13 tables, all share the same schema pattern)
+# Enum lookup tables (18 tables; all have name, display_label, sort_order and description,
+# and some add columns: a role, a behaviour, a clamp type's factors ...)
 # ──────────────────────────────────────────────────────────────────
 
 class RunStatusDef(Base):
@@ -47,6 +48,9 @@ class EventTypeDef(Base):
     display_label = Column(Text, nullable=False)
     sort_order = Column(Integer, nullable=False, default=0)
     description = Column(Text, default="")
+    #: The engine's name for the concept this row plays (``server/engine/roles.py``,
+    #: ``VOCABULARY``), or NULL for a row the engine does not name.  Unique within the table.
+    role = Column(Text, nullable=True, unique=True)
 
 class BridgeTypeDef(Base):
     __tablename__ = "bridge_types"
@@ -54,6 +58,9 @@ class BridgeTypeDef(Base):
     display_label = Column(Text, nullable=False)
     sort_order = Column(Integer, nullable=False, default=0)
     description = Column(Text, default="")
+    #: The engine's name for the concept this row plays (``server/engine/roles.py``,
+    #: ``VOCABULARY``), or NULL for a row the engine does not name.  Unique within the table.
+    role = Column(Text, nullable=True, unique=True)
 
 class BridgeOrientationDef(Base):
     __tablename__ = "bridge_orientations"
@@ -61,6 +68,9 @@ class BridgeOrientationDef(Base):
     display_label = Column(Text, nullable=False)
     sort_order = Column(Integer, nullable=False, default=0)
     description = Column(Text, default="")
+    #: The engine's name for the concept this row plays (``server/engine/roles.py``,
+    #: ``VOCABULARY``), or NULL for a row the engine does not name.  Unique within the table.
+    role = Column(Text, nullable=True, unique=True)
 
 class ClauseTypeDef(Base):
     __tablename__ = "clause_types"
@@ -68,6 +78,9 @@ class ClauseTypeDef(Base):
     display_label = Column(Text, nullable=False)
     sort_order = Column(Integer, nullable=False, default=0)
     description = Column(Text, default="")
+    #: The engine's name for the concept this row plays (``server/engine/roles.py``,
+    #: ``VOCABULARY``), or NULL for a row the engine does not name.  Unique within the table.
+    role = Column(Text, nullable=True, unique=True)
 
 class RuleTypeDef(Base):
     __tablename__ = "rule_types"
@@ -75,6 +88,9 @@ class RuleTypeDef(Base):
     display_label = Column(Text, nullable=False)
     sort_order = Column(Integer, nullable=False, default=0)
     description = Column(Text, default="")
+    #: The engine's name for the concept this row plays (``server/engine/roles.py``,
+    #: ``VOCABULARY``), or NULL for a row the engine does not name.  Unique within the table.
+    role = Column(Text, nullable=True, unique=True)
 
 class ThemeTypeDef(Base):
     __tablename__ = "theme_types"
@@ -82,6 +98,9 @@ class ThemeTypeDef(Base):
     display_label = Column(Text, nullable=False)
     sort_order = Column(Integer, nullable=False, default=0)
     description = Column(Text, default="")
+    #: The engine's name for the concept this row plays (``server/engine/roles.py``,
+    #: ``VOCABULARY``), or NULL for a row the engine does not name.  Unique within the table.
+    role = Column(Text, nullable=True, unique=True)
 
 class ProposalLevelDef(Base):
     __tablename__ = "proposal_levels"
@@ -89,6 +108,9 @@ class ProposalLevelDef(Base):
     display_label = Column(Text, nullable=False)
     sort_order = Column(Integer, nullable=False, default=0)
     description = Column(Text, default="")
+    #: The engine's name for the concept this row plays (``server/engine/roles.py``,
+    #: ``VOCABULARY``), or NULL for a row the engine does not name.  Unique within the table.
+    role = Column(Text, nullable=True, unique=True)
 
 class LinkTypeDef(Base):
     __tablename__ = "link_types"
@@ -96,6 +118,11 @@ class LinkTypeDef(Base):
     display_label = Column(Text, nullable=False)
     sort_order = Column(Integer, nullable=False, default=0)
     description = Column(Text, default="")
+    #: What the engine does with a link of this type: ``category``, ``instance``,
+    #: ``property``, ``lateral`` or ``slip`` (``server/engine/roles.py``,
+    #: ``LINK_BEHAVIOURS``).  Which type has which behaviour is configuration; the engine
+    #: names behaviours and never a link type.  NULL gives a link no behaviour.
+    behaviour = Column(Text, nullable=True)
 
 class CodeletFamilyDef(Base):
     __tablename__ = "codelet_families"
@@ -103,6 +130,10 @@ class CodeletFamilyDef(Base):
     display_label = Column(Text, nullable=False)
     sort_order = Column(Integer, nullable=False, default=0)
     description = Column(Text, default="")
+    #: A codelet of this family runs alone under the free-running executor (the meta and
+    #: answer codelets read and rewrite the whole Workspace), where the others run beside
+    #: one another.  Read by ``parallel/free_running.py``.
+    serialised = Column(Boolean, nullable=False, default=False)
 
 class CodeletPhaseDef(Base):
     __tablename__ = "codelet_phases"
@@ -117,6 +148,9 @@ class PostingDirectionDef(Base):
     display_label = Column(Text, nullable=False)
     sort_order = Column(Integer, nullable=False, default=0)
     description = Column(Text, default="")
+    #: The engine's name for the concept this row plays (``server/engine/roles.py``,
+    #: ``VOCABULARY``), or NULL for a row the engine does not name.  Unique within the table.
+    role = Column(Text, nullable=True, unique=True)
 
 class ParamValueTypeDef(Base):
     __tablename__ = "param_value_types"
@@ -124,6 +158,80 @@ class ParamValueTypeDef(Base):
     display_label = Column(Text, nullable=False)
     sort_order = Column(Integer, nullable=False, default=0)
     description = Column(Text, default="")
+
+
+class StringKindDef(Base):
+    """The kinds of string a problem has (initial, modified, target, answer)."""
+    __tablename__ = "string_kinds"
+    name = Column(Text, primary_key=True)
+    display_label = Column(Text, nullable=False)
+    sort_order = Column(Integer, nullable=False, default=0)
+    description = Column(Text, default="")
+    #: The engine's name for the concept this row plays (``server/engine/roles.py``,
+    #: ``VOCABULARY``), or NULL for a row the engine does not name.  Unique within the table.
+    role = Column(Text, nullable=True, unique=True)
+
+class RuleScopeDef(Base):
+    """The scope a rule's clause applies to (the object itself, or its subobjects)."""
+    __tablename__ = "rule_scopes"
+    name = Column(Text, primary_key=True)
+    display_label = Column(Text, nullable=False)
+    sort_order = Column(Integer, nullable=False, default=0)
+    description = Column(Text, default="")
+    #: The engine's name for the concept this row plays (``server/engine/roles.py``,
+    #: ``VOCABULARY``), or NULL for a row the engine does not name.  Unique within the table.
+    role = Column(Text, nullable=True, unique=True)
+
+class FailureKindDef(Base):
+    """The kinds of failure a snag reports (swap, conflict, change)."""
+    __tablename__ = "failure_kinds"
+    name = Column(Text, primary_key=True)
+    display_label = Column(Text, nullable=False)
+    sort_order = Column(Integer, nullable=False, default=0)
+    description = Column(Text, default="")
+    #: The engine's name for the concept this row plays (``server/engine/roles.py``,
+    #: ``VOCABULARY``), or NULL for a row the engine does not name.  Unique within the table.
+    role = Column(Text, nullable=True, unique=True)
+
+class ClampTypeDef(Base):
+    """A kind of clamp, and what it holds the Coderack to.
+
+    The name is the engine's ``clamp_type`` string; ``role`` names which of the engine's
+    four clamp concepts the row is.  ``codelet_background_level`` names the tier of
+    ``urgency_levels`` the clamp holds the rest of the Coderack against (NULL: none),
+    ``jootsing_factor`` is the factor the jootsing probability takes for a clamp of this
+    type, ``progress_focus`` names a row of ``progress_focuses`` and ``codelet_patterns`` lists the
+    codelet patterns the clamp clamps.
+    """
+    __tablename__ = "clamp_types"
+    name = Column(Text, primary_key=True)
+    display_label = Column(Text, nullable=False)
+    sort_order = Column(Integer, nullable=False, default=0)
+    description = Column(Text, default="")
+    #: The engine's name for the concept this row plays (``server/engine/roles.py``,
+    #: ``VOCABULARY``), or NULL for a row the engine does not name.  Unique within the table.
+    role = Column(Text, nullable=True, unique=True)
+    codelet_background_level = Column(Text, nullable=True)
+    jootsing_factor = Column(Float, nullable=True)
+    #: The factor applies only while the clamp is still the newest event of the Trace (the
+    #: justify clamp: ``jootsing.ss:135-139``); otherwise the factor is 0.
+    jootsing_only_when_latest = Column(Boolean, nullable=False, default=False)
+    progress_focus = Column(Text, nullable=True)
+    #: The codelet patterns (names in ``codelet_pattern_defs``) a clamp of this type clamps, as a
+    #: list: a justify clamp clamps two, a rule-codelet clamp one, a manual clamp none (a person
+    #: names the pattern when making it).
+    codelet_patterns = Column(JSON, nullable=False, default=list)
+
+
+class ProgressFocusDef(Base):
+    """A progress focus: which trace event types count as progress for a clamp."""
+    __tablename__ = "progress_focuses"
+    name = Column(Text, primary_key=True)
+    display_label = Column(Text, nullable=False)
+    sort_order = Column(Integer, nullable=False, default=0)
+    description = Column(Text, default="")
+    #: The event types (names of ``event_types``) that count as progress, as a list.
+    event_types = Column(JSON, nullable=False, default=list)
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -229,6 +337,13 @@ class EngineParam(Base):
     #: The seed file's key order (parameters are looked up by name, but the database keeps
     #: the order so that it loses nothing the file says).
     sort_order = Column(Integer, nullable=False, default=_next_after_last("engine_params"))
+    #: What the value's names refer to, so a change that renames or removes the thing
+    #: updates the parameter with it: ``node_list`` (a list of Slipnet node names),
+    #: ``trigger_node_list`` (a node list that is also the union of the posting rules'
+    #: triggering nodes), ``node_map`` (a map keyed by node name), ``codelet_type_list`` (a list
+    #: of codelet type names), ``urgency_level`` (the name of an urgency level) or NULL (the
+    #: value names nothing).  Declared in ``seed_data/engine_param_refs.json``.
+    refers_to = Column(Text, nullable=True)
 
 
 class UrgencyLevel(Base):
@@ -419,6 +534,8 @@ class ThemeRelation(Base):
     )
     abstractness = Column(Integer, nullable=True)
     description = Column(Text, default="")
+    #: The engine's name for the relation (``relation.opposite`` ...), or NULL.  Unique.
+    role = Column(Text, nullable=True, unique=True)
 
 
 class HelpTopic(Base):

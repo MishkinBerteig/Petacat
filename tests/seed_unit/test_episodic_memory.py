@@ -25,7 +25,27 @@ ALPHABETIC = "plato-alphabetic-position-category"
 BOND_FACET = "plato-bond-facet"
 
 
+def _signatures_of(themes, top_rule):
+    """The two rule signatures an answer with these themes and this top rule carries.
+
+    Every answer the engine makes has both (ruling 35), and two answers are the same answer only
+    when their problems and both rules' signatures are equal (``answers_equal``).  The helper
+    answers differ in their themes, so the signatures must differ with them, or a past answer
+    and a query that differ only in their themes would be one answer and never remind.  The
+    *top* rule is the same intrinsic clause throughout (the top rule's description, which these tests
+    vary, is carried by the bottom signature's letters too), so ``calculate-answer-distance``'s top
+    rule term is zero and the distances these tests assert stay those of the themes.  The
+    *bottom* rule, which has no term in the distance (``memory.ss:558-559``), is the one that
+    carries the difference: a verbatim clause whose letters spell the themes.
+    """
+    spelled = "".join(
+        chr(ord("a") + (sum(map(ord, f"{dim}={val}")) % 26)) for dim, val in sorted(themes.items())
+    ) + top_rule
+    return _rule(), [["verbatim", [f"plato-{c}" for c in spelled if c.isalpha()] or ["plato-a"]]]
+
+
 def _answer(themes, *, quality=80.0, top_rule="top-rule"):
+    top_signature, bottom_signature = _signatures_of(themes, top_rule)
     return AnswerDescription(
         problem=("abc", "abd", "xyz", "xyd"),
         top_rule_description=top_rule,
@@ -36,6 +56,8 @@ def _answer(themes, *, quality=80.0, top_rule="top-rule"):
         temperature=0.0,
         themes=themes,
         unjustified_slippages=[],
+        top_rule_signature=top_signature,
+        bottom_rule_signature=bottom_signature,
     )
 
 
@@ -564,7 +586,8 @@ def nodes():
 
 def _real_rule(nodes, position="plato-rightmost", relation="plato-successor"):
     """A real one-clause rule: "change letter-category of the <position> letter by <r>"."""
-    from server.engine.rules import CLAUSE_INTRINSIC, RULE_TOP, Rule, RuleChange, RuleClause
+    from server.engine.rules import Rule, RuleChange, RuleClause
+    from tests.support.standard_names import CLAUSE_INTRINSIC, RULE_TOP
 
     clause = RuleClause(
         clause_type=CLAUSE_INTRINSIC,
@@ -584,7 +607,8 @@ def _real_rule(nodes, position="plato-rightmost", relation="plato-successor"):
 
 def _changeless_rule(nodes, position="plato-rightmost"):
     """A clause with no changes: it has nothing to say in English at all."""
-    from server.engine.rules import CLAUSE_INTRINSIC, RULE_TOP, Rule, RuleClause
+    from server.engine.rules import Rule, RuleClause
+    from tests.support.standard_names import CLAUSE_INTRINSIC, RULE_TOP
 
     clause = RuleClause(
         clause_type=CLAUSE_INTRINSIC,
@@ -604,7 +628,8 @@ def _same_prose_rule(nodes, position, description_type):
     The English never mentions the description type, only the descriptor, so these
     read alike whichever type is given.
     """
-    from server.engine.rules import CLAUSE_INTRINSIC, RULE_TOP, Rule, RuleChange, RuleClause
+    from server.engine.rules import Rule, RuleChange, RuleClause
+    from tests.support.standard_names import CLAUSE_INTRINSIC, RULE_TOP
 
     clause = RuleClause(
         clause_type=CLAUSE_INTRINSIC,

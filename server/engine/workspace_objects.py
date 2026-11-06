@@ -9,7 +9,7 @@ from fractions import Fraction
 from typing import TYPE_CHECKING, Any
 
 from server.engine.ids import KIND_OBJECT, next_id
-from server.engine.run_binding import constants, exact_fraction
+from server.engine.run_binding import constants, exact_fraction, vocab as run_vocab
 
 if TYPE_CHECKING:
     from server.engine.descriptions import Description
@@ -59,9 +59,13 @@ class WorkspaceObject:
         # 69-78) and only becomes non-zero at the next update cycle, so a
         # just-built group has weight 0 in choose-object until then.
         self.intra_string_unhappiness: float = 0.0
+        # Keyed by the run's orientation names (``vocabulary.bridge_orientation_*``); the
+        # string holds them as ``orientation_horizontal`` / ``orientation_vertical`` for the
+        # per-cycle updates.
+        voc = run_vocab()
         self.inter_string_unhappiness: dict[str, float] = {
-            "horizontal": 0.0,
-            "vertical": 0.0,
+            voc.bridge_orientation_horizontal: 0.0,
+            voc.bridge_orientation_vertical: 0.0,
         }
         self.average_unhappiness: float = 0.0
         self.salience: dict[str, float] = {
@@ -430,13 +434,15 @@ class WorkspaceObject:
     def mapped(self, bridge_type: str) -> bool:
         """Has a bridge of the given orientation?
 
-        *bridge_type* is ``"horizontal"``, ``"vertical"``, or ``"both"``.
+        *bridge_type* is an orientation name of the run's vocabulary
+        (``bridge_orientation_horizontal`` or ``..._vertical``), or ``"both"`` (the engine's own).
 
         Scheme: workspace-objects.ss:179-183.
         """
-        if bridge_type == "vertical":
+        voc = run_vocab()
+        if bridge_type == voc.bridge_orientation_vertical:
             return self.vertical_bridge is not None
-        if bridge_type == "horizontal":
+        if bridge_type == voc.bridge_orientation_horizontal:
             return self.horizontal_bridge is not None
         if bridge_type == "both":
             return (self.horizontal_bridge is not None
@@ -566,22 +572,17 @@ class WorkspaceObject:
 
         Scheme: workspace-objects.ss:457-489.
         """
-        h_weakness = self._bridge_weakness("horizontal")
-        v_weakness = self._bridge_weakness("vertical")
+        h_weakness = self._bridge_weakness(True)
+        v_weakness = self._bridge_weakness(False)
 
-        stype = self._string_type()
-        if stype == "initial":
-            self.inter_string_unhappiness["horizontal"] = h_weakness
-            self.inter_string_unhappiness["vertical"] = v_weakness
-        elif stype == "modified":
-            self.inter_string_unhappiness["horizontal"] = h_weakness
-        elif stype == "target":
-            self.inter_string_unhappiness["vertical"] = v_weakness
-            # In justify mode, target also has horizontal bridges
-            if self._justify_mode():
-                self.inter_string_unhappiness["horizontal"] = h_weakness
-        elif stype == "answer":
-            self.inter_string_unhappiness["horizontal"] = h_weakness
+        # The string answers from the facts it computed at creation (``WorkspaceString``):
+        # an initial string maps both ways, a modified or answer string horizontally, a target
+        # string vertically and, when justifying, horizontally too.
+        string = self.string
+        if string.maps_horizontal or (string.horizontal_needs_justify and self._justify_mode()):
+            self.inter_string_unhappiness[string.orientation_horizontal] = h_weakness
+        if string.maps_vertical:
+            self.inter_string_unhappiness[string.orientation_vertical] = v_weakness
 
     def update_average_unhappiness(self) -> None:
         """Combine intra and inter-string unhappiness.
@@ -589,20 +590,18 @@ class WorkspaceObject:
         Scheme: workspace-objects.ss:492-517.
         """
         intra = self.intra_string_unhappiness
-        h = self.inter_string_unhappiness["horizontal"]
-        v = self.inter_string_unhappiness["vertical"]
+        string = self.string
+        h = self.inter_string_unhappiness[string.orientation_horizontal]
+        v = self.inter_string_unhappiness[string.orientation_vertical]
 
-        stype = self._string_type()
-        if stype == "initial":
-            self.average_unhappiness = round(_average(intra, h, v))
-        elif stype == "modified":
-            self.average_unhappiness = round(_average(intra, h))
-        elif stype == "target":
-            if self._justify_mode():
+        if string.maps_vertical:
+            if string.maps_horizontal:
+                self.average_unhappiness = round(_average(intra, h, v))
+            elif string.horizontal_needs_justify and self._justify_mode():
                 self.average_unhappiness = round(_average(intra, v, h))
             else:
                 self.average_unhappiness = round(_average(intra, v))
-        elif stype == "answer":
+        elif string.maps_horizontal:
             self.average_unhappiness = round(_average(intra, h))
         else:
             self.average_unhappiness = round(intra)
@@ -650,24 +649,17 @@ class WorkspaceObject:
             self.salience["vertical_inter"] = clamped
             return
 
-        h = self.inter_string_unhappiness["horizontal"]
-        v = self.inter_string_unhappiness["vertical"]
+        string = self.string
+        h = self.inter_string_unhappiness[string.orientation_horizontal]
+        v = self.inter_string_unhappiness[string.orientation_vertical]
         ri = self.relative_importance
         w = constants().salience
         wu, wi, total = w.inter_unhappiness, w.inter_importance, w.inter_total
 
-        stype = self._string_type()
-        if stype == "initial":
+        if string.maps_horizontal or (string.horizontal_needs_justify and self._justify_mode()):
             self.salience["horizontal_inter"] = round((wu * h + wi * ri) / total)
+        if string.maps_vertical:
             self.salience["vertical_inter"] = round((wu * v + wi * ri) / total)
-        elif stype == "modified":
-            self.salience["horizontal_inter"] = round((wu * h + wi * ri) / total)
-        elif stype == "target":
-            self.salience["vertical_inter"] = round((wu * v + wi * ri) / total)
-            if self._justify_mode():
-                self.salience["horizontal_inter"] = round((wu * h + wi * ri) / total)
-        elif stype == "answer":
-            self.salience["horizontal_inter"] = round((wu * h + wi * ri) / total)
 
     def update_average_salience(self) -> None:
         """Combine intra and inter-string salience.
@@ -678,17 +670,15 @@ class WorkspaceObject:
         h = self.salience["horizontal_inter"]
         v = self.salience["vertical_inter"]
 
-        stype = self._string_type()
-        if stype == "initial":
-            self.salience["average"] = round(_average(intra, h, v))
-        elif stype == "modified":
-            self.salience["average"] = round(_average(intra, h))
-        elif stype == "target":
-            if self._justify_mode():
+        string = self.string
+        if string.maps_vertical:
+            if string.maps_horizontal:
+                self.salience["average"] = round(_average(intra, h, v))
+            elif string.horizontal_needs_justify and self._justify_mode():
                 self.salience["average"] = round(_average(intra, v, h))
             else:
                 self.salience["average"] = round(_average(intra, v))
-        elif stype == "answer":
+        elif string.maps_horizontal:
             self.salience["average"] = round(_average(intra, h))
         else:
             self.salience["average"] = round(intra)
@@ -722,8 +712,8 @@ class WorkspaceObject:
     # ------------------------------------------------------------------
 
     def _string_type(self) -> str:
-        """Return the string type name (initial/modified/target/answer)."""
-        return getattr(self.string, "string_type", "initial")
+        """Return the string-kind name (a ``string_kind_*`` name of the run's vocabulary)."""
+        return getattr(self.string, "string_type", None) or run_vocab().string_kind_initial
 
     def _justify_mode(self) -> bool:
         """Return True if the engine is in justify mode.
@@ -733,19 +723,18 @@ class WorkspaceObject:
         """
         return getattr(self.string, "justify_mode", False)
 
-    def _bridge_weakness(self, orientation: str) -> float:
+    def _bridge_weakness(self, horizontal: bool) -> float:
         """Compute bridge-based weakness for a given orientation.
 
         Scheme: workspace-objects.ss:459-477.
         """
-        bridge = (self.horizontal_bridge if orientation == "horizontal"
-                  else self.vertical_bridge)
+        bridge = self.horizontal_bridge if horizontal else self.vertical_bridge
         if bridge is not None:
             return 100.0 - getattr(bridge, "strength", 0)
         # Check enclosing group's bridge
         if self.enclosing_group is not None:
             eg_bridge = (getattr(self.enclosing_group, "horizontal_bridge", None)
-                         if orientation == "horizontal"
+                         if horizontal
                          else getattr(self.enclosing_group, "vertical_bridge", None))
             if eg_bridge is not None:
                 return 100.0 - constants().enclosed_group_bridge_factor * getattr(

@@ -27,10 +27,12 @@ probability half of each test — a structure that is nothing but a strength.
 """
 
 from server.engine.slipnet import Alphabet
+from tests.support.standard_configuration import standard_meta
 import pytest
 
 from server.engine.bonds import Bond
-from server.engine.bridges import BRIDGE_TOP, Bridge
+from server.engine.bridges import Bridge
+from tests.support.standard_names import BRIDGE_TOP
 from server.engine.codelet_dsl.builtins import (
     _get_incompatible_structures,
     _wins_fight,
@@ -41,10 +43,15 @@ from server.engine.workspace import WorkspaceString
 from server.engine.workspace_structures import WorkspaceStructure
 
 from tests.unit._fakes import FakeNode
+from tests.support import standard_names
 
 
 class _FakeMeta:
     """The two formula coefficients ``temp_adjusted_values`` reads."""
+
+    #: The Standard Configuration's vocabulary: the structures under test read their level names
+    #: and bridge types from ``meta.vocabulary``.
+    vocabulary = standard_meta().vocabulary
 
     def __init__(self, scale=30.0, base=0.5):
         self._coeffs = {"temp_exponent_scale": scale, "temp_exponent_base": base}
@@ -65,12 +72,22 @@ class _FakeTemperature:
 
 
 class _FakeWorkspace:
-    """Only the three bridge lists ``_get_bridges_of_type`` consults."""
+    """Only the three bridge lists, and the resolver ``bridges_of`` that ``Workspace`` puts over them."""
 
     def __init__(self, top_bridges=None):
         self.top_bridges = top_bridges if top_bridges is not None else []
         self.bottom_bridges = []
         self.vertical_bridges = []
+
+    def bridges_of(self, bridge_type):
+        voc = standard_meta().vocabulary
+        if bridge_type == voc.bridge_type_top:
+            return self.top_bridges
+        if bridge_type == voc.bridge_type_bottom:
+            return self.bottom_bridges
+        if bridge_type == voc.bridge_type_vertical:
+            return self.vertical_bridges
+        return []
 
 
 def _standard_slipnet():
@@ -158,7 +175,7 @@ def _group(objs, string, category, direction=None, bonds=None):
 
 
 def _built(structure):
-    structure.proposal_level = WorkspaceStructure.BUILT
+    structure.proposal_level = standard_names.BUILT
     return structure
 
 

@@ -6,6 +6,7 @@ provides via `pip install -e ".[dev]"`.
 """
 
 import pytest
+from tests.support import standard_names
 
 pytest.importorskip("sqlalchemy", reason="sqlalchemy not available locally")
 
@@ -28,39 +29,30 @@ def test_configuration_tables_exclude_runtime_tables_and_help_topics():
 
 
 def test_every_trace_event_type_the_engine_emits_is_declared():
-    """``trace_events.event_type`` is a foreign key onto ``event_types``.
+    """Every event type the engine records is a row of ``event_types``.
 
-    An event type added in code but not in ``enums.json`` makes persisting that
-    event fail with a foreign-key violation at runtime — which is how
-    ``concept_activation`` first showed up.
+    ``trace_events.event_type`` records the name the run gave the event (it is not a foreign key,
+    so a recorded trace survives a rename or removal), but the Admin view lists the event types
+    from ``enums.json``: an event type added in code and not there is a role bound to no row —
+    which is how ``concept_activation`` first showed up.
     """
     import json
     import os
 
-    from server.engine import trace as trace_module
+    from server.engine.metadata import MetadataProvider
+    from server.engine.roles import VOCABULARY
 
     seed_dir = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
     with open(os.path.join(seed_dir, "enums.json")) as f:
         declared = {row["name"] for row in json.load(f)["event_types"]}
 
-    emitted = {
-        value
-        for name, value in vars(trace_module).items()
-        if name.isupper() and isinstance(value, str) and not name.startswith("_")
-    }
-    # Only the event-type constants matter; they are exactly the ones the trace
-    # records, and each must have an enum row.
-    event_types = {
-        trace_module.BOND_BUILT, trace_module.BOND_BROKEN,
-        trace_module.GROUP_BUILT, trace_module.GROUP_BROKEN,
-        trace_module.BRIDGE_BUILT, trace_module.BRIDGE_BROKEN,
-        trace_module.RULE_BUILT, trace_module.RULE_BROKEN,
-        trace_module.DESCRIPTION_BUILT, trace_module.ANSWER_FOUND,
-        trace_module.SNAG, trace_module.CLAMP_START, trace_module.CLAMP_END,
-        trace_module.CONCEPT_MAPPING_BUILT, trace_module.CONCEPT_ACTIVATION,
-    }
-    assert event_types <= emitted  # sanity: we listed real constants
-    missing = event_types - declared
+    # The engine records the event types it has a role for (``event_type.*``); the
+    # configuration binds each to a row, and that row must exist in ``event_types``.
+    meta = MetadataProvider.from_standard_configuration(seed_dir)
+    roles = {s.name for s in VOCABULARY if s.name.startswith("event_type.")}
+    bound = {b.role: b.name for b in meta.vocabulary_bindings if b.role in roles}
+    assert set(bound) == roles, f"event-type roles bound to no row: {sorted(roles - set(bound))}"
+    missing = set(bound.values()) - declared
     assert not missing, f"event types missing from enums.json: {sorted(missing)}"
 
 

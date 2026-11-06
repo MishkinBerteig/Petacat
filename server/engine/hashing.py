@@ -69,8 +69,7 @@ def _digest(payload: Any) -> str:
 #:
 #: * ``demo_problems`` -- a catalogue of examples; editing one changes no run's thinking.
 #: * ``slipnet_layout`` -- where a node is drawn.
-#: * ``enum_values`` -- the engine's own vocabularies, mirrored from lookup tables.
-HASH_EXCLUDED_FIELDS = frozenset({"demo_problems", "slipnet_layout", "enum_values"})
+HASH_EXCLUDED_FIELDS = frozenset({"demo_problems", "slipnet_layout"})
 
 #: Part of every digest, so a hash of this scheme can never equal a hash of another.
 HASH_SCHEME = 2

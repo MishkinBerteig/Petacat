@@ -13,12 +13,7 @@ import math
 from typing import TYPE_CHECKING, Any
 
 from server.engine.slipnet import holds_role
-from server.engine.themes import (
-    THEME_BOTTOM_BRIDGE,
-    THEME_TOP_BRIDGE,
-    THEME_VERTICAL_BRIDGE,
-    relation_name_for_label,
-)
+from server.engine.themes import relation_name_for_label
 from server.engine.run_binding import constants
 from server.engine.workspace_structures import WorkspaceStructure
 from server.engine.concept_mappings import ConceptMapping
@@ -30,14 +25,6 @@ if TYPE_CHECKING:
     from server.engine.slipnet import SlipnetNode
     from server.engine.workspace_objects import WorkspaceObject
 
-# Bridge type string constants (values live in DB bridge_types table)
-BRIDGE_TOP = "top"
-BRIDGE_BOTTOM = "bottom"
-BRIDGE_VERTICAL = "vertical"
-
-# Bridge orientation string constants (values live in DB bridge_orientations table)
-ORIENTATION_HORIZONTAL = "horizontal"
-ORIENTATION_VERTICAL = "vertical"
 
 
 class Bridge(WorkspaceStructure):
@@ -80,13 +67,14 @@ class Bridge(WorkspaceStructure):
 
     @property
     def orientation(self) -> str:
-        if self.bridge_type in (BRIDGE_TOP, BRIDGE_BOTTOM):
-            return ORIENTATION_HORIZONTAL
-        return ORIENTATION_VERTICAL
+        v = constants().vocab
+        if self.bridge_type == v.bridge_type_top or self.bridge_type == v.bridge_type_bottom:
+            return v.bridge_orientation_horizontal
+        return v.bridge_orientation_vertical
 
     @property
     def is_horizontal(self) -> bool:
-        return self.orientation == ORIENTATION_HORIZONTAL
+        return self.orientation == constants().vocab.bridge_orientation_horizontal
 
     # ------------------------------------------------------------------
     # The three concept-mapping lists  (Scheme: bridges.ss:150-238)
@@ -388,10 +376,11 @@ class Bridge(WorkspaceStructure):
     @property
     def theme_type(self) -> str:
         """The Themespace theme type this bridge feeds."""
+        v = constants().vocab
         return {
-            BRIDGE_TOP: THEME_TOP_BRIDGE,
-            BRIDGE_BOTTOM: THEME_BOTTOM_BRIDGE,
-            BRIDGE_VERTICAL: THEME_VERTICAL_BRIDGE,
+            v.bridge_type_top: v.theme_type_top_bridge,
+            v.bridge_type_bottom: v.theme_type_bottom_bridge,
+            v.bridge_type_vertical: v.theme_type_vertical_bridge,
         }[self.bridge_type]
 
     @property
@@ -740,7 +729,7 @@ def _label_node(descriptor1: Any, descriptor2: Any) -> Any:
     "same, no slippage" (ABSENCE-BEHAVIOUR.md 2.3).
     """
     if descriptor1 is descriptor2:
-        return getattr(descriptor1, "relations", {}).get("identity")
+        return getattr(descriptor1, "relations", {}).get(constants().vocab.theme_relation_identity)
     for link in getattr(descriptor1, "outgoing_links", []):
         if link.to_node is descriptor2:
             return link.label_node
@@ -836,22 +825,19 @@ def _special_spanning_bridge_case(d1: Any, d2: Any, theme: Any) -> bool:
 
 
 def _special_middle_middle_case(d1: Any, d2: Any, theme: Any) -> bool:
-    from server.engine.themes import RELATION_OPPOSITE
-
     return (
         holds_role(d1.descriptor, "position.middle")
         and holds_role(d2.descriptor, "position.middle")
-        and theme.relation == RELATION_OPPOSITE
+        and theme.relation == constants().vocab.theme_relation_opposite
         and _dimension_plays(d1.object, theme.dimension, "dimension.string_position")
     )
 
 
 def _relation_consistent_with_theme(d1: Any, d2: Any, theme: Any) -> bool:
-    from server.engine.themes import RELATION_DIFFERENT, RELATION_IDENTITY
-
+    v = constants().vocab
     relation = _label_relation(d1.descriptor, d2.descriptor)
-    if theme.relation == RELATION_DIFFERENT:
-        return relation != RELATION_IDENTITY
+    if theme.relation == v.theme_relation_diff:
+        return relation != v.theme_relation_identity
     return relation == theme.relation
 
 
@@ -1037,7 +1023,7 @@ def mappable_descriptions(
     d1: Any, d2: Any, object1: Any, object2: Any, bridge_type: str
 ) -> bool:
     """Dispatch to the horizontal or vertical predicate for *bridge_type*."""
-    if bridge_type == BRIDGE_VERTICAL:
+    if bridge_type == constants().vocab.bridge_type_vertical:
         return vertical_mappable_descriptions(d1, d2)
     return horizontal_mappable_descriptions(d1, d2, object1, object2)
 
@@ -1166,7 +1152,7 @@ def reverse_direction_orientation(concept_mappings: list[ConceptMapping]) -> boo
         for obj in (cm.object1, cm.object2):
             slipnet = _slipnet_of(obj)
             if slipnet is not None:
-                opposite = slipnet.relations.get("opposite")
+                opposite = slipnet.relations.get(constants().vocab.theme_relation_opposite)
                 if opposite is not None:
                     break
         if opposite is not None:
@@ -1240,7 +1226,12 @@ def propose_bridge(
 
     if ctx is not None and ctx.verbose:
         # bridges.ss:1111-1119
-        orientation = "vertical" if bridge_type == BRIDGE_VERTICAL else "horizontal"
+        v = constants().vocab
+        orientation = (
+            v.bridge_orientation_vertical
+            if bridge_type == v.bridge_type_vertical
+            else v.bridge_orientation_horizontal
+        )
         if flip1 and flip2:
             key = "proposing-bridge-both-flipped"
         elif flip1:
@@ -1266,7 +1257,7 @@ def _propose_bridge_side_effects(
     group-scout when the two have different platonic lengths, which in practice
     is every letter/multi-letter-group pairing.
     """
-    if bridge_type == BRIDGE_VERTICAL:
+    if bridge_type == constants().vocab.bridge_type_vertical:
         return
     if platonic_length(object1) is platonic_length(object2):
         return
@@ -1487,7 +1478,7 @@ def _incompatible_bridges(b1: Bridge, b2: Bridge, orientation: str) -> bool:
 
     b1_cms = b1.concept_mappings
     b2_cms = b2.concept_mappings
-    if orientation == ORIENTATION_HORIZONTAL:
+    if orientation == constants().vocab.bridge_orientation_horizontal:
         b1_cms = [cm for cm in b1_cms if not _letter_category_or_length_slippage(cm)]
         b2_cms = [cm for cm in b2_cms if not _letter_category_or_length_slippage(cm)]
 
@@ -1524,9 +1515,10 @@ def direction_incompatible_bridges(
     of BR-8.
     """
     relation = getattr(direction_cm.label, "relation", None) if direction_cm.label else None
-    if relation == "identity":
+    v = constants().vocab
+    if relation == v.theme_relation_identity:
         pred1, pred2 = (lambda a, b: a < b), (lambda a, b: a > b)
-    elif relation == "opposite":
+    elif relation == v.theme_relation_opposite:
         pred1, pred2 = (lambda a, b: a > b), (lambda a, b: a < b)
     else:
         return []
@@ -1570,7 +1562,9 @@ def direction_incompatible_bridges(
 def _subobject_bridges(group: Any, orientation: str) -> list[Bridge]:
     """Scheme: ``get-subobject-bridges`` — the bridges of a group's constituents."""
     attribute = (
-        "horizontal_bridge" if orientation == ORIENTATION_HORIZONTAL else "vertical_bridge"
+        "horizontal_bridge"
+        if orientation == constants().vocab.bridge_orientation_horizontal
+        else "vertical_bridge"
     )
     result: list[Bridge] = []
     for sub in getattr(group, "objects", []) or []:
@@ -1589,14 +1583,7 @@ def _get_bridges_of_type(workspace: Any, bridge_type: str) -> list[Bridge]:
     always 0) and bridge incompatibility (mutually contradictory bridges such as
     a-a, a-b and a-d all stayed built at once).
     """
-    attribute = {
-        BRIDGE_TOP: "top_bridges",
-        BRIDGE_BOTTOM: "bottom_bridges",
-        BRIDGE_VERTICAL: "vertical_bridges",
-    }.get(bridge_type)
-    if attribute is None:
-        return []
-    return list(getattr(workspace, attribute, []))
+    return list(workspace.bridges_of(bridge_type))
 
 
 def _group_incompatible_bridges(
@@ -1607,11 +1594,12 @@ def _group_incompatible_bridges(
     Scheme: bridges.ss:826-866 (group-incompatible-bridges).
     """
     result: list[Bridge] = []
+    horizontal = orientation == constants().vocab.bridge_orientation_horizontal
 
     # Check subobject bridges for group objects
     for obj, other in ((object1, object2), (object2, object1)):
         if hasattr(obj, "objects"):  # It's a group
-            bridge_attr = "horizontal_bridge" if orientation == "horizontal" else "vertical_bridge"
+            bridge_attr = "horizontal_bridge" if horizontal else "vertical_bridge"
             for sub in getattr(obj, "objects", []):
                 bridge = getattr(sub, bridge_attr, None)
                 if bridge is not None:
@@ -1629,7 +1617,7 @@ def _group_incompatible_bridges(
     for obj, other_obj in ((object1, object2), (object2, object1)):
         enc = getattr(obj, "enclosing_group", None)
         if enc is not None:
-            bridge_attr = "horizontal_bridge" if orientation == "horizontal" else "vertical_bridge"
+            bridge_attr = "horizontal_bridge" if horizontal else "vertical_bridge"
             group_bridge = getattr(enc, bridge_attr, None)
             if group_bridge is not None:
                 # Incompatible if the other side's enclosing group doesn't match

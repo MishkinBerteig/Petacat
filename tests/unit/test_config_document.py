@@ -57,9 +57,17 @@ def test_config_hash_equals_the_engine_hash_of_the_provider(base, reference):
     assert cd.config_hash(base) == hashing.config_hash(reference)
 
 
+#: Tables that are configuration but feed no provider field.  Each is an enum table whose rows no
+#: cognitive behaviour reads: a run's status, a codelet's phase and a parameter's value type are
+#: labels the services, the Admin view and the loader use to describe and validate rows, so no
+#: ``MetadataProvider`` field is built from them (they were once fed through ``enum_values``).
+NON_COGNITIVE_TABLES_NO_PROVIDER_FIELD_READS = {"run_statuses", "codelet_phases", "param_value_types"}
+
+
 def test_every_provider_field_is_fed_by_known_tables_and_every_table_feeds_a_field():
     fed = {t for tables in PROVIDER_FIELD_TABLES.values() for t in tables}
-    assert fed == set(cd.TABLE_NAMES)
+    assert fed.isdisjoint(NON_COGNITIVE_TABLES_NO_PROVIDER_FIELD_READS)
+    assert fed | NON_COGNITIVE_TABLES_NO_PROVIDER_FIELD_READS == set(cd.TABLE_NAMES)
     assert set(PROVIDER_FIELD_TABLES) == {f.name for f in __import__("dataclasses").fields(MetadataProvider)}
 
 

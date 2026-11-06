@@ -105,8 +105,8 @@ def _english(slipnet: Slipnet) -> list[str]:
             D.cm_short_name(n), rule_lc(n), article_of(n), plain_name_of(n),
             full_name_of(n), cm_short_name_of(n), V.label_name(n),
         ]
-        out.append(D.header(T.TraceEvent(T.CONCEPT_ACTIVATION, 5, 50.0, slipnode=n)))
-        out.append(D.print_name(T.TraceEvent(T.CONCEPT_ACTIVATION, 5, 50.0, slipnode=n)))
+        out.append(D.header(T.TraceEvent(standard_names.CONCEPT_ACTIVATION, 5, 50.0, slipnode=n)))
+        out.append(D.print_name(T.TraceEvent(standard_names.CONCEPT_ACTIVATION, 5, 50.0, slipnode=n)))
 
     a, b, c = (_glyph(slipnet, ch) for ch in "abc")
     two, three = _number(slipnet, 2), _number(slipnet, 3)
@@ -115,7 +115,7 @@ def _english(slipnet: Slipnet) -> list[str]:
     for direction in (roles.direction_left, roles.direction_right, None):
         letters = _group(roles, a, b, c, category=roles.group_category_successor, direction=direction)
         out.append(D.group_event_text(letters))
-        out.append(D.print_name(T.TraceEvent(T.GROUP_BUILT, 5, 50.0, group=letters)))
+        out.append(D.print_name(T.TraceEvent(standard_names.GROUP_BUILT, 5, 50.0, group=letters)))
         out.append(V.ascii_name(letters))
     numbers = _group(roles, two, three, category=roles.group_category_successor, nested=True)
     out.append(D.group_event_text(numbers))
@@ -123,8 +123,8 @@ def _english(slipnet: Slipnet) -> list[str]:
         roles.group_category_successor, roles.group_category_predecessor, roles.group_category_sameness,
     ):
         group = _group(roles, a, a, category=category, direction=None)
-        out.append(D.header(T.TraceEvent(T.GROUP_BUILT, 5, 50.0, group=group)))
-        out.append(D.header(T.TraceEvent(T.GROUP_BUILT, 5, 50.0, group=group, flipped=True)))
+        out.append(D.header(T.TraceEvent(standard_names.GROUP_BUILT, 5, 50.0, group=group)))
+        out.append(D.header(T.TraceEvent(standard_names.GROUP_BUILT, 5, 50.0, group=group, flipped=True)))
         out.append(V.ascii_name(group))
         out.append(V.full_object_name(group))
     out.append(V.full_object_name(SimpleNamespace()))
@@ -150,7 +150,7 @@ def _english(slipnet: Slipnet) -> list[str]:
             V.concept_mapping_long_name(cm), str(D.cm_ref(cm)),
         ]
         out.append(D.header(T.TraceEvent(
-            T.CONCEPT_MAPPING_BUILT, 5, 50.0, concept_mapping=cm,
+            standard_names.CONCEPT_MAPPING_BUILT, 5, 50.0, concept_mapping=cm,
             bridge=SimpleNamespace(bridge_type="top"))))
 
     # Theme-supporting concept mappings (the whole/single exclusion; bond-category vs group).
@@ -239,16 +239,16 @@ def test_a_node_with_every_display_column_null_prints_with_the_fallbacks():
 
     # Every display path of the files.
     for event in (
-        T.TraceEvent(T.CONCEPT_ACTIVATION, 5, 50.0, slipnode=bare),
-        T.TraceEvent(T.GROUP_BUILT, 5, 50.0,
+        T.TraceEvent(standard_names.CONCEPT_ACTIVATION, 5, 50.0, slipnode=bare),
+        T.TraceEvent(standard_names.GROUP_BUILT, 5, 50.0,
                      group=SimpleNamespace(group_category=bare, objects=[], bond_facet=None,
                                            direction=None)),
-        T.TraceEvent(T.GROUP_BUILT, 5, 50.0, flipped=True,
+        T.TraceEvent(standard_names.GROUP_BUILT, 5, 50.0, flipped=True,
                      group=SimpleNamespace(group_category=bare, objects=[], bond_facet=None,
                                            direction=None)),
     ):
         assert isinstance(D.header(event), str) and isinstance(D.print_name(event), str)
-    assert D.header(T.TraceEvent(T.GROUP_BUILT, 5, 50.0, group=SimpleNamespace(
+    assert D.header(T.TraceEvent(standard_names.GROUP_BUILT, 5, 50.0, group=SimpleNamespace(
         group_category=bare, objects=[], bond_facet=None, direction=None))) == "Built L1-3"
     group = SimpleNamespace(
         objects=[SimpleNamespace(get_descriptor_for=lambda f: bare)],
@@ -287,6 +287,7 @@ from tests.support.role_table import SINGLE_ROLES  # noqa: E402
 from server.engine.numeric.backend import use_backend  # noqa: E402
 from server.engine.rng import RNG  # noqa: E402
 from server.engine.runner import EngineRunner  # noqa: E402
+from tests.support import standard_names
 
 pytestmark = pytest.mark.numeric_matrix
 

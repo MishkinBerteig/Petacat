@@ -19,6 +19,9 @@ import { render, screen } from '@testing-library/react'
 
 import { SlipnetNodeFocus } from './SlipnetView'
 import { useRunStore, type RunStatus } from '@/store/runStore'
+import { api } from '@/api/client'
+import { useVocabularyStore } from '@/store/vocabulary'
+import { renamed } from '@/test/standardVocabulary'
 
 // The node focus view calls api.getSlipnetLinks() / api.getSlipnetNodes() on
 // mount to populate the connections list. We don't care about that side
@@ -99,5 +102,37 @@ describe('SlipnetNodeFocus — Edit button visibility', () => {
       expect(screen.getByRole('button', { name: /^Close$/ })).toBeInTheDocument()
       unmount()
     }
+  })
+})
+
+describe('SlipnetNodeFocus — link types compared by behaviour', () => {
+  const SLIP = 'rgb(255, 107, 138)'
+  const link = (link_type: string) => ({
+    id: 1, from_node: 'plato-a', to_node: 'plato-b', link_type,
+    label_node: null, link_length: 50, fixed_length: false,
+  })
+
+  async function colourOf(text: string): Promise<string> {
+    const el = await screen.findByText(text)
+    return (el as HTMLElement).style.color
+  }
+
+  it('colours a slip link by its behaviour under the standard name', async () => {
+    vi.mocked(api.getSlipnetLinks).mockResolvedValueOnce([link('lateral_sliplink')] as never)
+    render(<SlipnetNodeFocus nodeName="plato-a" onClose={() => {}} />)
+    expect(await colourOf('lateral_sliplink')).toBe(SLIP)
+  })
+
+  it('colours it the same when the link type is renamed', async () => {
+    useVocabularyStore.getState().adopt(renamed({}, { lateral_sliplink: 'slip17' }))
+    vi.mocked(api.getSlipnetLinks).mockResolvedValueOnce([link('slip17')] as never)
+    render(<SlipnetNodeFocus nodeName="plato-a" onClose={() => {}} />)
+    expect(await colourOf('slip17')).toBe(SLIP)
+  })
+
+  it('colours a type the run does not describe in the neutral colour', async () => {
+    vi.mocked(api.getSlipnetLinks).mockResolvedValueOnce([link('mystery')] as never)
+    render(<SlipnetNodeFocus nodeName="plato-a" onClose={() => {}} />)
+    expect(await colourOf('mystery')).toBe('var(--text-secondary)')
   })
 })

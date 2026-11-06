@@ -19,6 +19,7 @@ from server.engine.slipnet import Alphabet
 from server.engine.workspace import WorkspaceString
 
 from tests.unit._fakes import FakeNode
+from tests.support import standard_names
 
 
 class _Obj:
@@ -170,7 +171,7 @@ def test_num_supporting_bonds_counts_matching_built_disjoint_bond():
     self_bond = _bond(a, b, cat, _letter_category())
     c, d = _Obj(2, 2, string=string), _Obj(3, 3, string=string)
     other = _bond(c, d, cat, _letter_category())
-    other.proposal_level = Bond.BUILT
+    other.proposal_level = standard_names.BUILT
     string.bonds = [self_bond, other]
     assert self_bond.get_num_of_local_supporting_bonds() == 1
 
@@ -192,7 +193,7 @@ def test_num_supporting_bonds_ignores_different_category():
     self_bond = _bond(a, b, _sameness(), _letter_category())
     c, d = _Obj(2, 2, string=string), _Obj(3, 3, string=string)
     other = _bond(c, d, _successor(), _letter_category())
-    other.proposal_level = Bond.BUILT
+    other.proposal_level = standard_names.BUILT
     string.bonds = [self_bond, other]
     assert self_bond.get_num_of_local_supporting_bonds() == 0
 
@@ -227,7 +228,7 @@ def _succ_bond(string, left_index, right_index, category, direction):
         _letter_category(),
         direction=direction,
     )
-    bond.proposal_level = Bond.BUILT
+    bond.proposal_level = standard_names.BUILT
     string.add_bond(bond)
     return bond
 
@@ -317,7 +318,7 @@ def test_update_strength_hands_its_rng_to_the_density_walk():
         objects=[string.objects[1], string.objects[2]],
         bonds=[],
     )
-    rr.proposal_level = Group.BUILT
+    rr.proposal_level = standard_names.BUILT
     string.add_group(rr)
 
     sameness = _sameness()

@@ -17,13 +17,13 @@ from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 
 from server.engine.formulas import round_ratio, weighted_average
+from server.engine import run_binding
 from server.engine.trace import (
-    ANSWER_FOUND,
-    CLAMP_START,
-    SNAG,
     ClampEvent,
     SnagEvent,
     TraceEvent,
+    clamp_type_codelet_patterns,
+    clamp_type_spec,
     negate_theme_pattern_entry,
 )
 from server.engine.groups import Group
@@ -145,7 +145,7 @@ def check_progress(
             return ProgressWatcherResult(progress_detected=True)
 
         # Enough time has elapsed -- undo the clamp
-        last_clamp = trace.get_last_event(CLAMP_START)
+        last_clamp = trace.get_last_event(run_binding.vocab().event_type_clamp_start)
         # ``coderack`` is threaded through so that ``deactivate`` lifts the clamped
         # codelet pattern here too (``trace.ss:656-664``).  The progress-watcher DSL
         # body's own ``coderack.unclamp_all()`` sits behind ``if
@@ -275,15 +275,14 @@ def check_progress(
     clamp_event = ClampEvent(
         codelet_count=codelet_count,
         temperature=float(temperature_control.value),
-        clamp_type="rule_codelet_clamp",
+        clamp_type=run_binding.vocab().clamp_type_rule_codelet,
         max_activation=float(meta.get_param("max_activation")),
         clamped_theme_patterns=[],
         clamped_concept_patterns=[],
-        clamped_codelet_patterns=[
-            meta.codelet_patterns.get("rule-codelet-pattern", [])
-        ],
+        clamped_codelet_patterns=clamp_type_codelet_patterns(
+            meta, run_binding.vocab().clamp_type_rule_codelet
+        ),
         rules=[],
-        progress_focus="rule",
     )
 
     trace.add_clamp_event(clamp_event)
@@ -344,12 +343,12 @@ def attempt_jootsing(
     # ── Check for recurring clamps ──
     if vlog is not None:
         vlog.say("checking-recurring-clamps")
-    clamps = get_most_recent_event_set(trace, "clamp")
+    clamps = get_most_recent_event_set(trace, run_binding.vocab().event_type_clamp_start)
     # Filter out manual clamps
     clamps = [
         c
         for c in clamps
-        if isinstance(c, ClampEvent) and c.clamp_type != "manual_clamp"
+        if isinstance(c, ClampEvent) and c.clamp_type != run_binding.vocab().clamp_type_manual
     ]
 
     recurring_clamps_min = meta.get_param("jootsing_recurring_clamps_min")
@@ -367,15 +366,15 @@ def attempt_jootsing(
             if vlog is not None:
                 vlog.say("jootsing-from-clamps", clamp_type.replace("_", "-"))
             # Jootsing from clamps
-            if clamp_type == "rule_codelet_clamp":
+            if clamp_type == run_binding.vocab().clamp_type_rule_codelet:
                 return joots_from_rule_codelet_clamps(
                     clamps, commentary, codelet_count, meta.commentary_templates
                 )
-            elif clamp_type == "snag_response_clamp":
+            elif clamp_type == run_binding.vocab().clamp_type_snag_response:
                 return joots_from_snag_response_clamps(
                     clamps, commentary, codelet_count, meta.commentary_templates
                 )
-            elif clamp_type == "justify_clamp":
+            elif clamp_type == run_binding.vocab().clamp_type_justify:
                 return joots_from_justify_clamps(
                     clamps,
                     trace,
@@ -395,7 +394,7 @@ def attempt_jootsing(
     # ── Check for recurring snags ──
     if vlog is not None:
         vlog.say("checking-recurring-snags")
-    snags = get_most_recent_event_set(trace, "snag")
+    snags = get_most_recent_event_set(trace, run_binding.vocab().event_type_snag)
 
     if len(snags) < meta.get_param("jootsing_recurring_snags_min"):
         if vlog is not None:
@@ -492,14 +491,16 @@ def attempt_jootsing(
     negative_entries = [negate_theme_pattern_entry(e, max_theme_activation) for e in chosen_entries]
 
     negative_theme_pattern: dict[str, Any] = {
-        "type": "vertical_bridge",
+        "type": run_binding.vocab().theme_type_vertical_bridge,
         "entries": negative_entries,
     }
 
     # Also build a bottom-up codelet pattern for the clamp (``%bottom-up-codelet-
     # pattern%``, ``jootsing.ss:117``).  The real urgency list, not a placeholder
     # naming it, so that the event can actually apply and lift it.
-    bottom_up_pattern = meta.codelet_patterns.get("bottom-up-codelet-pattern", [])
+    snag_response_patterns = clamp_type_codelet_patterns(
+        meta, run_binding.vocab().clamp_type_snag_response
+    )
 
     # Create and activate the snag-response clamp.  The temperature is the caller's:
     # ``Workspace`` has no ``temperature`` attribute, so reading it off the Workspace
@@ -507,7 +508,7 @@ def attempt_jootsing(
     clamp_event = ClampEvent(
         codelet_count=codelet_count,
         temperature=float(temperature_control.value),
-        clamp_type="snag_response_clamp",
+        clamp_type=run_binding.vocab().clamp_type_snag_response,
         max_activation=float(meta.get_param("max_activation")),
         # ``jootsing.ss:113-118`` passes both patterns to one clamp event and
         # ``make-clamp-event`` (``trace.ss:523-532``) sorts them BY TYPE.  The codelet
@@ -517,9 +518,8 @@ def attempt_jootsing(
         # what it clamped disagreed with what was actually clamped.
         clamped_theme_patterns=[negative_theme_pattern],
         clamped_concept_patterns=[],
-        clamped_codelet_patterns=[bottom_up_pattern],
+        clamped_codelet_patterns=snag_response_patterns,
         rules=[],
-        progress_focus="workspace",
     )
 
     trace.add_clamp_event(clamp_event)
@@ -558,23 +558,25 @@ def get_most_recent_event_set(
     For snags: get events since last answer.
     For clamps: get all events.
     Then partition into equivalence sets and pick the youngest set.
+
+    *event_type* is the name of an event type (``vocabulary.event_type_snag``,
+    ``vocabulary.event_type_clamp_start``).
     """
+    vocab = run_binding.vocab()
     # The Scheme's event list is consed, newest first (``trace.ss:201``), and
     # ``get-new-events-since-last`` takes the first N of it (``trace.ss:89-95``); the
     # Trace here is chronological, so the list is reversed to the Scheme's order.  The
     # order is the result's: ``partition`` (``utilities.ss:811-825``) puts the newest
     # event first in its class, and ``stochastic-filter`` flips a coin for the snag
     # pattern's entries in that order (``jootsing.ss:76-90``).
-    if event_type == "snag":
-        all_recent = trace.get_new_events_since_last(ANSWER_FOUND)
+    if event_type == vocab.event_type_snag:
+        all_recent = trace.get_new_events_since_last(vocab.event_type_answer_found)
     else:
         all_recent = list(trace.events)
     all_recent = list(reversed(all_recent))
 
     # Filter to the requested event type
-    type_map = {"snag": SNAG, "clamp": CLAMP_START}
-    target_type = type_map.get(event_type, event_type)
-    filtered = [e for e in all_recent if e.event_type == target_type]
+    filtered = [e for e in all_recent if e.event_type == event_type]
 
     if not filtered:
         return []
@@ -644,26 +646,27 @@ def get_clamp_jootsing_probability(
     else:
         average_progress = 0.0
 
-    # Clamp type factor
-    if clamp_type == "justify_clamp":
-        # ``jootsing.ss:135-139``: ``(if (tell (tell *trace* 'get-last-event 'any)
-        # 'type? 'clamp) 1 0)``.  Jootsing away from a justify clamp is permitted only
-        # when the clamp is *still* the most recent thing in the Trace — that is, when
-        # it produced no events at all and everything stalled under it.  A clamp that
-        # is provoking groups, slippages and rules is working, and the program has no
-        # business abandoning it.  Hardcoding 1 removed that condition entirely.
+    # Clamp type factor: the clamp type's row (``meta.clamp_types``).  A factor that holds only
+    # while the clamp is the newest event of the Trace (``jootsing.ss:135-139``:
+    # ``(if (tell (tell *trace* 'get-last-event 'any) 'type? 'clamp) 1 0)``) is the justify
+    # clamp's: jootsing away from it is permitted only when it produced no events at all and
+    # everything stalled under it.  A clamp that is provoking groups, slippages and rules is
+    # working, and the program has no business abandoning it.  Hardcoding 1 removed that
+    # condition entirely.  A clamp type the table does not hold gets
+    # ``unlisted_clamp_jootsing_factor``.
+    spec = clamp_type_spec(clamp_type)
+    if spec is None or spec.jootsing_factor is None:
+        clamp_type_factor = meta.get_param("unlisted_clamp_jootsing_factor")
+    elif spec.jootsing_only_when_latest:
         last_event = trace.get_last_event() if trace is not None else None
         clamp_type_factor = (
-            1.0
-            if last_event is not None and last_event.event_type == CLAMP_START
+            spec.jootsing_factor
+            if last_event is not None
+            and last_event.event_type == run_binding.vocab().event_type_clamp_start
             else 0.0
         )
-    elif clamp_type == "snag_response_clamp":
-        clamp_type_factor = 1.0
-    elif clamp_type == "rule_codelet_clamp":
-        clamp_type_factor = 0.5
     else:
-        clamp_type_factor = 0.5
+        clamp_type_factor = spec.jootsing_factor
 
     # Final probability
     progress_factor = 1.0 - average_progress / 100.0
@@ -775,11 +778,12 @@ def joots_from_justify_clamps(
 
     # Extract rules from the most recent justify clamp
     if hasattr(most_recent, "rules") and most_recent.rules:
+        vocab = run_binding.vocab()
         for r in most_recent.rules:
             if hasattr(r, "rule_type"):
-                if r.rule_type == "top" and top_rule is None:
+                if r.rule_type == vocab.rule_type_top and top_rule is None:
                     top_rule = r
-                elif r.rule_type == "bottom" and bottom_rule is None:
+                elif r.rule_type == vocab.rule_type_bottom and bottom_rule is None:
                     bottom_rule = r
 
     if top_rule is None or bottom_rule is None:

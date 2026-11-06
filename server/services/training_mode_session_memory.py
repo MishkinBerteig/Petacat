@@ -53,7 +53,7 @@ from dataclasses import dataclass, field
 from typing import Any, Iterable, Iterator, Protocol
 
 from server.engine.ids import KIND_ANSWER, KIND_SNAG, IdAllocator
-from server.engine.memory import AnswerDescription, EpisodicMemory, SnagDescription
+from server.engine.memory import AnswerDescription, EpisodicMemory, SnagDescription, answers_equal
 from server.engine.metadata import MetadataProvider
 
 #: Merges kept in a worker task's tail, at least; the service raises it with the workers.
@@ -130,16 +130,9 @@ def additions_of(copy: EpisodicMemory, base_answers: int, base_snags: int) -> Ad
 
 
 def answer_present(master: EpisodicMemory, d: AnswerDescription) -> bool:
-    """``EpisodicMemory.answer_present`` on an already-built description: the three problem
-    strings and the answer, and both rules' clause lists (``memory.ss:90-97``)."""
-    for past in master.answers:
-        if (
-            tuple(past.problem) == tuple(d.problem)
-            and past.top_rule_signature == d.top_rule_signature
-            and past.bottom_rule_signature == d.bottom_rule_signature
-        ):
-            return True
-    return False
+    """``EpisodicMemory.answer_present`` on an already-built description (``memory.ss:90-97``),
+    through the engine's one comparison of two answers, ``memory.answers_equal``."""
+    return any(answers_equal(past, d) for past in master.answers)
 
 
 def snag_present(master: EpisodicMemory, d: SnagDescription) -> bool:

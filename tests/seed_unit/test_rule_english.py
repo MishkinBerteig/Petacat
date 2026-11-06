@@ -29,16 +29,13 @@ from server.engine.rule_english import (
     _punctuate,
     transcribe_rule_to_english_lines,
 )
-from server.engine.rules import (
+from server.engine.rules import Rule, RuleChange, RuleClause, rules_equal
+from tests.support.standard_names import (
     CLAUSE_EXTRINSIC,
     CLAUSE_INTRINSIC,
     CLAUSE_VERBATIM,
     RULE_BOTTOM,
     RULE_TOP,
-    Rule,
-    RuleChange,
-    RuleClause,
-    rules_equal,
 )
 from server.engine.slipnet import Slipnet
 

@@ -66,8 +66,26 @@ from typing import Any
 KIND_INT = "int"
 KIND_FLOAT = "float"
 KIND_BOOL = "bool"
+#: A parameter whose value holds names of something in the configuration (nodes, codelet
+#: types): which kind of names, and so the shape of the value, is the configuration's own
+#: ``engine_params.refers_to`` column, not a fact written here.  The interface is told the
+#: presentation kind that column implies (``node_list`` or ``node_map``): see
+#: :func:`presentation_kind`.
+KIND_REFERENCE = "reference"
 KIND_NODE_LIST = "node_list"
 KIND_NODE_MAP = "node_map"
+
+#: ``refers_to`` values that make a parameter a list of names, and a map keyed by names.
+_LIST_REFERS_TO = ("node_list", "trigger_node_list", "codelet_type_list")
+_MAP_REFERS_TO = ("node_map",)
+
+
+def presentation_kind(kind: str, refers_to: str | None) -> str:
+    """The kind the interface draws a control for: a reference parameter is a list or a map
+    of names according to its ``refers_to``; every other kind is its own."""
+    if kind != KIND_REFERENCE:
+        return kind
+    return KIND_NODE_MAP if refers_to in _MAP_REFERS_TO else KIND_NODE_LIST
 
 #: Grouping for presentation.  Not semantic — the engine does not care — but a flat list
 #: of that many numbers is unreadable, and these are the divisions the architecture
@@ -97,8 +115,12 @@ class RunParameter:
     #: dissertation's results, which is a different and stronger warning than "unusual".
     departs_from_original: bool = True
 
-    def validate(self, value: Any) -> Any:
+    def validate(self, value: Any, refers_to: str | None = None) -> Any:
         """Coerce and range-check, or raise ``ValueError`` naming the parameter.
+
+        *refers_to* is the configuration's ``engine_params.refers_to`` for this parameter;
+        it fixes the shape of a reference parameter.  Without it a reference parameter
+        accepts either shape (a list of names or a map keyed by names).
 
         Coercing rather than rejecting a float where an int belongs, because JSON has one
         number type and a client that sends ``15.0`` for ``update_cycle_length`` means 15.
@@ -108,17 +130,20 @@ class RunParameter:
                 raise ValueError(f"{self.name} must be true or false, got {value!r}")
             return value
 
-        if self.kind == KIND_NODE_LIST:
-            if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
-                raise ValueError(f"{self.name} must be a list of Slipnet node names")
-            return list(value)
-
-        if self.kind == KIND_NODE_MAP:
-            if not isinstance(value, dict) or not all(
-                isinstance(k, str) and isinstance(v, (int, float)) for k, v in value.items()
-            ):
-                raise ValueError(f"{self.name} must map Slipnet node names to numbers")
-            return dict(value)
+        if self.kind == KIND_REFERENCE:
+            as_list = refers_to in _LIST_REFERS_TO
+            as_map = refers_to in _MAP_REFERS_TO
+            if isinstance(value, list) and (as_list or not as_map and refers_to is None):
+                if not all(isinstance(v, str) for v in value):
+                    raise ValueError(f"{self.name} must be a list of names")
+                return list(value)
+            if isinstance(value, dict) and (as_map or not as_list and refers_to is None):
+                if not all(isinstance(k, str) and isinstance(v, (int, float)) for k, v in value.items()):
+                    raise ValueError(f"{self.name} must map names to numbers")
+                return dict(value)
+            raise ValueError(
+                f"{self.name} must be {'a map of names to numbers' if as_map else 'a list of names'}"
+            )
 
         if isinstance(value, bool) or not isinstance(value, (int, float)):
             raise ValueError(f"{self.name} must be a number, got {value!r}")
@@ -182,11 +207,11 @@ RUN_PARAMETERS: tuple[RunParameter, ...] = (
        "How long the initially-relevant nodes are held at full activation at the start "
        "of a run, in update cycles rather than codelets. The warm-up that stops the run "
        "wandering before it has any structure.", 0, 1000),
-    _p("initially_clamped_slipnodes", KIND_NODE_LIST, GROUP_SLIPNET,
+    _p("initially_clamped_slipnodes", KIND_REFERENCE, GROUP_SLIPNET,
        "Initially clamped nodes",
        "Which concepts are held active during the warm-up. Changing this changes what "
        "the run is predisposed to notice first.", ),
-    _p("top_down_slipnodes", KIND_NODE_LIST, GROUP_SLIPNET, "Top-down nodes",
+    _p("top_down_slipnodes", KIND_REFERENCE, GROUP_SLIPNET, "Top-down nodes",
        "Which concepts may post codelets of their own once fully active. This is the "
        "channel by which the Slipnet directs perception rather than only recording it."),
     _p("shrunk_link_length_factor", KIND_FLOAT, GROUP_SLIPNET, "Shrunk link factor",
@@ -195,7 +220,7 @@ RUN_PARAMETERS: tuple[RunParameter, ...] = (
        "concepts it labels is cheaper, so an active concept makes its own relation "
        "easier to use — which is how the Slipnet's state changes what the Workspace "
        "can see.", 0.0, 1.0),
-    _p("intrinsic_link_lengths", KIND_NODE_MAP, GROUP_SLIPNET, "Intrinsic link lengths",
+    _p("intrinsic_link_lengths", KIND_REFERENCE, GROUP_SLIPNET, "Intrinsic link lengths",
        "The conceptual distance of each labelled link. Shorter means the two concepts "
        "are closer, so activation spreads more readily and a slippage between them is "
        "cheaper — which is the mechanism by which one concept can stand in for another."),
@@ -283,8 +308,11 @@ class UnknownParameter(ValueError):
     """An override named something that is not a run parameter."""
 
 
-def validate_overrides(overrides: dict[str, Any] | None) -> dict[str, Any]:
+def validate_overrides(overrides: dict[str, Any] | None, meta: Any = None) -> dict[str, Any]:
     """Check a set of overrides, returning the coerced values.
+
+    *meta* (the configuration the Run will execute under) supplies each reference
+    parameter's ``refers_to``, which fixes the shape of its value.
 
     Rejects unknown names rather than ignoring them.  Ignoring is the tempting choice —
     it keeps old clients working — but a typo in a parameter name would then silently
@@ -299,7 +327,8 @@ def validate_overrides(overrides: dict[str, Any] | None) -> dict[str, Any]:
             f"Settable parameters are: {', '.join(sorted(PARAMETERS_BY_NAME))}"
         )
     return {
-        name: PARAMETERS_BY_NAME[name].validate(value)
+        name: PARAMETERS_BY_NAME[name].validate(
+            value, None if meta is None else meta.param_refers_to.get(name))
         for name, value in overrides.items()
     }
 
@@ -309,7 +338,7 @@ def describe_parameters(meta: Any) -> list[dict]:
     return [
         {
             "name": p.name,
-            "kind": p.kind,
+            "kind": presentation_kind(p.kind, meta.param_refers_to.get(p.name)),
             "group": p.group,
             "label": p.label,
             "description": p.description,

@@ -16,6 +16,8 @@ from __future__ import annotations
 from copy import copy
 from typing import TYPE_CHECKING, Any
 
+from server.engine.run_binding import vocab
+
 if TYPE_CHECKING:
     from server.engine.slipnet import Slipnet, SlipnetNode
     from server.engine.workspace_objects import Letter, WorkspaceObject
@@ -71,7 +73,7 @@ def get_related_node(
     Otherwise, looks for an outgoing link whose label is *relation* and
     returns the target node (preferring one with the same category as *node*).
     """
-    if relation is slipnet.relation("identity"):
+    if relation is slipnet.relation(vocab().theme_relation_identity):
         return node
 
     # Collect all outgoing links labeled with *relation*.
@@ -110,10 +112,10 @@ def inverse(node: SlipnetNode | None, slipnet: Slipnet) -> SlipnetNode | None:
     """
     if node is None:
         return None
-    identity = slipnet.relation("identity")
+    identity = slipnet.relation(vocab().theme_relation_identity)
     if node is identity:
         return node
-    opposite = slipnet.relation("opposite")
+    opposite = slipnet.relation(vocab().theme_relation_opposite)
     if not opposite:
         return None
     return get_related_node(node, opposite, slipnet)
@@ -130,7 +132,7 @@ def get_label(
     (``None``): the mapping counts as a slippage (ABSENCE-BEHAVIOUR.md 2.3).
     """
     if from_node is to_node:
-        return slipnet.relations.get("identity")
+        return slipnet.relations.get(vocab().theme_relation_identity)
     for link in to_node.incoming_links:
         if link.from_node is from_node:
             return link.label_node
@@ -149,7 +151,7 @@ def relationship_between(
     if not nodes or any(n is None for n in nodes):
         return None
     if len(nodes) == 1:
-        return slipnet.relations.get("identity")
+        return slipnet.relations.get(vocab().theme_relation_identity)
 
     labels: list[SlipnetNode | None] = []
     for a, b in zip(nodes[:-1], nodes[1:]):
@@ -201,7 +203,7 @@ def change_length_first(
     """
     if length_arg is None:
         return False
-    if length_arg is slipnet.relation("predecessor"):
+    if length_arg is slipnet.relation(vocab().theme_relation_predecessor):
         return True
     if is_platonic_number(length_arg):
         if current_length is None:
@@ -244,22 +246,19 @@ class ImageFailure(Exception):
     site that is not the string-position swap or the conflict check is a change.
     """
 
-    SWAP = "swap"
-    CONFLICT = "conflict"
-    CHANGE = "change"
-
     def __init__(
         self,
         message: str = "",
         objects: list | None = None,
-        kind: str = CHANGE,
+        kind: str | None = None,
         dimension: Any = None,
         transform: tuple | None = None,
         dimension2: Any = None,
     ) -> None:
         super().__init__(message)
         self.objects: list = objects or []
-        self.kind: str = kind
+        #: The failure kind's name: a ``failure_kind.*`` vocabulary name (a change when none given).
+        self.kind: str = kind if kind is not None else vocab().failure_kind_change
         #: The rest of the Scheme's ``<failure-result>`` (``answers.ss:1145-1150``),
         #: which the snag's explanation is written from (``trace.ss:1097-1125``):
         #: ``SWAP`` carries ``dimension``; ``CONFLICT`` carries ``dimension`` (the
@@ -451,7 +450,7 @@ class Image:
         # to it, or an absent role, is the unhandled case.
         alpha_first = self.slipnet.roles.alphabet_first_marker
         alpha_last = self.slipnet.roles.alphabet_last_marker
-        opp = self.slipnet.relation("opposite")
+        opp = self.slipnet.relation(vocab().theme_relation_opposite)
         first_letter = self.slipnet.alphabet.first_letter
         last_letter = self.slipnet.alphabet.last_letter
 
@@ -479,9 +478,9 @@ class Image:
         if arg is None:
             raise ImageFailure("new_length: arg is None")
 
-        identity = self.slipnet.relation("identity")
-        pred = self.slipnet.relation("predecessor")
-        succ = self.slipnet.relation("successor")
+        identity = self.slipnet.relation(vocab().theme_relation_identity)
+        pred = self.slipnet.relation(vocab().theme_relation_predecessor)
+        succ = self.slipnet.relation(vocab().theme_relation_successor)
 
         if arg is identity:
             return
@@ -665,7 +664,7 @@ class Image:
 
         roles = self.slipnet.roles
         plato_left = roles.direction_left
-        identity = self.slipnet.relation("identity")
+        identity = self.slipnet.relation(vocab().theme_relation_identity)
         sameness = roles.bond_category_sameness
         samegrp = roles.group_category_sameness
         letter_category = roles.dimension_letter_category
@@ -763,7 +762,7 @@ class Image:
         # An unbound role or a missing relation leaves the field unset (``None``), never
         # an ``Absent`` token: the image holds nodes or nothing.
         letter_category = self.slipnet.roles.dimension_letter_category or None
-        identity = self.slipnet.relations.get("identity")
+        identity = self.slipnet.relations.get(vocab().theme_relation_identity)
         plato_right = self.slipnet.roles.direction_right or None
         plato_one = self.slipnet.alphabet.unit_length_node
 
@@ -1140,7 +1139,7 @@ def _group_image_relations(
     through ``extend`` set an image's ``start_letter`` to the relation itself
     and the letter came out as its short name.
     """
-    identity = slipnet.relations.get("identity")
+    identity = slipnet.relations.get(vocab().theme_relation_identity)
     sameness = slipnet.roles.bond_category_sameness
 
     if len(ordered_objects) > 1:

@@ -4,6 +4,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useRunStore } from '@/store/runStore';
+import { useLinkBehaviours } from '@/store/vocabulary';
 import { api, describeApiError, request } from '@/api/client';
 import type { SlipnetNodeDef, SlipnetState } from '@/types';
 
@@ -26,17 +27,19 @@ export interface LinkDef {
   fixed_length: boolean;
 }
 
-// Link type colors — brighter/bolder for visibility on dark background
+// Link colours by BEHAVIOUR (what the engine does with a link of the type), never by the
+// type's name: the run's configuration names its link types, and says each one's behaviour
+// (`link_behaviours` in the run's vocabulary). Brighter/bolder for visibility on dark background.
 const LINK_COLORS: Record<string, string> = {
   category: '#7799cc',
   instance: '#4a9eff',
   property: '#5dce5d',
   lateral: '#ffb347',
-  lateral_sliplink: '#ff6b8a',
+  slip: '#ff6b8a',
 };
 
 const LINK_DASH: Record<string, string> = {
-  lateral_sliplink: '6,3',
+  slip: '6,3',
 };
 
 function activationColor(activation: number): string {
@@ -163,13 +166,16 @@ export function SlipnetGraphView({
   const [loadError, setLoadError] = useState<string | null>(null);
   /** Why the last clamp asked for is not in force. */
   const [actionError, setActionError] = useState<string | null>(null);
-  const [linkFilters, setLinkFilters] = useState<Record<string, boolean>>({
-    category: true,
-    instance: true,
-    property: true,
-    lateral: true,
-    lateral_sliplink: true,
-  });
+  // A link type is shown unless its box was unticked.
+  const [linkFilters, setLinkFilters] = useState<Record<string, boolean>>({});
+  const { behaviourOf, linkTypes } = useLinkBehaviours();
+  const colourOf = (linkType: string) => LINK_COLORS[behaviourOf(linkType) ?? ''] ?? '#888';
+  // The run's link types, then any the drawn links use that the run does not describe.
+  const filterTypes = useMemo(() => {
+    const out = [...linkTypes];
+    for (const l of links) if (!out.includes(l.link_type)) out.push(l.link_type);
+    return out;
+  }, [linkTypes, links]);
 
   // Zoom and pan state
   const [zoomPct, setZoomPct] = useState(100);
@@ -362,7 +368,7 @@ export function SlipnetGraphView({
 
       {/* Filter controls */}
       <div style={{ display: 'flex', gap: 8, padding: '4px 0', fontSize: 10, flexWrap: 'wrap', flexShrink: 0 }}>
-        {Object.keys(LINK_COLORS).map(lt => (
+        {filterTypes.map(lt => (
           <label key={lt} style={{ display: 'flex', alignItems: 'center', gap: 3, cursor: 'pointer' }}>
             <input
               type="checkbox"
@@ -370,7 +376,7 @@ export function SlipnetGraphView({
               onChange={() => setLinkFilters(f => ({ ...f, [lt]: !f[lt] }))}
               style={{ width: 12, height: 12 }}
             />
-            <span style={{ color: LINK_COLORS[lt] }}>{lt}</span>
+            <span style={{ color: colourOf(lt) }}>{lt}</span>
           </label>
         ))}
       </div>
@@ -432,7 +438,7 @@ export function SlipnetGraphView({
           const opacity = Math.min(1, baseOpacity + activationBoost + endpointBoost);
           const strokeWidth = 1 + (labelActivation / 100) * 2 + endpointProduct * 1;
 
-          const isSliplink = link.link_type === 'lateral_sliplink';
+          const isSliplink = behaviourOf(link.link_type) === 'slip';
           const isFullyActive = labelActivation >= 50;
           const useGlow = (isSliplink && isFullyActive) || labelFrozen;
 
@@ -464,10 +470,10 @@ export function SlipnetGraphView({
               key={link.id ?? `${link.from_node}|${link.to_node}|${link.link_type}|${link.label_node ?? ''}`}
               d={pathD}
               fill="none"
-              stroke={labelFrozen ? 'cyan' : LINK_COLORS[link.link_type] ?? '#888'}
+              stroke={labelFrozen ? 'cyan' : colourOf(link.link_type)}
               strokeWidth={strokeWidth}
               strokeOpacity={opacity}
-              strokeDasharray={LINK_DASH[link.link_type] ?? ''}
+              strokeDasharray={LINK_DASH[behaviourOf(link.link_type) ?? ''] ?? ''}
               filter={useGlow ? 'url(#link-glow)' : undefined}
               style={isSliplink && isFullyActive ? {
                 animation: 'slipnet-pulse 0.6s ease-in-out infinite alternate',

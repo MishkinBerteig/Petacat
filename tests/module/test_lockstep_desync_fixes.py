@@ -14,14 +14,13 @@ import types
 
 import pytest
 
-from server.engine.bridges import BRIDGE_VERTICAL, Bridge
+from server.engine.bridges import Bridge
+from tests.support.standard_names import BRIDGE_VERTICAL
 from server.engine.concept_mappings import ConceptMapping
 from server.engine.descriptions import Description
 from server.engine.groups import Group
 from server.engine.metadata import MetadataProvider
 from server.engine.rules import (
-    SCOPE_SELF,
-    SCOPE_SUBOBJECTS,
     Rule,
     RuleChange,
     RuleClause,
@@ -29,7 +28,9 @@ from server.engine.rules import (
     rule_signature,
     rules_equal,
 )
+from tests.support.standard_names import SCOPE_SELF, SCOPE_SUBOBJECTS
 from server.engine.runner import EngineRunner
+from tests.support import standard_names
 
 pytestmark = pytest.mark.numeric_matrix
 
@@ -79,10 +80,10 @@ def test_a_bridge_on_a_group_read_the_other_way_is_not_equivalent_to_the_built_o
     succ_i = _group(ctx, init, "plato-succgrp", "plato-right")
     succ_t = _group(ctx, targ, "plato-succgrp", "plato-right")
     for g, s in ((succ_i, init), (succ_t, targ)):
-        g.proposal_level = Group.BUILT
+        g.proposal_level = standard_names.BUILT
         s.add_group(g)
     built = _bridge(ctx, succ_i, succ_t)
-    built.proposal_level = Bridge.BUILT
+    built.proposal_level = standard_names.BUILT
     ctx.workspace.add_bridge(built)
     succ_i.vertical_bridge = built
     succ_t.vertical_bridge = built
@@ -154,7 +155,7 @@ def test_a_reference_object_matches_any_of_its_descriptions_of_that_type(meta):
     assert "plato-single" in held
     if "plato-rightmost" not in held:
         description = Description(letter, position, nodes["plato-rightmost"])
-        description.proposal_level = Description.BUILT
+        description.proposal_level = standard_names.BUILT
         letter.descriptions.append(description)
     for name in ("plato-single", "plato-rightmost"):
         found = _find_matching_objects(

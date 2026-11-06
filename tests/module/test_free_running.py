@@ -418,7 +418,10 @@ def test_the_answer_and_self_watching_codelets_run_under_the_commit_lock(meta):
     same Slipnet session (on MLX, an abort), and a clamp could land between the update
     reading the Slipnet and writing it back.
     """
-    from server.parallel.free_running import SERIALISED_FAMILIES
+    # The Standard Configuration serialises these two families; the engine reads the list from
+    # the configuration (``meta.serialised_families``).
+    assert set(meta.serialised_families) == {"meta", "answer"}
+    serialised_families = meta.serialised_families
 
     runner = _prepared(meta, seed=3)
     engine = FreeRunningEngine(runner, workers=4)
@@ -435,7 +438,7 @@ def test_the_answer_and_self_watching_codelets_run_under_the_commit_lock(meta):
     engine.run(3000)
 
     families = {name: spec.family for name, spec in meta.codelet_specs.items()}
-    serialised = {t: owned for t, owned in held.items() if families[t] in SERIALISED_FAMILIES}
+    serialised = {t: owned for t, owned in held.items() if families[t] in serialised_families}
     assert serialised, "no answer or self-watching codelet ran, so this proves nothing"
     assert all(owned == {True} for owned in serialised.values()), serialised
 
@@ -589,15 +592,13 @@ def test_a_pending_answer_is_not_collected_by_another_workers_codelet(meta):
     """
     import time
 
-    from server.parallel.free_running import SERIALISED_FAMILIES
-
     runner = _prepared(meta, seed=7)
     ctx = runner.ctx
     observed: list = []
 
     def probe(codelet):
         spec = ctx.meta.codelet_specs.get(codelet.codelet_type)
-        if observed or spec is None or spec.family not in SERIALISED_FAMILIES:
+        if observed or spec is None or spec.family not in meta.serialised_families:
             return
         ctx._pending_answer = "zzz"
         ctx._pending_answer_quality = 50

@@ -9,12 +9,99 @@ knowledge as Petacat ports it. It is not a mode and not a database. It is the st
 | `codelet_types.json` | The codelet types, with their Python `execute_body` source |
 | `roles.json` | The roles the engine looks nodes and codelet types up by |
 | `engine_params.json`, `urgency_levels.json`, `formula_coefficients.json` | Parameters, urgency bins and formula coefficients (stored as exact rationals such as `2/3`). Every fixed number that decides a strength, an unhappiness, a clip, an exponent or a rule's cost is a coefficient here, in the form (int or float) the engine used |
+| `engine_param_refs.json` | What a parameter's value names (`engine_params.refers_to`): see [Parameters that name things](#parameters-that-name-things) |
 | `theme_dimensions.json`, `theme_relations.json` | The Themespace's dimensions and relations |
 | `posting_rules.json` | Which codelets are posted, and when; a rule's `urgency_level` names a tier of `urgency_levels` |
 | `commentary_templates.json` | The natural-language commentary and Verbose mode's message texts |
 | `demo_problems.json` | The pre-configured analogy problems |
-| `enums.json` | The enum tables (bond categories, proposal levels, and the rest) |
+| `enums.json` | The 18 enum tables (bridge types, proposal levels, link types, clamp types, and the rest), with the `role` column that binds a row to the engine's vocabulary: see [The role vocabulary](#the-role-vocabulary) |
 | `help_topics.en.json` | The help text. It is content, not configuration: the server syncs it into the database at every start, and `scripts/generate_help_docs.py` derives `HELP.md` and the client's `helpTopics.ts` from it |
+
+## The role vocabulary
+
+The engine owns the **concepts** (a bridge joins the top strings, a clamp holds the Coderack against a
+background, a snag has a failure kind); the configuration owns the **names** it calls them. An
+enum-table row binds one concept by holding its engine name in its **`role`** column, and the engine
+reads the row bound to each role once per run and compares against that row's name, never against a
+literal. In the Metacat Standard Configuration each role is bound to the row Metacat calls it. Rename
+the row (`rename_enum_value` in the change API, or **Rename** in the Admin enum editor) and the run
+follows; a run does not change. A role bound to no row is simply absent for that run (a comparison
+against it is false), except the roles `start_check.py` lists as required, which stop a run at its start.
+The names the engine accepts in a `role` column are `server/engine/roles.py`'s `VOCABULARY`; the Admin
+enum editor offers exactly that list, read-only, for the table. A `role` is unique within its table, a
+row that holds one is not deleted until it is unbound (`422 role_bound`), and an unbound row is allowed
+and inert except that it becomes a valid value of the columns that name its table.
+
+| Table | Role names (`<prefix>.<name>`) |
+|---|---|
+| `event_types` | `event_type.` + `bond_built`, `bond_broken`, `group_built`, `group_broken`, `bridge_built`, `bridge_broken`, `rule_built`, `rule_broken`, `description_built`, `answer_found`, `snag`, `clamp_start`, `clamp_end`, `concept_mapping_built`, `concept_activation` |
+| `bridge_types` | `bridge_type.` + `top`, `bottom`, `vertical` |
+| `bridge_orientations` | `bridge_orientation.` + `horizontal`, `vertical` |
+| `clause_types` | `clause_type.` + `intrinsic`, `extrinsic`, `verbatim` |
+| `rule_types` | `rule_type.` + `top`, `bottom` |
+| `theme_types` | `theme_type.` + `top_bridge`, `bottom_bridge`, `vertical_bridge` |
+| `proposal_levels` | `proposal_level.` + `proposed`, `evaluated`, `built` |
+| `posting_directions` | `posting_direction.` + `bottom_up`, `top_down`, `thematic` |
+| `theme_relations` (`theme_relations.json`, not an enum table) | `theme_relation.` + `identity`, `opposite`, `successor`, `predecessor`, `diff` |
+| `string_kinds` | `string_kind.` + `initial`, `modified`, `target`, `answer` |
+| `rule_scopes` | `rule_scope.` + `self`, `subobjects` |
+| `failure_kinds` | `failure_kind.` + `swap`, `conflict`, `change` |
+| `clamp_types` | `clamp_type.` + `rule_codelet`, `snag_response`, `justify`, `manual` |
+
+Tables whose rows the engine does not name have no `role`: `run_statuses` (the lifecycle of a run and the
+API protocol, which the client compares), `codelet_phases` (a grouping label) and `param_value_types`
+(how the stored text of a parameter is parsed; renaming one makes the parameters of that type unreadable,
+so the change API advises against it).
+
+Four tables have other columns than the common four (`name`, `display_label`, `sort_order`,
+`description`), all in `enums.json`:
+
+- **`link_types.behaviour`** is what the engine does with a link of this type, one of `category`,
+  `instance`, `property`, `lateral`, `slip` (`LINK_BEHAVIOURS`). Which type has which behaviour is
+  configuration; the engine names behaviours and never a link type. Several types may share one behaviour.
+  A type that holds a behaviour is not deleted until the behaviour is unset.
+- **`codelet_families.serialised`** (boolean) says a codelet of this family runs alone under the
+  free-running executor, because it reads and rewrites the whole Workspace (`meta` and `answer`).
+- **`clamp_types`** has, besides `role`: `codelet_background_level`, the name of an urgency level the clamp
+  holds the rest of the Coderack against (null: none); `jootsing_factor`, the factor a clamp of this type gives
+  the jootsing probability; `jootsing_only_when_latest`, true when the factor applies only while the clamp is
+  still the newest event of the Trace (otherwise it is 0); `progress_focus`, the name of a row of
+  `progress_focuses`; and `codelet_patterns`, the list of codelet pattern names (the `pattern_name` of
+  `codelet_pattern_defs`) a clamp of this type clamps (the justify clamp clamps `top-down-codelet-pattern`
+  and `thematic-codelet-pattern`, the rule-codelet clamp `rule-codelet-pattern`, the snag-response clamp
+  `bottom-up-codelet-pattern`, a person's manual clamp none: the person names the pattern).
+- **`progress_focuses.event_types`** is the list of `event_types` names that count as progress for a clamp.
+
+Renaming a row rewrites every column that names it (`posting_rules.direction`, `codelet_type_defs.family`
+and `.phase`, `slipnet_link_defs.link_type`, `engine_params.value_type`, `formula_coefficients.value_type`,
+`clamp_types.progress_focus`, `progress_focuses.event_types`, `theme_dimension_defs.valid_relations`,
+the commentary sections keyed by the table's names) and lists the code, parameters and templates that still
+spell the old name. A codelet body, descriptor predicate or posting formula should write `role('bridge_type.top')`
+rather than the name, so that a rename needs no edit to it.
+
+## Parameters that name things
+
+`engine_params.refers_to` says what a parameter's value names, so a change that renames or removes the
+thing updates the parameter with it. It is declared in `engine_param_refs.json` (a map from parameter name
+to one of the five values; a parameter not in the file refers to nothing, and the column is null):
+
+| `refers_to` | The value is | Standard Configuration |
+|---|---|---|
+| `node_list` | a JSON list of Slipnet node names | `initially_clamped_slipnodes` |
+| `trigger_node_list` | a JSON list of node names that is also the union of the posting rules' triggering nodes | `top_down_slipnodes` |
+| `node_map` | a JSON map keyed by node name | `intrinsic_link_lengths`, `theme_dimension_labels`, `rule_english_dimension_phrases` |
+| `codelet_type_list` | a JSON list of codelet type names | `initial_codelet_types` |
+| `urgency_level` | the name of an urgency level, which a run needs to exist | `initial_codelet_urgency`, `bridge_recruit_urgency_level`, `default_urgency_level`, `manual_clamp_background_level` |
+
+The change API reads the column of the configuration it resolves against; no parameter name is written in
+code. A rule-trigger edit (`add_trigger`, `remove_trigger`) also changes the `trigger_node_list` parameter.
+
+The engine names no urgency tier. A run needs the tiers the configuration itself names: every tier a
+codelet body reads (`meta.get_urgency('low')`, found by parsing the bodies in force), every parameter above,
+every posting rule, clamp type and codelet pattern entry that names one. A tier renamed in its row and in
+the code that names it still runs. `manual_clamp_background_patterns` lists the clampable codelet patterns
+(`rule`, `bridge`, `group`) a person's clamp holds against a background of `manual_clamp_background_level`
+(`gui.ss:1221-1245`); the top-down and bottom-up patterns are clamped without one.
 
 ## When it is loaded
 

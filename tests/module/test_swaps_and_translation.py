@@ -27,10 +27,6 @@ import pytest
 from server.engine.images import ImageFailure
 from server.engine.metadata import MetadataProvider
 from server.engine.rules import (
-    CLAUSE_EXTRINSIC,
-    CLAUSE_INTRINSIC,
-    RULE_BOTTOM,
-    RULE_TOP,
     Rule,
     RuleChange,
     RuleClause,
@@ -38,7 +34,9 @@ from server.engine.rules import (
     apply_rule,
     build_rule_from_bridges,
 )
+from tests.support.standard_names import CLAUSE_EXTRINSIC, CLAUSE_INTRINSIC, RULE_BOTTOM, RULE_TOP
 from server.engine.runner import EngineRunner
+from tests.support import standard_names
 
 pytestmark = pytest.mark.numeric_matrix
 
@@ -75,7 +73,7 @@ def _bridge(ctx, obj1, obj2, bridge_type):
         bridge_type=bridge_type,
         concept_mappings=make_concept_mappings(obj1, obj2, bridge_type),
     )
-    bridge.proposal_level = bridge.BUILT
+    bridge.proposal_level = standard_names.BUILT
     ctx.workspace.add_bridge(bridge)
     return bridge
 
@@ -142,7 +140,7 @@ def _bbb_group(ctx):
         letters[1:4],
         [],
     )
-    group.proposal_level = group.BUILT
+    group.proposal_level = standard_names.BUILT
     ws.target_string.add_group(group)
     return group
 
@@ -224,7 +222,7 @@ def test_a_swap_over_overlapping_objects_is_a_swap_snag(ctx):
     assert apply_rule(
         rule, ws.target_string, ctx.slipnet, failure_action=failures.append
     ) is None
-    assert [f.kind for f in failures] == [ImageFailure.SWAP]
+    assert [f.kind for f in failures] == [standard_names.FAILURE_SWAP]
 
 
 # ── RU-4: the conflict check is the implication battery, not one identity ───
@@ -255,7 +253,7 @@ def test_a_length_change_on_a_group_conflicts_with_a_letter_change_inside_it(ctx
         letters[1:4],
         [],
     )
-    group.proposal_level = group.BUILT
+    group.proposal_level = standard_names.BUILT
     ws.target_string.add_group(group)
 
     rule = Rule(
@@ -293,7 +291,7 @@ def test_a_length_change_on_a_group_conflicts_with_a_letter_change_inside_it(ctx
     assert apply_rule(
         rule, ws.target_string, ctx.slipnet, failure_action=failures.append
     ) is None
-    assert [f.kind for f in failures] == [ImageFailure.CONFLICT]
+    assert [f.kind for f in failures] == [standard_names.FAILURE_CONFLICT]
     assert len(failures[0].objects) == 2
 
 
@@ -585,12 +583,12 @@ def test_a_letter_reference_object_makes_the_clause_denote_nothing(ijkk_ctx):
     application *succeeds*, which is the outcome the surrounding code handles.
     """
     from server.engine.rules import (
-        SCOPE_SUBOBJECTS,
         _get_constituent_objects,
         _get_extrinsic_transforms,
         _get_intrinsic_transforms,
         _get_reference_objects_for_clause,
     )
+    from tests.support.standard_names import SCOPE_SUBOBJECTS
 
     ctx = ijkk_ctx.ctx
     ws = ctx.workspace

@@ -28,7 +28,7 @@ license change was authorised by Dr. Marshall directly (see
 > end-to-end. Episodic Memory (Metacat-Mode learning) shapes the runs that inherit it: a run
 > declines an answer already held for the same problem and rules, so repeating a
 > problem across Metacat Mode's [episodic runs](#persistence-modes-and-episodic-runs)
-> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 5,954 test cases covering the engine, the API, and the
+> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 6,107 test cases covering the engine, the API, and the
 > help/config system, run on both the CPU and the GPU numeric backends. Underneath the seven components sits an execution
 > substrate — three [persistence modes](#persistence-modes-and-episodic-runs),
 > a [GPU numeric substrate](#the-numeric-substrate), and
@@ -455,7 +455,7 @@ Petacat has two test suites:
   plugin against the serial runs it claims to equal), `lockstep` (Petacat's decision
   traces against Metacat's), and `e2e` (full HTTP
   stack against a running database). All eight run in a single command against
-  the local Postgres — 5,954 cases, which includes the numeric matrix's second
+  the local Postgres — 6,107 cases, which includes the numeric matrix's second
   pass over the 1005 backend-sensitive tests. See
   [TESTING.md](TESTING.md) for the layer breakdown, the numeric backend matrix,
   the session ceiling, the unit-test rules, determinism requirements, test-double
@@ -1117,12 +1117,33 @@ for a session's, the external route). `GET /api/configurations/{id}/schema` list
 operation.
 
 - **Operations.** Generic operations (`insert`, `update`, `delete` on a row, addressed by its natural
-  key) and 29 convenience operations that expand into them (`add_node`, `remove_node`, `rename_node`,
-  `merge_nodes`, `add_link`, `set_param`, `adjust_param`, `set_coefficient`, `set_codelet_body`,
-  `move_layout`, `rebind_role` and others). A row states every column the configuration holds no default
-  for: a slipnet link states `fixed_length` (`fixed` in `add_link` and in `add_node`'s `links`), and a
-  posting rule states `posting_formula`, `count_formula` and `condition`. Nothing fills them in, and the
-  Admin routes and the model refuse a row that leaves one out.
+  key) and 30 convenience operations that expand into them (`add_node`, `remove_node`, `rename_node`,
+  `rename_enum_value`, `merge_nodes`, `add_link`, `set_param`, `adjust_param`, `set_coefficient`,
+  `set_codelet_body`, `move_layout`, `rebind_role` and others). A row states every column the configuration
+  holds no default for: a slipnet link states `fixed_length` (`fixed` in `add_link` and in `add_node`'s
+  `links`), and a posting rule states `posting_formula`, `count_formula` and `condition`. Nothing fills them
+  in, and the Admin routes and the model refuse a row that leaves one out.
+- **The vocabulary.** An enum-table row binds one of the engine's concepts by holding its name in a `role`
+  column (`behaviour` for link types), and the engine compares against the bound row's name, never a
+  literal (`seed_data/README.md`, "The role vocabulary"). `rename_enum_value` renames such a row (or a theme
+  relation) and rewrites every column that names it (`posting_rules.direction`, a codelet type's family and
+  phase, a link's type, a parameter's `value_type`, a clamp type's progress focus, a progress focus's event
+  types, a theme dimension's valid relations, and the commentary sections keyed by the table's names); it
+  keeps the row's role and place and lists the bodies, parameters and templates that still spell the old
+  name as `dangling`. Deleting a row that holds a role is refused (`422 role_bound`): unbind it first. A role
+  must be a name of the table's vocabulary and held by one row of it. The Admin **Enum Tables** tab shows the
+  role as a pick from the engine's list, with a **Rename** control.
+- **Episodic Memory's names.** A session's Episodic Memory persists names (nodes and theme relations, theme
+  types, rule and clause types). The change API has one rule for all of them: it neither refuses nor
+  rewrites. A rename, removal or merge is carried out on the configuration, the memory keeps the names it
+  stored, and the journal tells what became of an old name (`where-did-name-go`, the "names that no longer
+  resolve" panel).
+- **Parameters that name things.** `engine_params.refers_to` says what a parameter's value names
+  (`node_list`, `trigger_node_list`, `node_map`, `codelet_type_list`, `urgency_level`), and the cascades
+  read it from the configuration they resolve against. **A rule-trigger edit (`add_trigger`,
+  `remove_trigger`) also changes the parameter whose `refers_to` is `trigger_node_list`** (`top_down_slipnodes`
+  in the Metacat Standard Configuration): the node is added to it, or removed from it only when no rule still
+  triggers the node.
 - **Checked whole, first.** A batch that leaves a name pointing at nothing, a value the engine cannot read or code that does
   not compile is refused with the operation, table, key and (for code) line and column, and nothing is written.
   `expect` guards an update; `base_version` (required, an integer revision or `"head"`, on the external route `POST /api/training-mode/sessions/{id}/changes`, which answers 400 without it) with `base_mode` `strict` or `rebase` handles a configuration that moved on;
@@ -1479,7 +1500,7 @@ The tables below cover the routes a user drives.
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
 | POST | `/api/runs` | Create a new run — takes `mode` (the persistence mode: `fast`/`normal`/`audit`; a v1.2 name), `workers` (1–16; above 1 runs the exact speculative executor), `spreading_threshold`, and `parameters` for per-run overrides |
-| GET | `/api/runs/{id}` | Get run info |
+| GET | `/api/runs/{id}` | Get run info. With `POST /api/runs` (create) and `GET /api/review/runs/{id}` it also carries the run's bound vocabulary: `vocabulary` (role to name, e.g. `"bridge_type.top": "top"`) and `link_behaviours` (each link type's name to its behaviour), published once per run from the run's own configuration. The client compares trace event types, bridge and theme types, string kinds and link types through them, never against literal names (`client/src/store/vocabulary.ts`); run statuses are not vocabulary |
 | POST | `/api/runs/{id}/step` | Step N codelets |
 | POST | `/api/runs/{id}/run` | Run to completion |
 | POST | `/api/runs/{id}/stop` | Stop a running run |
@@ -1732,13 +1753,14 @@ files are not read again (see [`seed_data/README.md`](seed_data/README.md) and
 | `slipnet_links.json` | 202 links (category, instance, property, lateral, sliplink) |
 | `codelet_types.json` | 27 codelet types with Python execute bodies |
 | `engine_params.json` | Runtime parameters and thresholds |
+| `engine_param_refs.json` | What a parameter's names refer to (`engine_params.refers_to`: node list, trigger node list, node map, codelet type list, urgency level) |
 | `urgency_levels.json` | 7 urgency bin values |
 | `formula_coefficients.json` | 188 formula weights |
 | `theme_dimensions.json` | 9 conceptual dimensions |
 | `demo_problems.json` | 41 pre-configured analogy problems |
 | `posting_rules.json` | Codelet posting rules |
 | `commentary_templates.json` | Natural-language output templates, and Verbose mode's 200-odd message texts (`verbose_messages`) |
-| `enums.json` | Enum tables (bond categories, proposal levels, …) |
+| `enums.json` | The 18 enum tables (bridge types, proposal levels, link types, clamp types, …), with the `role` column that binds a row to the engine's vocabulary (see `seed_data/README.md`) |
 | `roles.json` | The roles the engine looks Slipnet nodes and codelet types up by (37 node-role rows, 5 codelet-type-role rows) |
 | `theme_relations.json` | The Themespace's 5 relations |
 | `slipnet_layout.json` | Grid positions for the Slipnet visualisation |

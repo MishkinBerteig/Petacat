@@ -233,6 +233,10 @@ def option_name(x: Any) -> str:
     if isinstance(x, tuple):
         if len(x) == 4 and x[0] in ("top", "vertical", "bottom") and isinstance(x[0], str):
             return x[0]
+        if len(x) == 3 and isinstance(x[0], str) and all(hasattr(s, "string_type") for s in x[1:]):
+            # The bridge scouts' ``(bridge type, string1, string2)``: Metacat's option is the type
+            # (the name the run's vocabulary gives it, which is ``top`` in the Standard Configuration).
+            return x[0]
         if len(x) == 3 and isinstance(x[0], (int, float)) and not isinstance(x[0], bool):
             return name_of(x[1])
     return name_of(x)

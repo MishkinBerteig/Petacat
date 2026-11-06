@@ -32,7 +32,7 @@ from server.engine.runner import EngineContext, StepResult
 from server.engine.sink import STRUCTURE_BUILT, NullSink
 from server.engine.serialization import describe_structure
 from server.engine.state_graph import capture_run_state
-from server.engine.trace import SNAG, TraceEvent
+from server.engine.trace import TraceEvent
 from server.models.run import (
     AnswerDescriptionRow,
     AuditAction,
@@ -118,7 +118,7 @@ class TraceRecordingSink:
 
     def on_trace_event(self, ctx: EngineContext, event: TraceEvent) -> None:
         self._trace_events.append(event)
-        if event.event_type == SNAG:
+        if event.event_type == ctx.meta.vocabulary.event_type_snag:
             # Take the snag descriptions the memory has gained during this run.  It
             # gains none for a snag it already knows (``snag_present?``,
             # ``answers.ss:1162``), which is exactly the deduplication the rows should
@@ -370,7 +370,7 @@ class AuditSink(TraceRecordingSink):
     ) -> None:
         self._record(
             ctx,
-            f"structure_{change}",
+            change,
             {
                 "structure": type(structure).__name__,
                 "id": getattr(structure, "id", None),
@@ -382,7 +382,9 @@ class AuditSink(TraceRecordingSink):
             # now, unused in Phase 0.
             before={
                 "proposal_level": (
-                    "evaluated" if change == STRUCTURE_BUILT else "built"
+                    ctx.meta.vocabulary.proposal_level_evaluated
+                    if change == STRUCTURE_BUILT
+                    else ctx.meta.vocabulary.proposal_level_built
                 ),
             },
         )

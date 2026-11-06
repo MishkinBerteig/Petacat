@@ -9,7 +9,7 @@ from types import SimpleNamespace as NS
 import pytest
 
 from server.engine import rules
-from server.engine.rules import CLAUSE_EXTRINSIC, CLAUSE_INTRINSIC
+from tests.support.standard_names import CLAUSE_EXTRINSIC, CLAUSE_INTRINSIC
 
 
 def _obj(left, right, enclosing=None, string=None):
@@ -140,6 +140,7 @@ def test_differing_dimensions_counts_one_per_matching_pair():
             bottom_rule_description="", top_rule_quality=70.0,
             bottom_rule_quality=0.0, quality=70.0, temperature=30.0,
             themes=themes, unjustified_slippages=[], unjustified_themes=unjustified,
+            top_rule_signature=[], bottom_rule_signature=[],
         )
 
     # Answer 1 states X twice (justified identity, unjustified opposite); answer 2 once.

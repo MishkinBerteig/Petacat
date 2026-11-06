@@ -447,16 +447,23 @@ STRING_TARGET = 2
 STRING_ANSWER = 3
 STRING_OTHER = 4
 
-_STRING_TYPE_CODES = {
-    "initial": STRING_INITIAL,
-    "modified": STRING_MODIFIED,
-    "target": STRING_TARGET,
-    "answer": STRING_ANSWER,
-}
+def string_type_codes(vocab: Any) -> dict[str, int]:
+    """The code of each string kind of *vocab* (the run's vocabulary), by the kind's name."""
+    return {
+        vocab.string_kind_initial: STRING_INITIAL,
+        vocab.string_kind_modified: STRING_MODIFIED,
+        vocab.string_kind_target: STRING_TARGET,
+        vocab.string_kind_answer: STRING_ANSWER,
+    }
 
 
-def string_type_code(name: str | None) -> int:
-    return _STRING_TYPE_CODES.get(name or "", STRING_OTHER)
+def string_type_code(name: str | None, vocab: Any = None) -> int:
+    """The code of the string kind *name*; *vocab* defaults to the bound run's vocabulary."""
+    if vocab is None:
+        from server.engine.run_binding import vocab as run_vocab
+
+        vocab = run_vocab()
+    return string_type_codes(vocab).get(name or "", STRING_OTHER)
 
 
 @dataclass(frozen=True)
@@ -638,19 +645,23 @@ def gather_object_values(objects: Sequence[Any]) -> ObjectValueBatch:
     """Read the combination stage's inputs off a string's objects."""
     from server.engine.run_binding import constants
 
+    k = constants()
+    codes = string_type_codes(k.vocab)
+    horizontal = k.vocab.bridge_orientation_horizontal
+    vertical = k.vocab.bridge_orientation_vertical
     return ObjectValueBatch(
         relative_importance=[o.relative_importance for o in objects],
         intra_unhappiness=[o.intra_string_unhappiness for o in objects],
         horizontal_unhappiness=[
-            o.inter_string_unhappiness["horizontal"] for o in objects
+            o.inter_string_unhappiness[horizontal] for o in objects
         ],
-        vertical_unhappiness=[o.inter_string_unhappiness["vertical"] for o in objects],
+        vertical_unhappiness=[o.inter_string_unhappiness[vertical] for o in objects],
         salience_clamped=[o.salience_clamped for o in objects],
-        string_type=[string_type_code(o._string_type()) for o in objects],
+        string_type=[codes.get(o._string_type() or "", STRING_OTHER) for o in objects],
         justify_mode=[o._justify_mode() for o in objects],
         prev_horizontal_salience=[o.salience["horizontal_inter"] for o in objects],
         prev_vertical_salience=[o.salience["vertical_inter"] for o in objects],
-        weights=constants().salience,
+        weights=k.salience,
     )
 
 

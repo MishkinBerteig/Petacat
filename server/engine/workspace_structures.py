@@ -42,18 +42,25 @@ def bound_meta() -> MetadataProvider:
 class WorkspaceStructure:
     """Base class for bonds, groups, bridges, descriptions, rules."""
 
-    # Proposal level string constants (values live in DB proposal_levels table)
-    PROPOSED = "proposed"
-    EVALUATED = "evaluated"
-    BUILT = "built"
+    # The built level's name, as the run's vocabulary spells it, kept beside ``proposal_level``
+    # so that ``is_built`` is one comparison.  A slot, not an entry of ``__dict__``, because the
+    # state graph captures ``vars(structure)`` and this is configuration, not run state: the
+    # same name for every structure of a run.  Subclasses have no ``__slots__`` and keep their
+    # ``__dict__``.
+    __slots__ = ("_built_level",)
 
     def __init__(self) -> None:
         self.id = next_id(KIND_STRUCTURE)
-        self.proposal_level = self.PROPOSED
+        run = current()
+        voc = run.constants.vocab
+        #: The level name the structure was made with, and the one that means "built", both
+        #: from the run's vocabulary; ``is_built`` is an equality test between them.
+        self.proposal_level = voc.proposal_level_proposed
+        self._built_level = voc.proposal_level_built
         self.strength: float = 0.0
         #: workspace-structures.ss:22 -- the count when the structure was made (not
         #: when built); the progress-watcher's activity is the age of the youngest.
-        self.time_stamp: int = getattr(current().clock, "now", 0)
+        self.time_stamp: int = getattr(run.clock, "now", 0)
         #: The group this structure is a constituent of, if any.  Set for *bonds*
         #: by ``build-group`` (groups.ss:927-928) and cleared by ``break-group``
         #: (groups.ss:988-989); the breaker reads it to decide whether a bond can
@@ -68,7 +75,12 @@ class WorkspaceStructure:
 
     @property
     def is_built(self) -> bool:
-        return self.proposal_level == self.BUILT
+        try:
+            built = self._built_level
+        except AttributeError:
+            # A structure the state graph restored with ``__new__`` never ran ``__init__``.
+            built = self._built_level = current().constants.vocab.proposal_level_built
+        return self.proposal_level == built
 
     def update_strength(self, rng: RNG | None = None) -> None:
         """Recompute strength from internal, external, and thematic terms.

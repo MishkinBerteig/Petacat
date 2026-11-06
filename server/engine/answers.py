@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 
 from server.engine.memory import AnswerDescription
 from server.engine.rules import rule_signature
+from server.engine.run_binding import vocab
 
 if TYPE_CHECKING:
     from server.engine.metadata import MetadataProvider
@@ -56,8 +57,8 @@ def get_quality_phrase(quality: float, meta: MetadataProvider) -> str:
 
 def create_answer_description(
     workspace: Workspace,
-    top_rule: Rule | None,
-    bottom_rule: Rule | None,
+    top_rule: Rule,
+    bottom_rule: Rule,
     quality: float,
     temperature: float,
     themes: dict[str, Any],
@@ -72,6 +73,7 @@ def create_answer_description(
     slippages the program never came to terms with.
     """
     answer_text = workspace.answer_string.text if workspace.answer_string else ""
+    v = vocab()
 
     allowed = tuple(
         node.name for node in workspace.slipnet.roles.answer_description_dimension
@@ -80,7 +82,7 @@ def create_answer_description(
     # The *whole* dominant vertical pattern, unfiltered: ``answers.ss:157-158`` reads
     # it as it stands and consults exactly one of its entries.
     vertical = _distil_vertical_pattern(
-        themes.get("vertical_bridge", {}), workspace, trace, allowed
+        themes.get(v.theme_type_vertical_bridge, {}), workspace, trace, allowed
     )
 
     return AnswerDescription(
@@ -90,22 +92,22 @@ def create_answer_description(
             workspace.target_string.text,
             answer_text,
         ),
-        top_rule_description=top_rule.english_transcription if top_rule else "",
-        bottom_rule_description=bottom_rule.english_transcription if bottom_rule else "",
-        top_rule_quality=top_rule.quality if top_rule else 0.0,
-        bottom_rule_quality=bottom_rule.quality if bottom_rule else 0.0,
+        top_rule_description=top_rule.english_transcription,
+        bottom_rule_description=bottom_rule.english_transcription,
+        top_rule_quality=top_rule.quality,
+        bottom_rule_quality=bottom_rule.quality,
         quality=quality,
         temperature=temperature,
         themes=vertical,
-        top_themes=dict(themes.get("top_bridge", {})),
+        top_themes=dict(themes.get(v.theme_type_top_bridge, {})),
         vertical_themes=vertical,
-        bottom_themes=dict(themes.get("bottom_bridge", {})),
+        bottom_themes=dict(themes.get(v.theme_type_bottom_bridge, {})),
         unjustified_themes=_unjustified_themes(
             unjustified_slippages or [], workspace.slipnet.roles
         ),
         unjustified_slippages=[str(cm) for cm in (unjustified_slippages or [])],
-        top_rule_abstractness=top_rule.abstractness if top_rule else 0.0,
-        bottom_rule_abstractness=bottom_rule.abstractness if bottom_rule else 0.0,
+        top_rule_abstractness=top_rule.abstractness,
+        bottom_rule_abstractness=bottom_rule.abstractness,
         # ``memory.ss:117`` stores the clause lists so ``answer-present?`` can compare
         # them structurally.  The English transcription cannot stand in for this.
         top_rule_signature=rule_signature(top_rule),
@@ -117,8 +119,6 @@ def create_answer_description(
         ),
     )
 
-
-_IDENTITY = "identity"
 
 
 def _distil_vertical_pattern(
@@ -163,10 +163,12 @@ def _distil_vertical_pattern(
     used to — let a Direction or Group-Category theme that happened to lead its cluster
     enter an answer's index with nothing in the Workspace supporting it.
     """
+    v = vocab()
+    identity = v.theme_relation_identity
     events = _important_answer_description_events(workspace, trace)
     cm_entries = _slippage_event_entries(events)
-    initial_group = _spanning_group_from_events(events, "initial")
-    target_group = _spanning_group_from_events(events, "target")
+    initial_group = _spanning_group_from_events(events, v.string_kind_initial)
+    target_group = _spanning_group_from_events(events, v.string_kind_target)
 
     roles = workspace.slipnet.roles
     # An absent role's token has a name no dimension carries, so its branch never matches.
@@ -184,13 +186,13 @@ def _distil_vertical_pattern(
             elif string_position in dominant:
                 pattern[string_position] = dominant[string_position]
             else:
-                pattern[string_position] = _IDENTITY
+                pattern[string_position] = identity
         elif dimension == bond_facet:
             continue
         elif _whole_string_identity_concept_mapping(
             dimension, initial_group, target_group, workspace
         ):
-            pattern[dimension] = _IDENTITY
+            pattern[dimension] = identity
     return pattern
 
 
@@ -212,17 +214,17 @@ def _important_answer_description_events(workspace: Workspace, trace: Any) -> li
         return []
 
     from server.engine.jootsing import equivalent_workspace_objects
-    from server.engine.trace import CONCEPT_MAPPING_BUILT, GROUP_BUILT
+    v = vocab()
 
     relevant: list[Any] = []
     for event in getattr(trace, "events", []) or []:
-        if event.event_type == CONCEPT_MAPPING_BUILT:
+        if event.event_type == v.event_type_concept_mapping_built:
             bridge = getattr(event, "bridge", None)
-            if bridge is None or getattr(bridge, "bridge_type", None) != "vertical":
+            if bridge is None or getattr(bridge, "bridge_type", None) != v.bridge_type_vertical:
                 continue
             if workspace.bridge_present(bridge):
                 relevant.append(event)
-        elif event.event_type == GROUP_BUILT:
+        elif event.event_type == v.event_type_group_built:
             group = getattr(event, "group", None)
             if group is None or not group.spans_whole_string():
                 continue
@@ -233,7 +235,7 @@ def _important_answer_description_events(workspace: Workspace, trace: Any) -> li
     def equal(e1: Any, e2: Any) -> bool:
         if e1.event_type != e2.event_type:
             return False
-        if e1.event_type == CONCEPT_MAPPING_BUILT:
+        if e1.event_type == v.event_type_concept_mapping_built:
             # ``CMs-equal?`` (``concept-mappings.ss:175-178``) — the two descriptors,
             # by identity.  Not the objects: the same slippage seen on two bridges is
             # one idea.
@@ -279,11 +281,9 @@ def _slippage_event_entries(events: list[Any]) -> dict[str, str]:
     two events name the same dimension with different relations.
     """
     from server.engine.themes import relation_name_for_label
-    from server.engine.trace import CONCEPT_MAPPING_BUILT
-
     entries: dict[str, str] = {}
     for event in events:
-        if event.event_type != CONCEPT_MAPPING_BUILT:
+        if event.event_type != vocab().event_type_concept_mapping_built:
             continue
         cm = event.concept_mapping
         if cm is None:
@@ -302,10 +302,10 @@ def _spanning_group_from_events(events: list[Any], string_type: str) -> Any:
     Scheme: ``answers.ss:159-178`` — ``select`` over the important events, which takes
     the first match in list order.
     """
-    from server.engine.trace import GROUP_BUILT
+    group_built = vocab().event_type_group_built
 
     for event in events:
-        if event.event_type != GROUP_BUILT:
+        if event.event_type != group_built:
             continue
         group = event.group
         if group is None:
@@ -425,7 +425,7 @@ def _unjustified_themes(slippages: list[Any], roles: Any) -> dict[str, Any]:
         # pattern; a dict keeps insertion order, so build them first.
         # A dimension the configuration lacks is not added (its token is no theme's name).
         augmented = {
-            node.name: themes.get(node.name, _IDENTITY)
+            node.name: themes.get(node.name, vocab().theme_relation_identity)
             for node in (roles.dimension_group_category, roles.dimension_direction)
             if node
         }
@@ -484,7 +484,11 @@ def make_translated_string(
     text = "".join(
         getattr(node, "short_name", "") for node in _generate_image_letters(source, slipnet)
     )
-    string_type = "modified" if source.string_type == "initial" else "answer"
+    v = vocab()
+    string_type = (
+        v.string_kind_modified if source.string_type == v.string_kind_initial
+        else v.string_kind_answer
+    )
     translated = WorkspaceString(text, slipnet, string_type=string_type)
     if workspace is not None:
         translated.workspace = workspace
@@ -515,9 +519,9 @@ def make_translated_string(
         return translated
 
     for group in [o for o in translated.objects if o not in letters]:
-        group.proposal_level = getattr(group, "BUILT", group.proposal_level)
+        group.proposal_level = vocab().proposal_level_built
         for bond in getattr(group, "group_bonds", ()) or ():
-            bond.proposal_level = getattr(bond, "BUILT", bond.proposal_level)
+            bond.proposal_level = vocab().proposal_level_built
             translated.add_bond(bond)
 
     # ``answers.ss:1061`` — before the bridges are drawn, whichever groups the rule's
@@ -657,12 +661,7 @@ def _bridge_to_translation(
     about one letter would have to be underwritten by a horizontal bridge on every
     object in the string before it counted as supported.
     """
-    from server.engine.bridges import (
-        BRIDGE_BOTTOM,
-        BRIDGE_TOP,
-        Bridge,
-        make_concept_mappings,
-    )
+    from server.engine.bridges import Bridge, make_concept_mappings
     from server.engine.rules import _get_constituent_objects, _is_workspace_string
 
     # Which horizontal pair the bridges belong to follows from which string was
@@ -670,8 +669,11 @@ def _bridge_to_translation(
     # target string becomes the answer (a bottom pair).  Justify mode translates a
     # bottom rule into a top one, so the initial-string case is reachable, and filing
     # those bridges under ``bottom`` would have misreported the bottom mapping.
+    v = vocab()
     bridge_type = (
-        BRIDGE_TOP if getattr(source, "string_type", "") == "initial" else BRIDGE_BOTTOM
+        v.bridge_type_top
+        if getattr(source, "string_type", "") == v.string_kind_initial
+        else v.bridge_type_bottom
     )
 
     if transforms is None:
@@ -702,7 +704,7 @@ def _bridge_to_translation(
                 obj, counterpart, bridge_type
             ),
         )
-        bridge.proposal_level = getattr(bridge, "BUILT", bridge.proposal_level)
+        bridge.proposal_level = vocab().proposal_level_built
         bridges.append(bridge)
         if workspace is not None:
             workspace.add_bridge(bridge)

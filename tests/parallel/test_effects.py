@@ -170,7 +170,7 @@ def test_detector_catches_a_planted_hidden_write(meta, monkeypatch):
 
     def sneaky(ctx, name):
         node = real_role(ctx, name)
-        if node and not isinstance(node, tuple) and not node.frozen:
+        if node and not isinstance(node, (tuple, str)) and not node.frozen:
             node.activation = node.activation + 1.0  # a hidden write on a read path
         return node
 

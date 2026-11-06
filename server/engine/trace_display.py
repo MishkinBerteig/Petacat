@@ -41,7 +41,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any
+from typing import Any, NamedTuple
 from server.engine.slipnet import (
     cm_short_name_of,
     full_name_of,
@@ -49,6 +49,7 @@ from server.engine.slipnet import (
     lowercase_name as _lowercase_name,
     opposite_node,
 )
+from server.engine.run_binding import vocab as run_vocab
 from server.engine.workspace import WorkspaceString
 
 logger = logging.getLogger(__name__)
@@ -56,12 +57,10 @@ logger = logging.getLogger(__name__)
 PICTURE_VERSION = 1
 
 # Roles the client colours.  ``%workspace-event-structure-color%``,
-# ``%top-bridge-color%`` & co. in Metacat.
+# ``%top-bridge-color%`` & co. in Metacat.  The top, bottom and vertical roles are the run's
+# names for the three bridge types and the snag role is its name for the snag event type
+# (:func:`_roles`), so a rule or a bridge is drawn in the colour of the name the run gives it.
 ROLE_EVENT = "event"
-ROLE_TOP = "top"
-ROLE_BOTTOM = "bottom"
-ROLE_VERTICAL = "vertical"
-ROLE_SNAG = "snag"
 ROLE_THEME_CM = "theme_cm"
 ROLE_VERTICAL_SLIPPAGE = "vertical_slippage"
 #: ``get-highlight-color`` (``answers.ss:1233``): a slippage that induced a coattail slippage is
@@ -71,6 +70,19 @@ ROLE_VERTICAL_SLIPPAGE_DIM = "vertical_slippage_dim"
 ROLE_COATTAIL_SLIPPAGE = "coattail_slippage"
 ROLE_COATTAIL_SLIPPAGE_DIM = "coattail_slippage_dim"
 ROLE_FADED = "faded"
+
+
+class _Roles(NamedTuple):
+    top: str
+    bottom: str
+    vertical: str
+    snag: str
+
+
+def _roles() -> _Roles:
+    """The run's names for the colour roles that are vocabulary names."""
+    v = run_vocab()
+    return _Roles(v.bridge_type_top, v.bridge_type_bottom, v.bridge_type_vertical, v.event_type_snag)
 
 
 # ---------------------------------------------------------------------------
@@ -138,26 +150,25 @@ def group_print_name(group: Any) -> str:
 
 def print_name(event: Any) -> str:
     """The label Metacat's Temporal Trace window draws for *event*."""
-    from server.engine import trace as T
-
+    v = run_vocab()
     kind = event.event_type
-    if kind == T.CONCEPT_ACTIVATION and event.slipnode is not None:
+    if kind == v.event_type_concept_activation and event.slipnode is not None:
         return f"({event.slipnode.short_name})"
-    if kind == T.GROUP_BUILT and event.group is not None:
+    if kind == v.event_type_group_built and event.group is not None:
         return group_print_name(event.group)
-    if kind == T.CONCEPT_MAPPING_BUILT and event.concept_mapping is not None:
-        prefix = {"top": "T", "vertical": "V", "bottom": "B"}.get(
+    if kind == v.event_type_concept_mapping_built and event.concept_mapping is not None:
+        prefix = {v.bridge_type_top: "T", v.bridge_type_vertical: "V", v.bridge_type_bottom: "B"}.get(
             getattr(event.bridge, "bridge_type", ""), "?"
         )
         return f"{prefix}:{concept_mapping_print_name(event.concept_mapping)}"
-    if kind == T.RULE_BUILT and event.structures:
+    if kind == v.event_type_rule_built and event.structures:
         rule = event.structures[0]
         return "[Top Rule]" if getattr(rule, "is_top_rule", True) else "[Bottom Rule]"
-    if kind == T.ANSWER_FOUND:
+    if kind == v.event_type_answer_found:
         return f"[Answer {getattr(event, 'answer_string', '') or ''}]"
-    if kind == T.SNAG:
+    if kind == v.event_type_snag:
         return "[Snag]"
-    if kind in (T.CLAMP_START, T.CLAMP_END):
+    if kind in (v.event_type_clamp_start, v.event_type_clamp_end):
         return "[Clamp]"
     return event.description or kind
 
@@ -182,28 +193,27 @@ def _full_object_name(obj: Any) -> str:
 
 def header(event: Any, justify_mode: bool = False) -> str:
     """The text after ``Event N:  `` that ``display-workspace`` draws."""
-    from server.engine import trace as T
-
+    v = run_vocab()
     kind = event.event_type
-    if kind == T.CONCEPT_ACTIVATION and event.slipnode is not None:
+    if kind == v.event_type_concept_activation and event.slipnode is not None:
         return f"Activation of {full_slipnode_name(event.slipnode)} concept"
-    if kind == T.GROUP_BUILT and event.group is not None:
+    if kind == v.event_type_group_built and event.group is not None:
         if event.flipped:
             return f"Flipped {_unflipped_group_name(event.group)}"
         return f"Built {_full_object_name(event.group)}"
-    if kind == T.CONCEPT_MAPPING_BUILT and event.concept_mapping is not None:
+    if kind == v.event_type_concept_mapping_built and event.concept_mapping is not None:
         noun = "slippage" if not event.concept_mapping.is_identity else "concept-mapping"
         return f"Made {concept_mapping_print_name(event.concept_mapping)} {noun}"
-    if kind == T.RULE_BUILT and event.structures:
+    if kind == v.event_type_rule_built and event.structures:
         rule = event.structures[0]
         return f"Built {'translated ' if getattr(rule, 'translated', False) else ''}rule"
-    if kind == T.ANSWER_FOUND:
+    if kind == v.event_type_answer_found:
         unjustified = getattr(event, "is_unjustified", lambda: False)()
         return answer_header(justify_mode, unjustified)
-    if kind == T.SNAG:
+    if kind == v.event_type_snag:
         return "Snag"
-    if kind in (T.CLAMP_START, T.CLAMP_END):
-        manual = getattr(event, "clamp_type", "") == "manual_clamp"
+    if kind in (v.event_type_clamp_start, v.event_type_clamp_end):
+        manual = getattr(event, "clamp_type", "") == v.clamp_type_manual
         return "Manually clamped patterns" if manual else "Clamped patterns"
     return event.description or kind
 
@@ -277,10 +287,10 @@ def _new_highlights() -> dict:
     return {"groups": [], "objects": [], "bridges": [], "concept_mappings": []}
 
 
-def _serialize_rule_for_picture(rule: Any, role: str) -> dict:
+def _serialize_rule_for_picture(rule: Any, role: str, vocabulary: Any) -> dict:
     from server.engine.serialization import _serialize_rule
 
-    out = _serialize_rule(rule)
+    out = _serialize_rule(rule, vocabulary)
     out["role"] = role
     return out
 
@@ -302,14 +312,15 @@ def workspace_picture(
     from server.engine.serialization import _serialize_bridge, _serialize_group
 
     ws = ctx.workspace
+    v = ctx.meta.vocabulary
     strings = ws.all_strings
     if groups is None:
         groups = [g for s in strings for g in s.groups if g.is_built]
     if bridges is None:
         bridges = {
-            "top": [b for b in ws.top_bridges if b.is_built],
-            "vertical": [b for b in ws.vertical_bridges if b.is_built],
-            "bottom": [b for b in ws.bottom_bridges if b.is_built],
+            v.bridge_type_top: [b for b in ws.top_bridges if b.is_built],
+            v.bridge_type_vertical: [b for b in ws.vertical_bridges if b.is_built],
+            v.bridge_type_bottom: [b for b in ws.bottom_bridges if b.is_built],
         }
 
     groups_by_text: dict[str, list[dict]] = {s.text: [] for s in strings}
@@ -318,7 +329,7 @@ def workspace_picture(
         if text is not None:
             groups_by_text.setdefault(text, []).append(_serialize_group(g))
 
-    rule_dicts = [_serialize_rule_for_picture(r, role) for r, role in (rules or [])]
+    rule_dicts = [_serialize_rule_for_picture(r, role, v) for r, role in (rules or [])]
     return {
         "initial": ws.initial_string.text,
         "modified": ws.modified_string.text,
@@ -326,20 +337,20 @@ def workspace_picture(
         "answer": answer_text
         if answer_text is not None
         else (ws.answer_string.text if ws.answer_string else None),
-        "num_top_bridges": len(bridges["top"]),
-        "num_bottom_bridges": len(bridges["bottom"]),
-        "num_vertical_bridges": len(bridges["vertical"]),
-        "num_top_rules": sum(1 for r in rule_dicts if r["type"] == "top"),
-        "num_bottom_rules": sum(1 for r in rule_dicts if r["type"] == "bottom"),
+        "num_top_bridges": len(bridges[v.bridge_type_top]),
+        "num_bottom_bridges": len(bridges[v.bridge_type_bottom]),
+        "num_vertical_bridges": len(bridges[v.bridge_type_vertical]),
+        "num_top_rules": sum(1 for r in rule_dicts if r["type"] == v.rule_type_top),
+        "num_bottom_rules": sum(1 for r in rule_dicts if r["type"] == v.rule_type_bottom),
         "bonds_per_string": {},
         "groups_per_string": {t: len(v) for t, v in groups_by_text.items()},
         "bonds": {},
         "groups": groups_by_text,
-        "top_bridges": [_serialize_bridge(b) for b in bridges["top"]],
-        "vertical_bridges": [_serialize_bridge(b) for b in bridges["vertical"]],
-        "bottom_bridges": [_serialize_bridge(b) for b in bridges["bottom"]],
-        "top_rules": [r for r in rule_dicts if r["type"] == "top"],
-        "bottom_rules": [r for r in rule_dicts if r["type"] == "bottom"],
+        "top_bridges": [_serialize_bridge(b) for b in bridges[v.bridge_type_top]],
+        "vertical_bridges": [_serialize_bridge(b) for b in bridges[v.bridge_type_vertical]],
+        "bottom_bridges": [_serialize_bridge(b) for b in bridges[v.bridge_type_bottom]],
+        "top_rules": [r for r in rule_dicts if r["type"] == v.rule_type_top],
+        "bottom_rules": [r for r in rule_dicts if r["type"] == v.rule_type_bottom],
     }
 
 
@@ -501,8 +512,8 @@ def _theme_patterns_for(event: Any) -> list:
 
 def build_event_picture(ctx: Any, event: Any) -> dict:
     """Everything ``display`` shows for *event*, taken now (``trace.ss:405-1212``)."""
-    from server.engine import trace as T
-
+    v = ctx.meta.vocabulary
+    R = _roles()
     ws = ctx.workspace
     highlights = _new_highlights()
     rules: list[tuple[Any, str]] = []
@@ -517,12 +528,12 @@ def build_event_picture(ctx: Any, event: Any) -> dict:
     for rule in ws.get_clamped_rules():
         rules.append((rule, ROLE_FADED))
 
-    if kind == T.GROUP_BUILT and event.group is not None:
+    if kind == v.event_type_group_built and event.group is not None:
         highlights["objects"].append(object_ref(event.group, ROLE_EVENT))
         highlights["groups"].append(object_ref(event.group, ROLE_EVENT))
         slipnet = _slipnet_block("Group Descriptors", [group_concept_pattern(event.group)])
 
-    elif kind == T.CONCEPT_MAPPING_BUILT and event.concept_mapping is not None:
+    elif kind == v.event_type_concept_mapping_built and event.concept_mapping is not None:
         cm, bridge = event.concept_mapping, event.bridge
         if bridge is not None:
             highlight_bridges(highlights, [bridge], ROLE_EVENT)
@@ -530,15 +541,15 @@ def build_event_picture(ctx: Any, event: Any) -> dict:
         word = "Slippage" if not cm.is_identity else "Concept-mapping"
         slipnet = _slipnet_block(f"{word} Concepts", [cm.get_concept_pattern()])
 
-    elif kind == T.CONCEPT_ACTIVATION and event.slipnode is not None:
+    elif kind == v.event_type_concept_activation and event.slipnode is not None:
         slipnet = _slipnet_block(
             "Concept Activation", [[(event.slipnode, event.slipnode.max_activation)]]
         )
         themes = []
 
-    elif kind == T.RULE_BUILT and event.structures:
+    elif kind == v.event_type_rule_built and event.structures:
         rule = event.structures[0]
-        role = ROLE_TOP if getattr(rule, "is_top_rule", True) else ROLE_BOTTOM
+        role = R.top if getattr(rule, "is_top_rule", True) else R.bottom
         if getattr(rule, "translated", False) and getattr(rule, "original_rule", None):
             rules.append((rule.original_rule, ROLE_FADED))
         for obj in rule_reference_objects(ctx, rule):
@@ -546,18 +557,18 @@ def build_event_picture(ctx: Any, event: Any) -> dict:
         highlight_bridges(highlights, list(getattr(rule, "supporting_bridges", []) or []), role)
         rules.append((rule, role))
         slipnet = _slipnet_block(
-            "Top Rule Concepts" if role == ROLE_TOP else "Bottom Rule Concepts",
+            "Top Rule Concepts" if role == R.top else "Bottom Rule Concepts",
             [rule.get_concept_pattern()],
         )
         # ``(impose-theme-pattern (tell rule 'get-theme-pattern))`` (``trace.ss:976``).
         themes = [_json_pattern(rule.theme_pattern)] if rule.theme_pattern else []
 
-    elif kind == T.SNAG:
+    elif kind == v.event_type_snag:
         _snag_highlights(ctx, event, highlights, rules)
         slipnet = _slipnet_block("Snag Object Descriptors", [event.snag_concept_pattern])
         temperature = 100.0
 
-    elif kind in (T.CLAMP_START, T.CLAMP_END):
+    elif kind in (v.event_type_clamp_start, v.event_type_clamp_end):
         for rule in getattr(event, "rules", []) or []:
             rules.append((rule, ROLE_FADED))
         themes = list(getattr(event, "clamped_theme_patterns", []) or [])
@@ -566,7 +577,7 @@ def build_event_picture(ctx: Any, event: Any) -> dict:
         )
         coderack = _codelet_pattern_block(ctx, event)
 
-    elif kind == T.ANSWER_FOUND:
+    elif kind == v.event_type_answer_found:
         _answer_highlights(ctx, event, highlights, rules)
         themes = []
 
@@ -582,19 +593,20 @@ def build_event_picture(ctx: Any, event: Any) -> dict:
         "slipnet": slipnet,
         "coderack": coderack,
         "themes": themes,
-        "question_mark": kind == T.SNAG,
+        "question_mark": kind == v.event_type_snag,
     }
-    if kind == T.ANSWER_FOUND and event.slippage_log is not None:
+    if kind == v.event_type_answer_found and event.slippage_log is not None:
         picture["translation"] = answer_translation_json(event)
-    elif kind == T.SNAG and event.slippage_log is not None:
+    elif kind == v.event_type_snag and event.slippage_log is not None:
         picture["translation"] = snag_translation_json(event)
     return picture
 
 
 def _codelet_pattern_block(ctx: Any, event: Any) -> dict:
-    from server.engine.trace import CLAMP_TYPE_CODELET_BACKGROUNDS
+    from server.engine.trace import clamp_type_spec
 
-    background = CLAMP_TYPE_CODELET_BACKGROUNDS.get(getattr(event, "clamp_type", ""))
+    spec = clamp_type_spec(getattr(event, "clamp_type", ""))
+    background = spec.codelet_background_level if spec is not None else None
     entries: list[dict] = []
     for pattern in getattr(event, "clamped_codelet_patterns", []) or []:
         if not pattern:
@@ -609,8 +621,9 @@ def _codelet_pattern_block(ctx: Any, event: Any) -> dict:
 
 def _snag_highlights(ctx: Any, event: Any, highlights: dict, rules: list) -> None:
     """``display-workspace`` of a snag (``trace.ss:1190-1211``)."""
+    R = _roles()
     vertical = list(event.supporting_vertical_bridges or [])
-    highlight_bridges(highlights, vertical, ROLE_VERTICAL)
+    highlight_bridges(highlights, vertical, R.vertical)
     highlights["concept_mappings"].extend(applied_slippage_highlights(event.slippage_log))
     rule = event.snag_rule
     # ``(for* each obj in rule-ref-objects ...)`` (``trace.ss:1200``): the objects ``translate``
@@ -621,20 +634,21 @@ def _snag_highlights(ctx: Any, event: Any, highlights: dict, rules: list) -> Non
         else rule_reference_objects(ctx, rule)
     )
     for obj in ref_objects:
-        highlights["objects"].append(object_ref(obj, ROLE_TOP))
+        highlights["objects"].append(object_ref(obj, R.top))
     if rule is not None:
-        highlight_bridges(highlights, list(getattr(rule, "supporting_bridges", []) or []), ROLE_TOP)
+        highlight_bridges(highlights, list(getattr(rule, "supporting_bridges", []) or []), R.top)
     for obj in event.snag_objects:
         if not _is_string(obj):
-            highlights["objects"].append(object_ref(obj, ROLE_SNAG))
+            highlights["objects"].append(object_ref(obj, R.snag))
     if rule is not None:
-        rules.append((rule, ROLE_TOP))
+        rules.append((rule, R.top))
     if event.translated_rule is not None:
-        rules.append((event.translated_rule, ROLE_SNAG))
+        rules.append((event.translated_rule, R.snag))
 
 
 def _answer_highlights(ctx: Any, event: Any, highlights: dict, rules: list) -> None:
     """``display-workspace`` of an answer (``trace.ss:439-464``)."""
+    R = _roles()
     # ``(tell self 'get-supporting-bridges 'vertical)`` and the slippage log (``trace.ss:447-452``).
     logged = event.slippage_log is not None
     vertical = (
@@ -642,10 +656,10 @@ def _answer_highlights(ctx: Any, event: Any, highlights: dict, rules: list) -> N
         if logged
         else [b for b in ctx.workspace.vertical_bridges if b.is_built]
     )
-    highlight_bridges(highlights, vertical, ROLE_VERTICAL)
+    highlight_bridges(highlights, vertical, R.vertical)
     highlights["concept_mappings"].extend(applied_slippage_highlights(event.slippage_log))
-    refs = {ROLE_TOP: event.top_rule_ref_objects, ROLE_BOTTOM: event.bottom_rule_ref_objects}
-    for rule, role in ((event.top_rule, ROLE_TOP), (event.bottom_rule, ROLE_BOTTOM)):
+    refs = {R.top: event.top_rule_ref_objects, R.bottom: event.bottom_rule_ref_objects}
+    for rule, role in ((event.top_rule, R.top), (event.bottom_rule, R.bottom)):
         if rule is None:
             continue
         for obj in (refs[role] if logged else rule_reference_objects(ctx, rule)):
@@ -715,6 +729,8 @@ def _describe(
     translation: dict | None = None,
 ) -> dict:
     """The shared body of ``make-answer-description-pexp`` / ``make-snag-description-pexp``."""
+    R = _roles()
+    v = ctx.meta.vocabulary
     highlights = _new_highlights()
     rules: list[tuple[Any, str]] = []
     # Theme bridges are drawn with their endpoints, then the vertical mapping is
@@ -723,26 +739,26 @@ def _describe(
     for b in list(theme_bridges) + list(vertical):
         if not any(b is x for x in vertical_all):
             vertical_all.append(b)
-    highlight_bridges(highlights, list(vertical), ROLE_VERTICAL)
+    highlight_bridges(highlights, list(vertical), R.vertical)
     for bridge, cm in _theme_supporting(theme_pattern, theme_bridges, ctx.slipnet):
         highlights["concept_mappings"].append(cm_highlight(bridge, cm, ROLE_THEME_CM))
     highlights["concept_mappings"].extend(applied_slippage_highlights(slippage_log))
     if top_rule is not None:
         for obj in (top_refs if top_refs is not None else rule_reference_objects(ctx, top_rule)):
-            highlights["objects"].append(object_ref(obj, ROLE_TOP))
-        highlight_bridges(highlights, top_bridges, ROLE_TOP)
-        rules.append((top_rule, ROLE_TOP))
+            highlights["objects"].append(object_ref(obj, R.top))
+        highlight_bridges(highlights, top_bridges, R.top)
+        rules.append((top_rule, R.top))
     if bottom_rule is not None:
-        if bottom_role != ROLE_SNAG:
+        if bottom_role != R.snag:
             for obj in (
                 bottom_refs if bottom_refs is not None else rule_reference_objects(ctx, bottom_rule)
             ):
-                highlights["objects"].append(object_ref(obj, ROLE_BOTTOM))
-            highlight_bridges(highlights, bottom_bridges, ROLE_BOTTOM)
+                highlights["objects"].append(object_ref(obj, R.bottom))
+            highlight_bridges(highlights, bottom_bridges, R.bottom)
         rules.append((bottom_rule, bottom_role))
     for obj in snag_objects or []:
         if not _is_string(obj):
-            highlights["objects"].append(object_ref(obj, ROLE_SNAG))
+            highlights["objects"].append(object_ref(obj, R.snag))
 
     # Nested groups under a supporting group are drawn as well.
     all_groups: list = []
@@ -762,7 +778,11 @@ def _describe(
         "workspace": workspace_picture(
             ctx,
             groups=all_groups,
-            bridges={"top": top_bridges, "vertical": vertical_all, "bottom": bottom_bridges},
+            bridges={
+                v.bridge_type_top: top_bridges,
+                v.bridge_type_vertical: vertical_all,
+                v.bridge_type_bottom: bottom_bridges,
+            },
             rules=rules,
             answer_text=answer_text,
         ),
@@ -785,6 +805,8 @@ def build_answer_description_picture(
     log and reference objects are what Metacat draws.  Without one (an older caller) the
     picture falls back to every built vertical bridge and to groups derived from the rules.
     """
+    R = _roles()
+    v = ctx.meta.vocabulary
     ws = ctx.workspace
     workspace_vertical = [b for b in ws.vertical_bridges if b.is_built]
     logged = event is not None and event.slippage_log is not None
@@ -822,14 +844,14 @@ def build_answer_description_picture(
         vertical=vertical,
         top_rule=top_rule,
         bottom_rule=bottom_rule,
-        bottom_role=ROLE_BOTTOM,
+        bottom_role=R.bottom,
         theme_pattern=pattern,
         answer_text=description.problem[3] if description.problem else None,
         temperature=description.temperature,
         themes=[
-            {"type": "vertical_bridge", "entries": description.vertical_themes or description.themes},
-            {"type": "top_bridge", "entries": description.top_themes},
-            {"type": "bottom_bridge", "entries": description.bottom_themes},
+            {"type": v.theme_type_vertical_bridge, "entries": description.vertical_themes or description.themes},
+            {"type": v.theme_type_top_bridge, "entries": description.top_themes},
+            {"type": v.theme_type_bottom_bridge, "entries": description.bottom_themes},
         ],
         top_bridges=top_bridges,
         bottom_bridges=bottom_bridges,
@@ -866,6 +888,7 @@ def build_snag_description_picture(
     ctx: Any, *, event: Any, theme_pattern: Any
 ) -> dict:
     """``make-snag-description-pexp`` (``trace.ss:1212-1250``)."""
+    R = _roles()
     ws = ctx.workspace
     vertical = list(event.supporting_vertical_bridges or [])
     snag_bridges = list(event.snag_bridges or [])
@@ -886,7 +909,7 @@ def build_snag_description_picture(
         vertical=vertical,
         top_rule=rule,
         bottom_rule=event.translated_rule,
-        bottom_role=ROLE_SNAG,
+        bottom_role=R.snag,
         theme_pattern=pattern,
         answer_text=None,
         temperature=100.0,

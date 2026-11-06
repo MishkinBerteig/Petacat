@@ -24,6 +24,38 @@ How it works
 There is no check of *what* a change does (3.4(a)): any node, role, letter or coefficient may
 be removed, renamed or merged, including one a session's Episodic Memory names.
 
+Episodic Memory and the names it holds
+--------------------------------------
+A session's Episodic Memory persists names: nodes and theme relations in theme patterns, theme
+types in theme patterns, rule and clause types in rule signatures.  The rule is one for all of
+them, a node or a vocabulary row (``rename_enum_value``) alike: the change API **neither refuses
+nor rewrites**.  The rename, removal or merge is carried out on the configuration, and the
+memory keeps the names it stored (``test_a_node_that_memory_names_can_be_removed_renamed_or_merged``
+and ``test_a_name_that_memory_holds_can_be_renamed_by_every_source`` pin it).  What became of an
+old name is the journal's story (``GET /api/journal/where-did-name-go``).
+
+Vocabulary rows (``rename_enum_value``)
+---------------------------------------
+Renaming a row of an enum table (or of ``theme_relations``) rewrites every column that names
+it (``REFERENCES`` and ``ENUM_RENAME_EXTRA`` in ``spec.py``), keeps the row's ``role`` (its
+``behaviour``, for ``link_types``) and its place, and rewrites the commentary sections keyed by
+the table's names (``TEMPLATE_KEYED_BY``).  Bodies, predicates, formulas, parameters and
+templates that still spell the old name are listed as ``dangling``, exactly as ``rename_node``
+lists code.  The enum tables are not addressed by the generic ops (``schema`` does not list them);
+the Admin enum editor's creates, updates and deletes follow the rules of ``vocabulary.py`` (a
+role is a name of the table's vocabulary and held by one row; a bound row is not deleted:
+``422 role_bound``).
+
+Parameters that name things
+---------------------------
+``engine_params.refers_to`` declares what a parameter's value names (``spec.REFERS_TO_KINDS``):
+the cascades read it from the configuration they resolve against, so no parameter name is
+written in this module.  **A rule-trigger edit (``add_trigger``, ``remove_trigger``) also
+changes the parameter whose ``refers_to`` is ``trigger_node_list``** (``top_down_slipnodes`` in
+the Metacat Standard Configuration): a node added as a trigger is added to its list, and one
+removed from a rule is removed from it only when no rule still triggers it.  A configuration
+that declares no such parameter leaves every parameter alone.
+
 The report
 ----------
 ``{"ok": True, "applied", "skipped", "cascaded", "dangling", "affected", "effects",
@@ -41,29 +73,28 @@ from typing import Any, Callable, Mapping
 
 from server.engine.parameters import RUN_PARAMETERS
 from server.engine.start_check import (
-    LEVEL_NAMING_PARAMETERS,
     REQUIRED_ENGINE_PARAMETERS,
     REQUIRED_FORMULA_COEFFICIENTS,
-    REQUIRED_URGENCY_LEVELS,
+    urgency_levels_read_by_bodies,
 )
-from server.services.change_resolve import checks
+from server.services.change_resolve import checks, vocabulary
 from server.services.change_resolve.errors import ChangeRefused
 from server.services.change_resolve.patch import PatchError, apply_patch, parse_pointer
 from server.services.change_resolve.spec import (
-    CODELET_TYPE_LIST_PARAMS,
     INPUT_TABLES,
-    NODE_LIST_PARAMS,
-    NODE_MAP_PARAMS,
     ORDERED_ROLES,
     PARAM_TABLES,
+    ENUM_RENAME_EXTRA,
     REFERENCES,
+    REFERS_TO_KINDS,
+    RENAMEABLE_TABLES,
     ROLE_NAMES,
     UNIQUE_EXTRA,
     column_defaults,
     language_of,
 )
 from server.services.config_document import ConfigDocument, apply_resolved
-from server.services.config_registry import REGISTRY
+from server.services.config_registry import LAYER_REGISTRY, REGISTRY
 from server.services.configuration_input import (
     KEY_EXISTS,
     MALFORMED,
@@ -89,13 +120,13 @@ COEFFS = "formula_coefficients"
 LEVELS = "urgency_levels"
 DEMOS = "demo_problems"
 TEMPLATES = "commentary_templates"
+CLAMP_TYPES = "clamp_types"
 
 _RULE_CODE_COLUMNS = ("urgency_formula", "posting_formula", "count_formula", "condition")
 _LINK_SHORT = {"from": "from_node", "to": "to_node", "type": "link_type", "label": "label_node",
                "length": "link_length", "fixed": "fixed_length"}
 _READ_PARAMS = frozenset(n for n, _ in REQUIRED_ENGINE_PARAMETERS)
 _READ_COEFFS = frozenset(n for n, _ in REQUIRED_FORMULA_COEFFICIENTS)
-_READ_LEVELS = frozenset(n for n, _ in REQUIRED_URGENCY_LEVELS)
 _RANGES = {p.name: (p.minimum, p.maximum) for p in RUN_PARAMETERS
            if p.minimum is not None or p.maximum is not None}
 
@@ -146,6 +177,8 @@ class _Run:
         self.cascaded: list[dict] = []
         self.dangling: list[dict] = []
         self.affected: list[dict] = []
+        #: advisories raised while resolving (the others are computed from the final document)
+        self.advisories_extra: list[dict] = []
         self.failed: dict[int, InputProblem] = {}
         #: (table, key tuple) -> index of the batch op that last wrote the row
         self.written: dict[tuple[str, tuple], int] = {}
@@ -156,13 +189,13 @@ class _Run:
         return self.doc.tables[table]
 
     def row(self, table: str, key: Mapping[str, Any]) -> dict | None:
-        return self.doc.tables[table].get(REGISTRY[table].key_tuple(key))
+        return self.doc.tables[table].get(LAYER_REGISTRY[table].key_tuple(key))
 
     def key_dict(self, table: str, row: Mapping[str, Any]) -> dict:
-        return REGISTRY[table].key_of(row)
+        return LAYER_REGISTRY[table].key_of(row)
 
     def key_tuple_of(self, table: str, row: Mapping[str, Any]) -> tuple:
-        spec = REGISTRY[table]
+        spec = LAYER_REGISTRY[table]
         return spec.key_tuple(spec.key_of(row))
 
     # -- failures ---------------------------------------------------------------
@@ -201,7 +234,7 @@ class _Run:
         names the effect the report states when it differs from the op (a rename that is
         carried out as a delete and an insert is reported as an update)."""
         table = op["table"]
-        spec = REGISTRY[table]
+        spec = LAYER_REGISTRY[table]
         kind = op["op"]
         before = after = None
         if kind == "update":
@@ -239,7 +272,7 @@ class _Run:
             )
 
     def e_insert(self, i, table, row, **kw):
-        self.emit(i, {"op": "insert", "table": table, "key": REGISTRY[table].key_of(row), "row": row}, **kw)
+        self.emit(i, {"op": "insert", "table": table, "key": LAYER_REGISTRY[table].key_of(row), "row": row}, **kw)
 
     def e_update(self, i, table, key, set_, **kw):
         self.emit(i, {"op": "update", "table": table, "key": dict(key), "set": dict(set_)}, **kw)
@@ -256,14 +289,14 @@ class _Run:
 
     def normalise(self, table: str, row: dict) -> dict:
         """A NULL part of a key is stored as NULL, not ``''``."""
-        spec = REGISTRY[table]
+        spec = LAYER_REGISTRY[table]
         for c in spec.key:
             if row.get(c) == "" and spec.table.columns[c].nullable:
                 row[c] = None
         return row
 
     def complete(self, table: str, row: dict) -> dict:
-        spec = REGISTRY[table]
+        spec = LAYER_REGISTRY[table]
         defaults = column_defaults(spec)
         if len(spec.order) == 1:  # a new row goes last: order is behaviour (the RNG's)
             defaults[spec.order[0]] = "$next"
@@ -281,7 +314,7 @@ class _Run:
         return out
 
     def check_unique(self, i: int, table: str, row: Mapping, exclude: tuple | None) -> None:
-        spec = REGISTRY[table]
+        spec = LAYER_REGISTRY[table]
         for cols in UNIQUE_EXTRA.get(table, ()):
             vals = tuple(row.get(c) for c in cols)
             if any(v is None for v in vals):
@@ -291,8 +324,18 @@ class _Run:
                     raise self.fail(KEY_EXISTS, f"{table}: {', '.join(cols)} {list(vals)} is already used",
                                     i, cols[0], table, list(spec.key_tuple(spec.key_of(row))))
 
+    def check_role(self, i: int, table: str, row: Mapping, exclude: tuple | None) -> None:
+        """A row of a vocabulary table (``theme_relations``) holds a name of the engine's
+        vocabulary for that table, and one no other row holds."""
+        spec = LAYER_REGISTRY[table]
+        others = (o for k, o in self.rows(table).items() if k != exclude)
+        problem = vocabulary.role_problem(
+            table, row, others, op_index=i, key=list(spec.key_tuple(spec.key_of(row))))
+        if problem is not None:
+            raise _Fail(problem)
+
     def check_code(self, i: int, table: str, row: Mapping, columns) -> None:
-        spec = REGISTRY[table]
+        spec = LAYER_REGISTRY[table]
         key = list(spec.key_tuple(spec.key_of(row)))
         for c in columns:
             language = language_of(table, c)
@@ -304,6 +347,9 @@ class _Run:
                 raise _Fail(checks.does_not_compile(i, table, c, key, language, found))
 
     def check_typed(self, i: int, table: str, row: Mapping) -> None:
+        if table == PARAMS and row.get("refers_to") is not None and row["refers_to"] not in REFERS_TO_KINDS:
+            raise self.fail(MALFORMED, f"refers_to must be one of {list(REFERS_TO_KINDS)} or null", i,
+                            "refers_to", table, [row.get("name")])
         if table in PARAM_TABLES:
             p = check_param_value(row.get("value"), row.get("value_type"), op_index=i, table=table)
             if p is not None:
@@ -319,13 +365,14 @@ class _Run:
         if key in self.rows(table):
             raise self.fail(KEY_EXISTS, f"{table} already has key {list(key)}", i, "row", table, list(key))
         self.check_unique(i, table, row, None)
-        self.check_code(i, table, row, REGISTRY[table].code_columns)
+        self.check_role(i, table, row, None)
+        self.check_code(i, table, row, LAYER_REGISTRY[table].code_columns)
         self.check_typed(i, table, row)
         self.e_insert(i, table, row, reason=reason)
 
     def do_update(self, i: int, table: str, key: Mapping, fields: Mapping, *, expect: Mapping | None = None,
                   patch: Mapping | None = None, reason: str | None = None) -> None:
-        spec = REGISTRY[table]
+        spec = LAYER_REGISTRY[table]
         old = self.row(table, key)
         if old is None:
             raise self.missing(i, table, dict(key))
@@ -355,8 +402,10 @@ class _Run:
         if not changed:
             return
         self.check_unique(i, table, new_row, spec.key_tuple(key))
+        if table in vocabulary.VOCABULARY_TABLES and (vocabulary.VOCABULARY_TABLES[table].column in changed):
+            self.check_role(i, table, new_row, spec.key_tuple(key))
         self.check_code(i, table, new_row, [c for c in changed if c in spec.code_columns])
-        if table in PARAM_TABLES and ({"value", "value_type"} & set(changed)):
+        if table in PARAM_TABLES and ({"value", "value_type", "refers_to"} & set(changed)):
             self.check_typed(i, table, new_row)
         self.e_update(i, table, key, {c: new_fields[c] for c in changed}, reason=reason)
 
@@ -388,11 +437,16 @@ class _Run:
         if expect is not None and not all(c in old and _same(old[c], v) for c, v in expect.items()):
             raise self.fail(STALE, f"{table} row {list(key.values())} differs from expect", i,
                             "expect", table, list(key.values()))
+        if table == THEME_RELS:
+            # A bound relation is unbound first, like every bound row (``role_bound``).
+            problem = vocabulary.delete_problem(table, old, op_index=i)
+            if problem is not None:
+                raise _Fail(problem)
         remover = _REMOVERS.get(table)
         if remover is not None:
             remover(self, i, old)
         else:
-            self.e_delete(i, table, REGISTRY[table].key_of(old), reason=reason)
+            self.e_delete(i, table, LAYER_REGISTRY[table].key_of(old), reason=reason)
             if table in PARAM_TABLES:
                 pass  # effects are reported by the run-start comparison
 
@@ -413,7 +467,7 @@ class _Run:
                 continue
             if source and pattern.search(source):
                 self.dangling.append(
-                    {"cause_op": i, "table": table, "key": REGISTRY[table].key_of({REGISTRY[table].key[0]: name}),
+                    {"cause_op": i, "table": table, "key": LAYER_REGISTRY[table].key_of({LAYER_REGISTRY[table].key[0]: name}),
                      "column": column, "reason": f"source names {what}"}
                 )
 
@@ -433,7 +487,7 @@ class _Run:
         for e in self.rows(RULES).values():
             if e.get("urgency_level") == level:
                 self.dangling.append(
-                    {"cause_op": i, "table": RULES, "key": REGISTRY[RULES].key_of(e),
+                    {"cause_op": i, "table": RULES, "key": LAYER_REGISTRY[RULES].key_of(e),
                      "column": "urgency_level", "reason": f"names {what}"}
                 )
 
@@ -456,8 +510,18 @@ class _Run:
         self.e_update(i, PARAMS, {"name": name}, {"value": json.dumps(new)}, reason=reason)
         return True
 
-    def edit_node_params(self, i, fn_list, fn_map, reason: str, names_list=NODE_LIST_PARAMS,
-                         names_map=NODE_MAP_PARAMS) -> None:
+    def params_referring(self, *kinds: str, doc: ConfigDocument | None = None) -> tuple[str, ...]:
+        """The parameters whose ``refers_to`` column is one of *kinds*, in table order: the one
+        declaration of which parameters hold node names, codelet type names or an urgency level."""
+        rows = (self.doc if doc is None else doc).tables[PARAMS].values()
+        return tuple(r["name"] for r in rows if r.get("refers_to") in kinds)
+
+    def edit_node_params(self, i, fn_list, fn_map, reason: str, names_list=None,
+                         names_map=None) -> None:
+        if names_list is None:
+            names_list = self.params_referring("node_list", "trigger_node_list")
+        if names_map is None:
+            names_map = self.params_referring("node_map")
         for p in names_list:
             self.edit_param_json(i, p, lambda v: fn_list(v) if isinstance(v, list) else v, reason.replace("{p}", p))
         for p in names_map:
@@ -524,10 +588,12 @@ class _Run:
         for n in sorted(_READ_COEFFS):
             if (n,) not in t[COEFFS]:
                 gaps[("formula_coefficient", n)] = f"the engine reads formula coefficient {n!r}; a run will stop at its start"
-        for n in sorted(_READ_LEVELS):
+        bodies = ((r["name"], r.get("execute_body") or "") for r in t[CODELETS].values())
+        for n, users in sorted(urgency_levels_read_by_bodies(bodies).items()):
             if (n,) not in t[LEVELS]:
-                gaps[("urgency_level", n)] = f"the engine reads urgency level {n!r}; a run will stop at its start"
-        for p in LEVEL_NAMING_PARAMETERS:
+                gaps[("urgency_level", n)] = (
+                    f"codelet {', '.join(users)} reads urgency level {n!r}; a run will stop at its start")
+        for p in self.params_referring("urgency_level", doc=doc):
             r = t[PARAMS].get((p,))
             if r is not None and (r["value"],) not in t[LEVELS]:
                 gaps[("urgency_level", r["value"])] = (
@@ -562,7 +628,7 @@ class _Run:
         return out
 
     def advisories(self) -> list[dict]:
-        out: list[dict] = []
+        out: list[dict] = list(self.advisories_extra)
         lengths = None
         r, v = self.param_json("intrinsic_link_lengths")
         if isinstance(v, dict):
@@ -573,7 +639,7 @@ class _Run:
                 continue
 
             def add(field, message):
-                out.append({"op": i, "table": table, "key": REGISTRY[table].key_of(row),
+                out.append({"op": i, "table": table, "key": LAYER_REGISTRY[table].key_of(row),
                             "field": field, "message": message})
 
             if table == NODES and isinstance(row.get("conceptual_depth"), (int, float)):
@@ -633,11 +699,11 @@ def _remove_node(r: _Run, i: int, row: Mapping, *, splice=None, scan: bool = Tru
         role = ("from" if lk["from_node"] == n else "to" if lk["to_node"] == n
                 else "label" if lk.get("label_node") == n else None)
         if role:
-            r.e_delete(i, LINKS, REGISTRY[LINKS].key_of(lk), reason=f"link has {why} as its {role}")
+            r.e_delete(i, LINKS, LAYER_REGISTRY[LINKS].key_of(lk), reason=f"link has {why} as its {role}")
     for tname, col in ((NODE_ROLES, "node_name"), (THEME_RELS, "node_name")):
         for dep in list(r.rows(tname).values()):
             if dep.get(col) == n:
-                r.e_delete(i, tname, REGISTRY[tname].key_of(dep), reason=f"depends on {why}")
+                r.e_delete(i, tname, LAYER_REGISTRY[tname].key_of(dep), reason=f"depends on {why}")
     for tname, col in ((LAYOUT, "node_name"), (THEME_DIMS, "slipnet_node")):
         dep = r.row(tname, {col: n})
         if dep is not None:
@@ -676,11 +742,11 @@ def _remove_codelet_type(r: _Run, i: int, row: Mapping) -> None:
             r.e_delete(i, RULES, {"rule_key": rule["rule_key"]}, reason=f"posting rule for {why}")
     for e in list(r.rows(PATTERNS).values()):
         if e["codelet_type"] == n:
-            r.e_delete(i, PATTERNS, REGISTRY[PATTERNS].key_of(e), reason=f"pattern entry for {why}")
+            r.e_delete(i, PATTERNS, LAYER_REGISTRY[PATTERNS].key_of(e), reason=f"pattern entry for {why}")
     for e in list(r.rows(CODELET_ROLES).values()):
         if e["codelet_type"] == n:
-            r.e_delete(i, CODELET_ROLES, REGISTRY[CODELET_ROLES].key_of(e), reason=f"role binding of {why}")
-    for p in CODELET_TYPE_LIST_PARAMS:
+            r.e_delete(i, CODELET_ROLES, LAYER_REGISTRY[CODELET_ROLES].key_of(e), reason=f"role binding of {why}")
+    for p in r.params_referring("codelet_type_list"):
         r.edit_param_json(i, p, lambda v: [x for x in v if x != n] if isinstance(v, list) else v,
                           f"element of {why} in {p}")
     r.e_delete(i, CODELETS, {"name": n})
@@ -690,11 +756,15 @@ def _remove_level(r: _Run, i: int, row: Mapping) -> None:
     n = row["name"]
     why = f"removed urgency level {n!r}"
     r.mark_dangling(i, _quoted(n), f"the removed urgency level {n!r}", skip=None)
-    r.mark_scalar_params(i, LEVEL_NAMING_PARAMETERS, n, f"the removed urgency level {n!r}")
+    r.mark_scalar_params(i, r.params_referring("urgency_level"), n, f"the removed urgency level {n!r}")
     r.mark_rules_naming_level(i, n, f"the removed urgency level {n!r}")
+    for e in r.rows(CLAMP_TYPES).values():
+        if e.get("codelet_background_level") == n:
+            r.dangling.append({"cause_op": i, "table": CLAMP_TYPES, "key": LAYER_REGISTRY[CLAMP_TYPES].key_of(e),
+                               "column": "codelet_background_level", "reason": f"names the removed urgency level {n!r}"})
     for e in list(r.rows(PATTERNS).values()):
         if e["urgency_level"] == n:
-            r.e_delete(i, PATTERNS, REGISTRY[PATTERNS].key_of(e), reason=f"pattern entry names {why}")
+            r.e_delete(i, PATTERNS, LAYER_REGISTRY[PATTERNS].key_of(e), reason=f"pattern entry names {why}")
     r.e_delete(i, LEVELS, {"name": n})
 
 
@@ -715,7 +785,7 @@ def _rewrite_fk_dependents(r: _Run, i: int, table: str, column: str, old: str, n
     that would cascade), and reported as updates."""
     gone = [dict(d) for d in r.rows(table).values() if d.get(column) == old]
     for d in gone:
-        r.e_delete(i, table, REGISTRY[table].key_of(d))
+        r.e_delete(i, table, LAYER_REGISTRY[table].key_of(d))
     return [(table, column, d, why) for d in gone]
 
 
@@ -723,7 +793,7 @@ def _reinsert(r: _Run, i: int, gone: list, new: str) -> None:
     for table, column, d, why in gone:
         row = {**d, column: new}
         r.e_insert(i, table, row)
-        r.cascaded.append({"cause_op": i, "table": table, "key": REGISTRY[table].key_of(row),
+        r.cascaded.append({"cause_op": i, "table": table, "key": LAYER_REGISTRY[table].key_of(row),
                            "op": "update", "reason": why})
 
 
@@ -744,7 +814,7 @@ def _rename_node(r: _Run, i: int, key: Mapping, new: str) -> None:
             nk = r.key_tuple_of(LINKS, {**lk, **changes})
             if nk in r.rows(LINKS):
                 raise r.fail(KEY_EXISTS, f"{LINKS} already has key {list(nk)}", i, "fields", LINKS, list(nk))
-            r.e_update(i, LINKS, REGISTRY[LINKS].key_of(lk), changes, reason=f"link references {why}")
+            r.e_update(i, LINKS, LAYER_REGISTRY[LINKS].key_of(lk), changes, reason=f"link references {why}")
     for tname, col in ((LAYOUT, "node_name"), (THEME_DIMS, "slipnet_node")):
         if r.row(tname, {col: old}) is not None:
             r.e_update(i, tname, {col: old}, {col: new}, reason=f"references {why}")
@@ -772,8 +842,8 @@ def _rename_codelet_type(r: _Run, i: int, key: Mapping, new: str) -> None:
             nk = r.key_tuple_of(PATTERNS, {**e, "codelet_type": new})
             if nk in r.rows(PATTERNS):
                 raise r.fail(KEY_EXISTS, f"{PATTERNS} already has key {list(nk)}", i, "fields", PATTERNS, list(nk))
-            r.e_update(i, PATTERNS, REGISTRY[PATTERNS].key_of(e), {"codelet_type": new}, reason=f"pattern entry references {why}")
-    for p in CODELET_TYPE_LIST_PARAMS:
+            r.e_update(i, PATTERNS, LAYER_REGISTRY[PATTERNS].key_of(e), {"codelet_type": new}, reason=f"pattern entry references {why}")
+    for p in r.params_referring("codelet_type_list"):
         r.edit_param_json(i, p, lambda v: [new if x == old else x for x in v] if isinstance(v, list) else v,
                           f"element in {p} for {why}")
 
@@ -784,15 +854,185 @@ def _rename_level(r: _Run, i: int, key: Mapping, new: str) -> None:
         raise r.fail(KEY_EXISTS, f"{LEVELS} already has key {[new]}", i, "fields", LEVELS, [new])
     why = f"renamed urgency level {old!r} to {new!r}"
     r.mark_dangling(i, _quoted(old), f"the old name {old!r} of a renamed urgency level")
-    r.mark_scalar_params(i, LEVEL_NAMING_PARAMETERS, old, f"the old name {old!r} of a renamed urgency level")
+    r.mark_scalar_params(i, r.params_referring("urgency_level"), old, f"the old name {old!r} of a renamed urgency level")
     r.e_update(i, LEVELS, {"name": old}, {"name": new})
     r.cascaded.append({"cause_op": i, "table": LEVELS, "key": {"name": new}, "op": "update", "reason": why})
     for e in list(r.rows(RULES).values()):
         if e.get("urgency_level") == old:
-            r.e_update(i, RULES, REGISTRY[RULES].key_of(e), {"urgency_level": new}, reason=f"posting rule references {why}")
+            r.e_update(i, RULES, LAYER_REGISTRY[RULES].key_of(e), {"urgency_level": new}, reason=f"posting rule references {why}")
+    for e in list(r.rows(CLAMP_TYPES).values()):
+        if e.get("codelet_background_level") == old:
+            r.e_update(i, CLAMP_TYPES, LAYER_REGISTRY[CLAMP_TYPES].key_of(e), {"codelet_background_level": new},
+                       reason=f"clamp type references {why}")
     for e in list(r.rows(PATTERNS).values()):
         if e["urgency_level"] == old:
-            r.e_update(i, PATTERNS, REGISTRY[PATTERNS].key_of(e), {"urgency_level": new}, reason=f"pattern entry references {why}")
+            r.e_update(i, PATTERNS, LAYER_REGISTRY[PATTERNS].key_of(e), {"urgency_level": new}, reason=f"pattern entry references {why}")
+
+
+# --- an enum row (or a theme relation) renamed -------------------------------------------------
+
+
+#: Tables renamed by updating the row's name in place (the theme relations are keyed by name and
+#: referenced only from the configuration document).
+IN_PLACE_RENAMES = (THEME_RELS,)
+
+
+def _rewritten_references(table: str) -> list[tuple[str, str, bool]]:
+    """``(table, column, many)`` for every column that holds a name of a row of *table*: the
+    declared references plus the rename-only ones (a theme dimension's valid relations)."""
+    refs = {**REFERENCES, **ENUM_RENAME_EXTRA}
+    return [(t, c, many) for (t, c), (target, many) in refs.items() if target == table]
+
+
+def _json_mentions(value: Any, name: str) -> bool:
+    """*name* spelled as a key or as a whole string anywhere in a JSON value."""
+    if isinstance(value, str):
+        return value == name
+    if isinstance(value, list):
+        return any(_json_mentions(v, name) for v in value)
+    if isinstance(value, dict):
+        return any(k == name or _json_mentions(v, name) for k, v in value.items())
+    return False
+
+
+def _rename_keys(value: Any, old: str, new: str, deep: bool, top: bool = True) -> Any:
+    """*value* with every dict key *old* renamed *new*: the keys of this dict, and (``deep``) of
+    every dict below it."""
+    if isinstance(value, dict):
+        return {(new if k == old else k): (_rename_keys(v, old, new, deep, False) if deep else v)
+                for k, v in value.items()}
+    if isinstance(value, list) and deep:
+        return [_rename_keys(v, old, new, deep, False) for v in value]
+    return value
+
+
+def _rewrite_templates(r: _Run, i: int, table: str, old: str, new: str, why: str) -> None:
+    """Rewrite the keys of the commentary sections that are keyed by this table's names
+    (``TEMPLATE_KEYED_BY``).  The Standard Configuration holds every section in one row
+    (``template_key`` ``all``); a row named for a section holds that section alone."""
+    for section, pointer, deep in TEMPLATE_KEYED_BY.get(table, ()):
+        for row in list(r.rows(TEMPLATES).values()):
+            if row["template_key"] == "all":
+                full = f"/{section}{pointer}"
+            elif row["template_key"] == section:
+                full = pointer
+            else:
+                continue
+            data = row["template_data"]
+            node = data
+            try:
+                for part in [p for p in full.split("/") if p]:
+                    node = node[part]
+            except (KeyError, TypeError, IndexError):
+                continue
+            renamed = _rename_keys(node, old, new, deep)
+            if renamed == node:
+                continue
+            result = renamed if not full else apply_patch(
+                json.loads(json.dumps(data)), [{"op": "replace", "path": full, "value": renamed}])
+            r.e_update(i, TEMPLATES, {"template_key": row["template_key"]}, {"template_data": result},
+                       reason=f"commentary section {section}{pointer} is keyed by {table} names: {why}")
+
+
+def _mark_vocabulary_mentions(r: _Run, i: int, old: str, what: str) -> None:
+    """List, and leave alone, every body, predicate, formula, parameter and template that still
+    spells *old* (the code that spells it is not rewritten: only ``role(...)`` survives a rename)."""
+    r.mark_dangling(i, _quoted(old), what)
+    for p in r.rows(PARAMS).values():
+        value = p.get("value")
+        if p.get("value_type") == "json":
+            ok, v = parse_param_value(value, "json")
+            hit = ok and _json_mentions(v, old)
+        else:
+            hit = value == old
+        if hit:
+            r.dangling.append({"cause_op": i, "table": PARAMS, "key": {"name": p["name"]},
+                               "column": "value", "reason": f"names {what}"})
+    for t in r.rows(TEMPLATES).values():
+        if _json_mentions(t.get("template_data"), old):
+            r.dangling.append({"cause_op": i, "table": TEMPLATES, "key": {"template_key": t["template_key"]},
+                               "column": "template_data", "reason": f"names {what}"})
+
+
+def _rename_enum_value(r: _Run, i: int, table: str, old: str, new: str) -> None:
+    """Rename a row of an enum table (or of ``theme_relations``) and every column that names it.
+
+    The row's name is its key and other rows reference it by foreign key, so a rename is
+    carried out as: insert the row under the new name (unbound, so the role stays unique),
+    point every referencing column at it, delete the old row, and give the new row the role
+    back.  Bodies, predicates, formulas, parameters and templates that spell the old name are
+    listed as dangling and left alone, exactly as ``rename_node`` lists code; the commentary
+    sections keyed by the table's names are rewritten.  Episodic Memory is not touched: a
+    session's memory keeps the names it stored (see the module docstring).
+    """
+    spec = LAYER_REGISTRY[table]
+    row = r.row(table, {"name": old})
+    if row is None:
+        raise r.missing(i, table, {"name": old}, "old")
+    if old == new:
+        return
+    if (new,) in r.rows(table):
+        raise r.fail(KEY_EXISTS, f"{table} already has key {[new]}", i, "new", table, [new])
+    why = f"renamed {table} row {old!r} to {new!r}"
+    what = f"the old name {old!r} of a renamed {table} row"
+    # the keyed commentary sections are rewritten first, so what is listed afterwards is only
+    # what still spells the old name
+    _rewrite_templates(r, i, table, old, new, why)
+    _mark_vocabulary_mentions(r, i, old, what)
+    column = vocabulary.VOCABULARY_TABLES[table].column if table in vocabulary.VOCABULARY_TABLES else None
+    held = row.get(column) if column else None
+    if table in _TABLE_ADVISORIES:
+        r.advisories_extra.append({"op": i, "table": table, "key": {"name": old}, "field": "name",
+                                   "message": _TABLE_ADVISORIES[table]})
+    if table in IN_PLACE_RENAMES:
+        r.e_update(i, table, {"name": old}, {"name": new}, reason=None)
+        r.cascaded.append({"cause_op": i, "table": table, "key": {"name": new}, "op": "update", "reason": why})
+    else:
+        r.e_insert(i, table, {**row, "name": new, **({column: None} if held else {})})
+        r.cascaded.append({"cause_op": i, "table": table, "key": {"name": new}, "op": "update", "reason": why})
+    for t, c, many in _rewritten_references(table):
+        for dep in list(r.rows(t).values()):
+            v = dep.get(c)
+            if many:
+                if not isinstance(v, list) or old not in v:
+                    continue
+                changed = [new if x == old else x for x in v]
+            elif v == old:
+                changed = new
+            else:
+                continue
+            tspec = LAYER_REGISTRY[t]
+            if c in tspec.key:
+                nk = tspec.key_tuple(tspec.key_of({**dep, c: changed}))
+                if nk in r.rows(t):
+                    raise r.fail(KEY_EXISTS, f"{t} already has key {list(nk)}", i, "new", t, list(nk))
+            r.e_update(i, t, tspec.key_of(dep), {c: changed}, reason=f"{t}.{c} references {why}")
+    if table not in IN_PLACE_RENAMES:
+        r.e_delete(i, table, {"name": old})
+        if held:
+            r.e_update(i, table, {"name": new}, {column: held})
+
+
+#: Commentary template sections whose keys are the names of a vocabulary table's rows, so
+#: renaming a row renames the key: ``table -> ((template_key, pointer, deep), ...)``.  ``pointer``
+#: is the JSON pointer of the dict whose keys are names ("" is the section itself); ``deep``
+#: renames the key at every depth below it.  A name spelled anywhere else is listed as dangling.
+TEMPLATE_KEYED_BY: dict[str, tuple[tuple[str, str, bool], ...]] = {
+    "event_types": (("answer_reporting", "", False),),
+    "clamp_types": (("answer_reporting", "/clamp_activation", False),
+                    ("answer_reporting", "/clamp_expiry", False)),
+    "failure_kinds": (("snag_explanation", "", False),),
+    "clause_types": (("rule_english", "", False),),
+    "theme_relations": (("theme_phrase_templates", "", True),),
+}
+
+#: Tables whose names something outside the configuration compares; renaming one is allowed and
+#: advised against.
+_TABLE_ADVISORIES: dict[str, str] = {
+    "run_statuses": "the client compares run status names; a rename breaks its display of a run",
+    "param_value_types": "the engine and the editors parse a parameter's text by these names; "
+                         "a rename makes the parameters of that type unreadable",
+}
 
 
 _RENAMERS: dict[str, Callable] = {
@@ -872,6 +1112,13 @@ def _h_rename_node(r: _Run, i: int, op: dict) -> None:
         r.do_update(i, NODES, {"name": op["old"]}, {"name": op["new"]})
 
 
+def _h_rename_enum_value(r: _Run, i: int, op: dict) -> None:
+    table = op["table"]
+    if table not in RENAMEABLE_TABLES:
+        raise r.fail(MALFORMED, f"{table!r} is not an enum table or a vocabulary table", i, "table")
+    _rename_enum_value(r, i, table, op["old"], op["new"])
+
+
 def _h_merge_nodes(r: _Run, i: int, op: dict) -> None:
     keep, drop = op["keep"], op["drop"]
     if keep == drop:
@@ -887,7 +1134,7 @@ def _h_merge_nodes(r: _Run, i: int, op: dict) -> None:
         if not touched:
             continue
         new = {**lk, **touched}
-        key = REGISTRY[LINKS].key_of(lk)
+        key = LAYER_REGISTRY[LINKS].key_of(lk)
         was_self = lk["from_node"] == lk["to_node"]
         if (new["from_node"] == new["to_node"] and not was_self):
             r.e_delete(i, LINKS, key, reason=f"link would become a self-link in the {why}")
@@ -899,7 +1146,7 @@ def _h_merge_nodes(r: _Run, i: int, op: dict) -> None:
     for e in list(r.rows(NODE_ROLES).values()):
         if e["node_name"] != drop:
             continue
-        key = REGISTRY[NODE_ROLES].key_of(e)
+        key = LAYER_REGISTRY[NODE_ROLES].key_of(e)
         held = [x for x in r.rows(NODE_ROLES).values() if x["role"] == e["role"] and x["node_name"] == keep]
         if held:
             r.e_delete(i, NODE_ROLES, key, reason=f"{keep!r} already holds role {e['role']!r} in the {why}")
@@ -1047,7 +1294,7 @@ def _list_of(r: _Run, i: int, table: str, row: Mapping, field: str) -> list:
             raise r.fail(MALFORMED, f"{table} {row['name']!r} is not a JSON list", i, "field", table)
         return v
     v = row.get(field)
-    if v is None and field in REGISTRY[table].json_columns:
+    if v is None and field in LAYER_REGISTRY[table].json_columns:
         return []
     if not isinstance(v, list):
         raise r.fail(MALFORMED, f"{table}.{field} is not a list", i, "field", table)
@@ -1101,15 +1348,23 @@ def _h_move_layout(r: _Run, i: int, op: dict) -> None:
 
 
 def _top_down_edit(r: _Run, i: int, node: str, add: bool, rule_key: str) -> None:
-    row, v = r.param_json("top_down_slipnodes")
-    if row is None or not isinstance(v, list):
-        return
-    if add and node not in v:
-        r.e_update(i, PARAMS, {"name": "top_down_slipnodes"}, {"value": json.dumps(v + [node])})
-    elif not add and node in v:
-        still = any(node in (x.get("triggering_slipnodes") or []) for x in r.rows(RULES).values())
-        if not still:
-            r.e_update(i, PARAMS, {"name": "top_down_slipnodes"}, {"value": json.dumps([x for x in v if x != node])})
+    """A rule-trigger edit also changes the parameter that lists the trigger nodes.
+
+    The parameter is the one whose ``engine_params.refers_to`` is ``trigger_node_list`` (the
+    Metacat Standard Configuration declares ``top_down_slipnodes``); a configuration that
+    declares none is left alone.  A node added as a trigger is added to the list; one removed
+    from a rule is removed from it only when no rule still triggers it.
+    """
+    for name in r.params_referring("trigger_node_list"):
+        row, v = r.param_json(name)
+        if row is None or not isinstance(v, list):
+            continue
+        if add and node not in v:
+            r.e_update(i, PARAMS, {"name": name}, {"value": json.dumps(v + [node])})
+        elif not add and node in v:
+            still = any(node in (x.get("triggering_slipnodes") or []) for x in r.rows(RULES).values())
+            if not still:
+                r.e_update(i, PARAMS, {"name": name}, {"value": json.dumps([x for x in v if x != node])})
 
 
 def _h_trigger(r: _Run, i: int, op: dict) -> None:
@@ -1155,7 +1410,7 @@ def _h_unbind(r: _Run, i: int, op: dict) -> None:
         if not rows and not op.get("ok_if_missing"):
             raise r.missing(i, table, {"role": op["role"], "ordinal": 0})
         for e in rows:
-            r.do_delete(i, table, REGISTRY[table].key_of(e))
+            r.do_delete(i, table, LAYER_REGISTRY[table].key_of(e))
         return
     r.do_delete(i, table, {"role": op["role"], "ordinal": ordinal or 0}, ok_if_missing=op.get("ok_if_missing", False))
 
@@ -1206,6 +1461,7 @@ _HANDLERS: dict[str, Callable] = {
     "add_node": _h_add_node,
     "remove_node": _h_remove_node,
     "rename_node": _h_rename_node,
+    "rename_enum_value": _h_rename_enum_value,
     "merge_nodes": _h_merge_nodes,
     "add_link": _h_add_link,
     "remove_link": _h_remove_link,

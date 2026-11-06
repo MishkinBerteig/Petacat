@@ -17,8 +17,6 @@ from typing import Any
 
 from server.engine.slipnet import SlipnetLink, SlipnetNode
 from server.engine.themes import (
-    THEME_TOP_BRIDGE,
-    THEME_VERTICAL_BRIDGE,
     Theme,
     ThemeCluster,
     bridge_type_for_theme_type,
@@ -27,6 +25,7 @@ from server.engine.themes import (
     pick_theme_type,
     theme_support_tester,
 )
+from tests.support.standard_names import THEME_TOP_BRIDGE, THEME_VERTICAL_BRIDGE
 from server.engine.workspace_objects import WorkspaceObject
 from tests.support.standard_configuration import standard_meta
 from tests.support.theme_fixtures import populate

@@ -9,12 +9,10 @@ from types import SimpleNamespace
 
 from server.engine.groups import Group
 from server.engine.rules import (
-    CLAUSE_INTRINSIC,
-    SCOPE_SELF,
-    SCOPE_SUBOBJECTS,
     IntrinsicChangeDescription,
     change_descriptions_to_rule_clause_template,
 )
+from tests.support.standard_names import CLAUSE_INTRINSIC, SCOPE_SELF, SCOPE_SUBOBJECTS
 
 
 def _node(name, role=None):

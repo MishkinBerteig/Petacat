@@ -30,6 +30,7 @@ def test_store_and_retrieve():
         temperature=30.0,
         themes={"direction": "opposite"},
         unjustified_slippages=[],
+        top_rule_signature=[], bottom_rule_signature=[],
     )
     mem.store_answer(desc)
     assert len(mem.answers) == 1
@@ -44,6 +45,7 @@ def test_reminding():
         quality=80, temperature=30,
         themes={"direction": "opposite", "position": "rightmost"},
         unjustified_slippages=[],
+        top_rule_signature=[], bottom_rule_signature=[],
     )
     desc2 = AnswerDescription(
         problem=("rst", "rsu", "xyz", "wyz"),
@@ -52,6 +54,7 @@ def test_reminding():
         quality=75, temperature=35,
         themes={"direction": "opposite", "position": "rightmost"},
         unjustified_slippages=[],
+        top_rule_signature=[], bottom_rule_signature=[],
     )
     mem.store_answer(desc1)
     remindings = mem.find_remindings(desc2, distance_threshold=5, meta=_META)
@@ -69,6 +72,7 @@ def test_comparison():
         quality=55, temperature=50,
         themes={STRING_POSITION: "identity"},
         unjustified_slippages=[],
+        top_rule_signature=[], bottom_rule_signature=[],
     )
     desc2 = AnswerDescription(
         problem=("abc", "abd", "xyz", "wyz"),
@@ -78,6 +82,7 @@ def test_comparison():
         quality=80, temperature=30,
         themes={STRING_POSITION: "identity", DIRECTION: "opposite"},
         unjustified_slippages=[],
+        top_rule_signature=[], bottom_rule_signature=[],
     )
     result = mem.compare_answers(desc1, desc2, meta=_META)
     assert STRING_POSITION in result["common_themes"]
@@ -92,6 +97,7 @@ def test_clear():
         top_rule_quality=0, bottom_rule_quality=0,
         quality=0, temperature=0,
         themes={}, unjustified_slippages=[],
+        top_rule_signature=[], bottom_rule_signature=[],
     ))
     mem.clear()
     assert len(mem.answers) == 0

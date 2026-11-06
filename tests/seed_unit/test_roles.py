@@ -21,7 +21,7 @@ from server.engine import roles as R
 from server.engine.metadata import MetadataProvider
 from server.engine.slipnet import Slipnet
 from server.engine.start_check import (
-    REQUIRED_FORMULA_COEFFICIENTS, REQUIRED_URGENCY_LEVELS, RunStartError, check_run_start,
+    REQUIRED_FORMULA_COEFFICIENTS, RunStartError, check_run_start,
     require_run_start,
 )
 from tests.support import reduced_configurations as rc
@@ -206,7 +206,7 @@ def test_the_declared_read_list_is_what_the_engine_reads() -> None:
     read = set(re.findall(r'get_formula_coeff\(\s*"([a-z_0-9]+)"', text))
     assert read <= {n for n, _ in REQUIRED_FORMULA_COEFFICIENTS}
     urgencies = set(re.findall(r'get_urgency\("([a-z_]+)"\)', text))
-    assert urgencies <= {n for n, _ in REQUIRED_URGENCY_LEVELS}
+    assert not urgencies, f"the engine names an urgency tier: {sorted(urgencies)}"
 
 
 def test_the_run_start_check_lists_everything_missing(meta) -> None:

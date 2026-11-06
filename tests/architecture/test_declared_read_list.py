@@ -1,11 +1,14 @@
 """The declared read list holds the engine's reads to the Metacat Standard Configuration.
 
-``server/engine/start_check.py`` names every parameter, formula coefficient and urgency level
-the engine reads, so a configuration that lacks one stops the run at its start (I-1) instead of
-failing mid-run.  This test keeps that list honest in both directions, by parsing the source:
+``server/engine/start_check.py`` names every parameter and formula coefficient the engine reads,
+and derives the urgency levels the configuration's own code names (a codelet body that reads a
+tier), so a configuration that lacks one stops the run at its start (I-1) instead of failing
+mid-run.  This test keeps that list honest in both directions, by parsing the source:
 
-* every literal name passed to ``get_param``, ``get_formula_coeff`` or ``get_urgency``
-  anywhere in ``server/`` is declared;
+* every literal name passed to ``get_param`` or ``get_formula_coeff`` anywhere in ``server/`` is
+  declared, and ``get_urgency`` is never given a literal tier in ``server/`` (a tier the
+  configuration's code names is the configuration's, derived by the run-start check from the
+  bodies);
 * a computed name is declared through each of its concrete names (a conditional expression
   names two), or is one of the few reads listed below whose names come from data;
 * every declared name exists in the Metacat Standard Configuration, and no name is declared twice;
@@ -47,9 +50,12 @@ _COMPUTED_READS: dict[tuple[str, str, str], str] = {
     ("engine/coderack.py", "get_urgency", "entry['urgency']"): "a level a codelet pattern names (checked per entry)",
     ("engine/runner.py", "get_urgency", "self.meta.get_param('initial_codelet_urgency')"): "checked by name",
     ("engine/bridges.py", "get_urgency", "ctx.meta.get_param('bridge_recruit_urgency_level')"): "checked by name",
-    ("engine/start_check.py", "get_param", "parameter"): "each LEVEL_NAMING_PARAMETERS name, which is declared",
+    ("engine/start_check.py", "get_param", "parameter"): "each parameter whose refers_to is urgency_level (a name the configuration declares)",
+    ("services/run_service.py", "get_urgency", "ctx.meta.get_param('manual_clamp_background_level')"): "checked by name (refers_to urgency_level)",
     ("services/run_service.py", "get_urgency", "level"): "a level a codelet pattern names (checked per entry)",
     ("engine/posting.py", "get_urgency", "rule.urgency_level"): "a tier a posting rule names (checked per rule)",
+    ("engine/posting.py", "get_urgency", "meta.get_param('default_urgency_level')"): "checked by name",
+    ("engine/runner.py", "get_urgency", "self.meta.get_param('default_urgency_level')"): "checked by name",
 }
 
 #: Reads made by the seed codelet bodies (``seed_data/codelet_types.json``).  They are declared like the
@@ -129,8 +135,22 @@ def _declared() -> dict[str, set[str]]:
         "get_param": {n for n, _ in sc.REQUIRED_ENGINE_PARAMETERS}
         | {n for n, _ in sc.OPTIONAL_ENGINE_PARAMETERS},
         "get_formula_coeff": {n for n, _ in sc.REQUIRED_FORMULA_COEFFICIENTS},
-        "get_urgency": {n for n, _ in sc.REQUIRED_URGENCY_LEVELS},
+        "get_urgency": set(_tiers_named_by_bodies()),
     }
+
+
+def _tiers_named_by_bodies() -> dict[str, list[str]]:
+    """The urgency tiers the Standard Configuration's codelet bodies read, which the run-start check
+    requires of a configuration (``start_check.urgency_levels_read_by_bodies``)."""
+    bodies = json.loads((SEED / "codelet_types.json").read_text())
+    return sc.urgency_levels_read_by_bodies((b["name"], b.get("execute_body", "")) for b in bodies)
+
+
+def _level_naming_parameters() -> tuple[str, ...]:
+    """The Standard Configuration's parameters whose value names an urgency level
+    (``engine_param_refs.json``: ``refers_to`` is ``urgency_level``)."""
+    refs = json.loads((SEED / "engine_param_refs.json").read_text())
+    return tuple(n for n, kind in refs.items() if kind == "urgency_level")
 
 
 def test_every_literal_name_the_engine_reads_is_declared() -> None:
@@ -142,6 +162,19 @@ def test_every_literal_name_the_engine_reads_is_declared() -> None:
         if name not in declared[accessor]
     )
     assert not missing, "read but not on the declared read list in start_check.py: " + "; ".join(missing)
+
+
+def test_the_engine_reads_no_tier_by_a_literal_name() -> None:
+    """A tier is named by the configuration: by a codelet body, a posting rule, a codelet pattern,
+    a clamp type or a parameter whose ``refers_to`` is ``urgency_level``.  Renaming a tier in the
+    rows and in that code must leave a run unchanged, so no module of ``server/`` spells one."""
+    literal, _, _ = _reads()
+    offenders = sorted(
+        f"get_urgency({name!r}) in {sorted(files)}"
+        for (accessor, name), files in literal.items()
+        if accessor == "get_urgency" and not all(f.startswith("codelet body ") for f in files)
+    )
+    assert not offenders, "the engine names an urgency tier: " + "; ".join(offenders)
 
 
 def test_every_computed_read_is_accounted_for() -> None:
@@ -174,7 +207,6 @@ def test_no_name_is_declared_twice() -> None:
     for label, table in (
         ("parameters", sc.REQUIRED_ENGINE_PARAMETERS + sc.OPTIONAL_ENGINE_PARAMETERS),
         ("coefficients", sc.REQUIRED_FORMULA_COEFFICIENTS),
-        ("urgency levels", sc.REQUIRED_URGENCY_LEVELS),
     ):
         names = [n for n, _ in table]
         assert len(names) == len(set(names)), (
@@ -190,7 +222,7 @@ def test_every_declared_name_is_read_somewhere() -> None:
         for accessor, table in (
             ("get_param", sc.REQUIRED_ENGINE_PARAMETERS),
             ("get_formula_coeff", sc.REQUIRED_FORMULA_COEFFICIENTS),
-            ("get_urgency", sc.REQUIRED_URGENCY_LEVELS),
+            ("get_urgency", [(n, ", ".join(users)) for n, users in _tiers_named_by_bodies().items()]),
         )
         for n, _ in table
         if n not in read[accessor]
@@ -201,7 +233,7 @@ def test_every_declared_name_is_read_somewhere() -> None:
 def test_every_level_naming_parameter_is_declared() -> None:
     """A parameter whose value names an urgency level is itself read, so it is declared."""
     declared = _declared()["get_param"]
-    assert set(sc.LEVEL_NAMING_PARAMETERS) <= declared
+    assert set(_level_naming_parameters()) <= declared
 
 
 # --- The converse: every stored name is read --------------------------------------------------
@@ -232,11 +264,16 @@ def _names_read() -> dict[str, set[str]]:
         for entry in entries:
             read["get_urgency"].add(entry[1] if isinstance(entry, (list, tuple)) else entry["urgency"])
     params = json.loads((SEED / "engine_params.json").read_text())
-    for parameter in sc.LEVEL_NAMING_PARAMETERS:
+    for parameter in _level_naming_parameters():
         read["get_urgency"].add(params[parameter])
-    from server.engine.trace import CLAMP_TYPE_CODELET_BACKGROUNDS
-
-    read["get_urgency"].update(CLAMP_TYPE_CODELET_BACKGROUNDS.values())
+    # A clamp type's ``codelet_background_level`` is read by ``trace_display`` through the type's
+    # ``meta.clamp_types`` row.
+    enums = json.loads((SEED / "enums.json").read_text())
+    read["get_urgency"].update(
+        row["codelet_background_level"]
+        for row in enums["clamp_types"]
+        if row.get("codelet_background_level")
+    )
     return read
 
 

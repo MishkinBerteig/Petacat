@@ -1,6 +1,6 @@
 """The bridge-type and orientation constants."""
 
-from server.engine.bridges import (
+from tests.support.standard_names import (
     BRIDGE_BOTTOM,
     BRIDGE_TOP,
     BRIDGE_VERTICAL,

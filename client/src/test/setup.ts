@@ -10,7 +10,11 @@
 
 import '@testing-library/jest-dom/vitest'
 import { cleanup } from '@testing-library/react'
-import { afterEach } from 'vitest'
+import { afterEach, beforeEach } from 'vitest'
+
+import { useVocabularyStore } from '@/store/vocabulary'
+
+import { STANDARD_PAYLOAD } from './standardVocabulary'
 
 // Node's own experimental `localStorage` shadows jsdom's and is `undefined` unless Node
 // is given a storage file, so components that remember a choice per browser would
@@ -28,6 +32,13 @@ if (typeof window.localStorage?.getItem !== 'function') {
     },
   })
 }
+
+// Every test starts with the Metacat Standard Configuration's bindings, as the server would
+// have published them with the run; a test of another vocabulary adopts its own.
+beforeEach(() => {
+  useVocabularyStore.getState().clear()
+  useVocabularyStore.getState().adopt(STANDARD_PAYLOAD)
+})
 
 afterEach(() => {
   cleanup()

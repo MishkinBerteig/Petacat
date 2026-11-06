@@ -7,6 +7,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { displayTraceEvent } from '@/api/client';
 import { useMomentStore } from '@/store/momentStore';
 import { useRunStore } from '@/store/runStore';
+import { useVocabulary, type RoleName } from '@/store/vocabulary';
 import type { TraceEvent } from '@/types';
 
 /** The seven Trace event types of §4.4, in the order the dissertation lists them.
@@ -15,19 +16,28 @@ import type { TraceEvent } from '@/types';
  * these, each a "macroscopic" processing event that may itself comprise the
  * actions of many codelets.  Bond and description building never appears here.
  */
-const EVENT_LABELS: Record<string, { icon: string; label: string; color: string }> = {
-  concept_activation: { icon: '[◈]', label: 'concept activated', color: 'var(--text-accent)' },
-  group_built: { icon: '[G]', label: 'group perceived', color: '#4caf50' },
-  concept_mapping_built: { icon: '[⇒]', label: 'slippage', color: '#03a9f4' },
-  rule_built: { icon: '[R]', label: 'rule created', color: '#9c27b0' },
-  answer_found: { icon: '[A]', label: 'answer', color: 'var(--success)' },
-  snag: { icon: '[!]', label: 'snag', color: 'var(--error)' },
-  clamp_start: { icon: '[C]', label: 'pattern clamped', color: 'var(--warning)' },
-};
+const EVENT_STYLE_BY_ROLE: [string, { icon: string; label: string; color: string }][] = [
+  ['event_type.concept_activation', { icon: '[◈]', label: 'concept activated', color: 'var(--text-accent)' }],
+  ['event_type.group_built', { icon: '[G]', label: 'group perceived', color: '#4caf50' }],
+  ['event_type.concept_mapping_built', { icon: '[⇒]', label: 'slippage', color: '#03a9f4' }],
+  ['event_type.rule_built', { icon: '[R]', label: 'rule created', color: '#9c27b0' }],
+  ['event_type.answer_found', { icon: '[A]', label: 'answer', color: 'var(--success)' }],
+  ['event_type.snag', { icon: '[!]', label: 'snag', color: 'var(--error)' }],
+  ['event_type.clamp_start', { icon: '[C]', label: 'pattern clamped', color: 'var(--warning)' }],
+];
+
+type EventStyles = Record<string, { icon: string; label: string; color: string }>;
+
+/** The styles keyed by the run's own event-type names (the vocabulary binds each role). */
+function eventStyles(v: RoleName): EventStyles {
+  const out: EventStyles = {};
+  for (const [role, style] of EVENT_STYLE_BY_ROLE) out[v(role)] = style;
+  return out;
+}
 
 /** Event type to a short icon prefix for compact display. */
-function eventIcon(eventType: string): string {
-  return EVENT_LABELS[eventType]?.icon ?? '[.]';
+function eventIcon(styles: EventStyles, eventType: string): string {
+  return styles[eventType]?.icon ?? '[.]';
 }
 
 /**
@@ -40,12 +50,12 @@ export function eventPrintName(evt: TraceEvent): string {
 }
 
 /** Human-readable name for an event type. */
-function eventLabel(eventType: string): string {
-  return EVENT_LABELS[eventType]?.label ?? eventType.replace(/_/g, ' ');
+function eventLabel(styles: EventStyles, eventType: string): string {
+  return styles[eventType]?.label ?? eventType.replace(/_/g, ' ');
 }
 
-function eventColor(eventType: string): string {
-  return EVENT_LABELS[eventType]?.color ?? 'var(--text-secondary)';
+function eventColor(styles: EventStyles, eventType: string): string {
+  return styles[eventType]?.color ?? 'var(--text-secondary)';
 }
 
 
@@ -78,6 +88,7 @@ export function TraceList({
   onSelect?: (event: TraceEvent) => void;
   selected?: number | null;
 }) {
+  const styles = eventStyles(useVocabulary());
   const [filter, setFilter] = useState<string>('');
   const [search, setSearch] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -125,7 +136,7 @@ export function TraceList({
           <option value="">All events ({trace.length})</option>
           {types.map((t) => (
             <option key={t} value={t}>
-              {eventLabel(t)} ({trace.filter((e) => e.event_type === t).length})
+              {eventLabel(styles, t)} ({trace.filter((e) => e.event_type === t).length})
             </option>
           ))}
         </select>
@@ -180,12 +191,12 @@ export function TraceList({
             <span
               style={{
                 width: 36,
-                color: eventColor(evt.event_type),
+                color: eventColor(styles, evt.event_type),
                 fontWeight: 600,
                 flexShrink: 0,
               }}
             >
-              {eventIcon(evt.event_type)}
+              {eventIcon(styles, evt.event_type)}
             </span>
             <span
               className="text-xs"

@@ -49,6 +49,11 @@ UNKNOWN_REFERENCE = "unknown_reference"
 DOES_NOT_COMPILE = "does_not_compile"
 STALE = "stale"
 KEY_EXISTS = "key_exists"
+#: A vocabulary row (an enum row, or a theme relation, that holds a ``role`` -- or a link type
+#: that holds a ``behaviour``) cannot be deleted while it is bound: unbind it first.
+ROLE_BOUND = "role_bound"
+#: The ``role`` a row is given is already held by another row of the table.
+ROLE_TAKEN = "role_taken"
 
 #: HTTP status per class.
 STATUS = {
@@ -57,6 +62,8 @@ STATUS = {
     DOES_NOT_COMPILE: 422,
     STALE: 409,
     KEY_EXISTS: 409,
+    ROLE_BOUND: 422,
+    ROLE_TAKEN: 422,
 }
 
 OPS = ("insert", "update", "delete")

@@ -56,20 +56,22 @@ from server.engine.workspace_structures import set_structure_clock
 if TYPE_CHECKING:
     from server.engine.runner import EngineRunner
 
-#: Codelet families that run whole, under the commit lock, like the update cycle.
-#:
-#: ``meta`` is the progress-watcher and the jootser, and ``answer`` the answer-finder
-#: and the answer-justifier.  They clamp and unclamp, snag, give up and report answers:
-#: in one step they rewrite theme activations, Slipnet clamps, coderack patterns and the
-#: Trace's clamp state, and the snag response and giving up each run an update cycle of
-#: their own.  Not all of that goes through the builtins that take the lock, and all of
-#: it is state the scheduled update reads and writes back.  Run beside an update, a
-#: clamp could land between the update reading the Slipnet and writing it back and be
-#: overwritten; on MLX two updates at once abort the process.  Run beside each other,
-#: one answer-finder could snag and empty the rack while another, already chosen, went
-#: on to report an answer.  They are rare, and an answer-finder holds the lock for most
-#: of its work anyway, so serialising them costs nothing measurable.
-SERIALISED_FAMILIES = frozenset({"meta", "answer"})
+# Codelet families that run whole, under the commit lock, like the update cycle, are the ones
+# the configuration marks ``serialised`` (``meta.serialised_families``).  In the Standard
+# Configuration:
+#
+# ``meta`` is the progress-watcher and the jootser, and ``answer`` the answer-finder
+# and the answer-justifier.  They clamp and unclamp, snag, give up and report answers:
+# in one step they rewrite theme activations, Slipnet clamps, coderack patterns and the
+# Trace's clamp state, and the snag response and giving up each run an update cycle of
+# their own.  Not all of that goes through the builtins that take the lock, and all of
+# it is state the scheduled update reads and writes back.  Run beside an update, a
+# clamp could land between the update reading the Slipnet and writing it back and be
+# overwritten; on MLX two updates at once abort the process.  Run beside each other,
+# one answer-finder could snag and empty the rack while another, already chosen, went
+# on to report an answer.  They are rare, and an answer-finder holds the lock for most
+# of its work anyway, so serialising them costs nothing measurable.
+
 
 
 @dataclass
@@ -245,6 +247,9 @@ class FreeRunningEngine:
         runner = self.runner
         ctx = runner.ctx
         update_cycle = ctx.meta.get_param("update_cycle_length")
+        #: The families whose codelets run alone (``meta.serialised_families``, from the
+        #: ``codelet_families.serialised`` column).
+        serialised_families = ctx.meta.serialised_families
 
         # Wait for the rest of the pool before touching the rack.  See
         # ``_all_started``: without this the first worker starves the main thread of
@@ -283,7 +288,7 @@ class FreeRunningEngine:
                     continue
 
                 spec = ctx.meta.codelet_specs.get(codelet.codelet_type)
-                serialised = spec is not None and spec.family in SERIALISED_FAMILIES
+                serialised = spec is not None and spec.family in serialised_families
                 with self._commit_lock if serialised else nullcontext():
                     # A snag's restart empties the rack (``delete-all-codelets``,
                     # ``answers.ss:1189``), and a codelet chosen before that would never

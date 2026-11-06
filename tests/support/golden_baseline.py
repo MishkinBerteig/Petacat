@@ -208,7 +208,6 @@ def english_corpus(runner: Any, meta: Any) -> dict[str, list[str]]:
     line, so a regression shows as a difference rather than a crash."""
     from server.engine.rule_english import transcribe_rule_to_english_lines
     from server.engine.rules import Rule
-    from server.engine.trace import SNAG
 
     ctx = runner.ctx
     rule_lines: list[str] = []
@@ -230,7 +229,7 @@ def english_corpus(runner: Any, meta: Any) -> dict[str, list[str]]:
     ]
     snags = [
         f"{ev.codelet_count}|{ev.snag_type}|{ev.explanation}"
-        for ev in ctx.trace.events if ev.event_type == SNAG
+        for ev in ctx.trace.events if ev.event_type == meta.vocabulary.event_type_snag
     ]
     return {"rule_english": rule_lines, "commentary": commentary, "verbose": verbose,
             "trace_display": display, "snag": snags}

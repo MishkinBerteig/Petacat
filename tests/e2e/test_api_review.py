@@ -296,8 +296,13 @@ async def test_a_recorded_run_appears_in_the_timeline_with_its_identity(review_c
     assert run["action_count"] == 0
 
     # Opening the same run by id gives the same projection.
+    # The opened run also carries the vocabulary the run was made under (the client compares
+    # through it); the timeline entry does not.
     opened = (await review_client.get(f"/api/review/runs/{run_id}")).json()
-    assert opened == run
+    vocabulary = opened.pop("vocabulary")
+    behaviours = opened.pop("link_behaviours")
+    assert vocabulary["bridge_type.top"] and behaviours
+    assert opened == {k: v for k, v in run.items() if k not in ("vocabulary", "link_behaviours")}
 
 
 @pytest.mark.asyncio

@@ -1,8 +1,9 @@
-"""Verify engine string constants match the values in seed_data/enums.json.
+"""Verify the engine's names match the rows of seed_data/enums.json.
 
-These tests ensure that every Python constant used in place of the former
-Enum classes has a corresponding entry in the seed data that gets loaded
-into the DB lookup tables.
+The run statuses are the engine's own constants and are pinned to their rows.  Every other name
+the engine uses is a role, bound to a row (``role`` column): each vocabulary table's rows are the
+roles' bindings.  The seed's link types, codelet families and phases, and posting directions cover
+every use in the other seed files, and the structure of ``enums.json`` is fixed.
 """
 
 import json
@@ -39,79 +40,54 @@ def test_run_status_constants_match_seed(enums_data):
     assert constants == expected
 
 
-# ── Event types ──
+# ── The vocabulary: every enum table the engine names rows of ──
+#
+# The engine holds no constant for any of these names (``tests/architecture/test_vocabulary_literals.py``
+# fails on one).  Each table's rows carry a ``role`` that binds one to a concept the engine owns,
+# and the provider resolves the bindings once (``meta.vocabulary_bindings``).  These tests pin the
+# seed rows: the old pin of the engine's constants against the rows, now stated on the bindings.
 
-def test_event_type_constants_match_seed(enums_data):
-    """Every event-type constant must have a row in ``enums.json``.
+#: The tables whose rows were equal, as a set of names, to the engine's constants before the
+#: vocabulary was read from the database: every row of each is bound to a role.
+BOUND_ENTIRELY = (
+    "event_types", "bridge_types", "bridge_orientations", "clause_types", "rule_types",
+    "theme_types", "proposal_levels", "string_kinds", "rule_scopes", "failure_kinds",
+    "clamp_types", "posting_directions",
+)
 
-    ``trace_events.event_type`` is a foreign key onto ``event_types``, so a
-    constant with no enum row makes persisting that event fail at runtime.
-    """
-    from server.engine.trace import (
-        ANSWER_FOUND, BOND_BROKEN, BOND_BUILT, BRIDGE_BROKEN, BRIDGE_BUILT,
-        CLAMP_END, CLAMP_START, CONCEPT_ACTIVATION, CONCEPT_MAPPING_BUILT,
-        DESCRIPTION_BUILT, GROUP_BROKEN, GROUP_BUILT, RULE_BROKEN,
-        RULE_BUILT, SNAG,
-    )
-    expected = _names(enums_data, "event_types")
-    constants = {
-        ANSWER_FOUND, BOND_BROKEN, BOND_BUILT, BRIDGE_BROKEN, BRIDGE_BUILT,
-        CLAMP_END, CLAMP_START, CONCEPT_ACTIVATION, CONCEPT_MAPPING_BUILT,
-        DESCRIPTION_BUILT, GROUP_BROKEN, GROUP_BUILT, RULE_BROKEN,
-        RULE_BUILT, SNAG,
+
+@pytest.fixture(scope="module")
+def bindings():
+    from server.engine.metadata import MetadataProvider
+
+    return MetadataProvider.from_standard_configuration(SEED_DIR).vocabulary_bindings
+
+
+@pytest.mark.parametrize("table", BOUND_ENTIRELY)
+def test_every_row_of_a_vocabulary_table_is_bound_to_a_role(enums_data, bindings, table):
+    """The seed rows of the table and the rows the roles are bound to are the same names, and the
+    roles are the table's own (``roles.VOCABULARY``)."""
+    from server.engine.roles import VOCABULARY
+
+    bound = [b for b in bindings if b.table == table]
+    assert {b.name for b in bound} == _names(enums_data, table)
+    assert {b.role for b in bound} == {s.name for s in VOCABULARY if s.table == table}
+    assert len(bound) == len({b.role for b in bound}), "a role is bound twice"
+
+
+def test_every_event_type_row_is_an_event_type_the_engine_records(enums_data, bindings):
+    """A role bound to no row would leave the engine recording events under no configured name, so
+    each of the 15 roles has a row."""
+    roles = {b.role for b in bindings if b.table == "event_types"}
+    assert len(roles) == 15 == len(_names(enums_data, "event_types"))
+
+
+def test_theme_relations_are_bound(bindings):
+    """The five relations the engine names are rows of ``theme_relations``."""
+    assert {b.role for b in bindings if b.table == "theme_relations"} == {
+        "theme_relation.identity", "theme_relation.opposite", "theme_relation.successor",
+        "theme_relation.predecessor", "theme_relation.diff",
     }
-    assert constants == expected
-
-
-# ── Bridge types ──
-
-def test_bridge_type_constants_match_seed(enums_data):
-    from server.engine.bridges import BRIDGE_TOP, BRIDGE_BOTTOM, BRIDGE_VERTICAL
-    expected = _names(enums_data, "bridge_types")
-    assert {BRIDGE_TOP, BRIDGE_BOTTOM, BRIDGE_VERTICAL} == expected
-
-
-# ── Bridge orientations ──
-
-def test_bridge_orientation_constants_match_seed(enums_data):
-    from server.engine.bridges import ORIENTATION_HORIZONTAL, ORIENTATION_VERTICAL
-    expected = _names(enums_data, "bridge_orientations")
-    assert {ORIENTATION_HORIZONTAL, ORIENTATION_VERTICAL} == expected
-
-
-# ── Clause types ──
-
-def test_clause_type_constants_match_seed(enums_data):
-    from server.engine.rules import CLAUSE_INTRINSIC, CLAUSE_EXTRINSIC, CLAUSE_VERBATIM
-    expected = _names(enums_data, "clause_types")
-    assert {CLAUSE_INTRINSIC, CLAUSE_EXTRINSIC, CLAUSE_VERBATIM} == expected
-
-
-# ── Rule types ──
-
-def test_rule_type_constants_match_seed(enums_data):
-    from server.engine.rules import RULE_TOP, RULE_BOTTOM
-    expected = _names(enums_data, "rule_types")
-    assert {RULE_TOP, RULE_BOTTOM} == expected
-
-
-# ── Theme types ──
-
-def test_theme_type_constants_match_seed(enums_data):
-    from server.engine.themes import (
-        THEME_TOP_BRIDGE, THEME_BOTTOM_BRIDGE, THEME_VERTICAL_BRIDGE, ALL_THEME_TYPES,
-    )
-    expected = _names(enums_data, "theme_types")
-    assert {THEME_TOP_BRIDGE, THEME_BOTTOM_BRIDGE, THEME_VERTICAL_BRIDGE} == expected
-    assert set(ALL_THEME_TYPES) == expected
-
-
-# ── Proposal levels ──
-
-def test_proposal_level_constants_match_seed(enums_data):
-    from server.engine.workspace_structures import WorkspaceStructure
-    expected = _names(enums_data, "proposal_levels")
-    assert {WorkspaceStructure.PROPOSED, WorkspaceStructure.EVALUATED, WorkspaceStructure.BUILT} == expected
 
 
 # ── Link types ──
@@ -165,15 +141,21 @@ def test_param_value_types_match_seed(enums_data):
 
 # ── Seed data structure ──
 
-def test_all_13_enum_tables_present(enums_data):
-    """Verify enums.json contains all 13 expected tables."""
+def test_all_enum_tables_present(enums_data):
+    """Verify enums.json contains every enum table of the registry (the 13 of the first
+    vocabulary, and the string kinds, rule scopes, failure kinds, clamp types and progress
+    focuses stage 4 added: 18)."""
+    from server.services.config_registry import ENUM_REGISTRY
+
     expected_tables = {
         "run_statuses", "event_types", "bridge_types", "bridge_orientations",
         "clause_types", "rule_types", "theme_types", "proposal_levels",
         "link_types", "codelet_families", "codelet_phases",
         "posting_directions", "param_value_types",
+        "string_kinds", "rule_scopes", "failure_kinds", "clamp_types", "progress_focuses",
     }
-    assert set(enums_data.keys()) == expected_tables
+    assert set(enums_data.keys()) == expected_tables == set(ENUM_REGISTRY)
+    assert len(expected_tables) == 18
 
 
 def test_enum_rows_have_required_fields(enums_data):

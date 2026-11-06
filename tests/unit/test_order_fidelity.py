@@ -15,6 +15,7 @@ from server.engine import jootsing, rules
 from server.engine.coderack import Codelet, Coderack, CoderackBin
 from server.engine.metadata import MetadataProvider
 from server.engine.rng import RNG
+from server.engine.run_binding import vocab
 from server.engine.workspace import WorkspaceString
 
 
@@ -133,15 +134,14 @@ def test_a_batch_over_capacity_drops_by_a_pick_over_the_newest_first_list():
 
 
 def _snag(count, tag):
-    return NS(event_type="snag", codelet_count=count, tag=tag)
+    return NS(event_type=vocab().event_type_snag, codelet_count=count, tag=tag)
 
 
 def test_the_most_recent_event_set_lists_the_newest_event_first(monkeypatch):
     events = [_snag(10, "a"), _snag(20, "b"), _snag(30, "c")]
     trace = NS(events=events, get_new_events_since_last=lambda kind: list(events))
     monkeypatch.setattr(jootsing, "_events_equivalent", lambda x, y: True)
-    monkeypatch.setattr(jootsing, "SNAG", "snag")
-    got = jootsing.get_most_recent_event_set(trace, "snag")
+    got = jootsing.get_most_recent_event_set(trace, vocab().event_type_snag)
     assert [e.tag for e in got] == ["c", "b", "a"]
 
 
@@ -170,7 +170,8 @@ def test_an_empty_slippage_log_prints_as_metacat_prints_it():
 
 def test_a_rule_clause_prints_as_printf_rule_clause_does():
     """``printf-rule-clause`` (``rules.ss:2131-2155``)."""
-    from server.engine.rules import CLAUSE_EXTRINSIC, CLAUSE_INTRINSIC, RuleChange, RuleClause
+    from server.engine.rules import RuleChange, RuleClause
+    from tests.support.standard_names import CLAUSE_EXTRINSIC, CLAUSE_INTRINSIC
     from server.engine.verbose import rule_clause_text
 
     def node(short):

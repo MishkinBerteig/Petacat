@@ -7,12 +7,18 @@ interface Param {
   name: string
   value: string
   value_type: string
+  /** What the value's names refer to, so a change that renames or removes the thing updates it. */
+  refers_to?: string | null
 }
 
+/** What a parameter's names can refer to (`engine_params.refers_to`); none for most. */
+const REFERS_TO = ['node_list', 'trigger_node_list', 'node_map', 'codelet_type_list', 'urgency_level']
+
 const COLUMNS: ColumnDef[] = [
-  { key: 'name', label: 'Name', type: 'text', width: '45%' },
-  { key: 'value', label: 'Value', type: 'text', width: '35%' },
-  { key: 'value_type', label: 'Type', type: 'text', width: '20%' },
+  { key: 'name', label: 'Name', type: 'text', width: '38%' },
+  { key: 'value', label: 'Value', type: 'text', width: '30%' },
+  { key: 'value_type', label: 'Type', type: 'text', width: '14%' },
+  { key: 'refers_to', label: 'Refers to', type: 'select', options: REFERS_TO, width: '18%' },
 ]
 
 /** Each operation named for this collection, so a refusal says which thing it refused. */
@@ -58,6 +64,7 @@ export function ParamsEditor({ configuration = GLOBAL_CONFIGURATION_ID }: Config
             name: row.name ?? '',
             value: row.value ?? '',
             value_type: row.value_type || 'string',
+            ...(row.refers_to ? { refers_to: row.refers_to } : {}),
           }),
         })}
         onUpdate={async (name, row) => {
@@ -67,6 +74,7 @@ export function ParamsEditor({ configuration = GLOBAL_CONFIGURATION_ID }: Config
             body: JSON.stringify({
               value: row.value ?? current?.value ?? '',
               value_type: row.value_type ?? current?.value_type ?? 'string',
+              ...('refers_to' in row ? { refers_to: row.refers_to } : {}),
             }),
           })
         }}

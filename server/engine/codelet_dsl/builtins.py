@@ -31,26 +31,11 @@ from server.engine.concept_mappings import ConceptMapping
 from server.engine.descriptions import Description
 from server.engine.formulas import round_ratio, temp_adjusted_probability, temp_adjusted_values
 from server.engine.groups import Group
-from server.engine.roles import ROLE_BY_NAME, absent
+from server.engine.roles import ROLE_BY_NAME, VOCABULARY_BY_NAME, absent
 from server.engine.run_binding import constants
 from server.engine.rules import Rule
 from server.engine.sink import STRUCTURE_BROKEN, STRUCTURE_BUILT
-from server.engine.trace import (
-    ANSWER_FOUND,
-    BOND_BROKEN,
-    BOND_BUILT,
-    BRIDGE_BROKEN,
-    BRIDGE_BUILT,
-    CLAMP_END,
-    CLAMP_START,
-    DESCRIPTION_BUILT,
-    GROUP_BROKEN,
-    GROUP_BUILT,
-    RULE_BROKEN,
-    RULE_BUILT,
-    SNAG,
-    TraceEvent,
-)
+from server.engine.trace import TraceEvent
 from server.engine import verbose as _verbose
 from server.engine.workspace_objects import Letter
 
@@ -560,7 +545,7 @@ def evaluate_group(ctx: EngineContext, group: Group) -> bool:
             ctx.verbose_log.say("group-not-strong-enough")
         return False
     activate_from_workspace(ctx, group.bond_category, group.direction)
-    group.proposal_level = group.EVALUATED
+    group.proposal_level = ctx.meta.vocabulary.proposal_level_evaluated
     _wrote(ctx, group)
     return True
 
@@ -826,7 +811,7 @@ def evaluate_structure(
         if ctx.verbose:
             ctx.verbose_log.say(_NOT_STRONG_ENOUGH.get(type(structure).__name__, "not-strong-enough"))
         return False
-    structure.proposal_level = structure.EVALUATED
+    structure.proposal_level = ctx.meta.vocabulary.proposal_level_evaluated
     _wrote(ctx, structure)
     return True
 
@@ -929,7 +914,7 @@ def _build_structure_locked(ctx: EngineContext, structure: Any) -> bool:
         return False
     # Descriptions and rules don't fight
     if isinstance(structure, Description):
-        structure.proposal_level = structure.BUILT
+        structure.proposal_level = ctx.meta.vocabulary.proposal_level_built
         # Scheme: ``build-description`` (descriptions.ss:185-187) routes a
         # *bond*-description — one whose type is bond-category or bond-facet
         # (``bond-description?``, descriptions.ss:69-71) — to the group's separate
@@ -946,7 +931,7 @@ def _build_structure_locked(ctx: EngineContext, structure: Any) -> bool:
         _wrote(ctx, structure, structure.object)
         return True
     elif isinstance(structure, Rule):
-        structure.proposal_level = structure.BUILT
+        structure.proposal_level = ctx.meta.vocabulary.proposal_level_built
         ctx.workspace.add_rule(structure)
         _record_rule_event(ctx, structure)
         ctx.sink.on_structure_change(ctx, structure, STRUCTURE_BUILT)
@@ -1078,7 +1063,7 @@ def _build_structure_locked(ctx: EngineContext, structure: Any) -> bool:
             ctx.verbose_log.say("building-bridge")
             ctx.verbose_log.print_object(structure)
         ctx.verbose_log.mark_built(structure)
-    structure.proposal_level = structure.BUILT
+    structure.proposal_level = ctx.meta.vocabulary.proposal_level_built
     if isinstance(structure, Bond):
         structure.string.add_bond(structure)
         # Scheme: ``build-bond`` (bonds.ss:419-421) jolts the bond category, and
@@ -1167,7 +1152,7 @@ def _absorb_duplicate_group(
         transferred = Description(
             existing, description.description_type, description.descriptor
         )
-        transferred.proposal_level = Description.BUILT
+        transferred.proposal_level = ctx.meta.vocabulary.proposal_level_built
         existing.descriptions.insert(0, transferred)
         # ``build-description`` (descriptions.ss:182-192) jolts the description
         # type and the descriptor as the description goes in; the duplicate
@@ -1319,7 +1304,7 @@ def _consolidate_group(ctx: EngineContext, group: Group) -> Group | None:
             ctx.verbose_log.say("building-bond")
             ctx.verbose_log.print_object(bond, level=ctx.verbose_log.fresh(bond))
             ctx.verbose_log.mark_built(bond)
-        bond.proposal_level = bond.BUILT
+        bond.proposal_level = ctx.meta.vocabulary.proposal_level_built
         string.add_bond(bond)
         activate_from_workspace(ctx, bond.bond_category, bond.direction)
         ctx.sink.on_structure_change(ctx, bond, STRUCTURE_BUILT)
@@ -1332,7 +1317,7 @@ from server.engine.concept_mappings import slippage_english_name
 from server.engine.formulas import bond_degree_of_assoc, group_evaluation_probability, length_description_probability, share_of_ceiling
 from server.engine.groups import Group as GroupClass, attach_length_description
 from server.engine.rules import _generate_image_letters, _get_reference_objects_for_clause, _remq_duplicates, apply_rule as apply_rule_to_string, get_rule_supporting_groups, rule_signature
-from server.engine.trace import AnswerEvent, CONCEPT_MAPPING_BUILT, make_concept_activation_monitor
+from server.engine.trace import AnswerEvent, make_concept_activation_monitor
 from server.engine.workspace import WorkspaceString
 
 
@@ -1378,7 +1363,7 @@ def _adjacent_bonds(
             ctx.verbose_log.say("building-bond")
             ctx.verbose_log.print_object(bond, level="new")
             ctx.verbose_log.mark_built(bond)
-        bond.proposal_level = bond.BUILT
+        bond.proposal_level = ctx.meta.vocabulary.proposal_level_built
         left.string.add_bond(bond, displacing=True)
         activate_from_workspace(ctx, bond_category)
         ctx.sink.on_structure_change(ctx, bond, STRUCTURE_BUILT)
@@ -1439,12 +1424,7 @@ def _merge_duplicate_bridge(ctx: EngineContext, proposed: Bridge) -> None:
 
 
 def _existing_equivalent_bridge(ctx: EngineContext, proposed: Bridge) -> Bridge | None:
-    bridge_lists = {
-        "top": ctx.workspace.top_bridges,
-        "bottom": ctx.workspace.bottom_bridges,
-        "vertical": ctx.workspace.vertical_bridges,
-    }
-    for b in bridge_lists.get(proposed.bridge_type, []):
+    for b in ctx.workspace.bridges_of(proposed.bridge_type):
         if (
             b is not proposed
             and b.is_built
@@ -1477,11 +1457,10 @@ def _augment_bridge_at_build(ctx: EngineContext, bridge: Bridge) -> None:
        having changed, and the rule abstracted from it cannot either.
     """
     from server.engine.bridges import (
-        BRIDGE_VERTICAL,
         make_concept_mappings,
         platonic_length,
     )
-    horizontal = bridge.bridge_type != BRIDGE_VERTICAL
+    horizontal = bridge.bridge_type != ctx.meta.vocabulary.bridge_type_vertical
 
     if horizontal:
         object_category = _bound(ctx.slipnet.roles.dimension_object_category)
@@ -1594,7 +1573,7 @@ def _apply_group_flips(
                 ctx.verbose_log.say("building-bond")
                 ctx.verbose_log.print_object(bond, level=ctx.verbose_log.fresh(bond))
                 ctx.verbose_log.mark_built(bond)
-            bond.proposal_level = bond.BUILT
+            bond.proposal_level = ctx.meta.vocabulary.proposal_level_built
             new_group.string.add_bond(bond)
             # ``build-bond`` (bonds.ss:419-421) jolts the category and the direction.
             activate_from_workspace(ctx, bond.bond_category, bond.direction)
@@ -1602,7 +1581,7 @@ def _apply_group_flips(
         if ctx.verbose:
             ctx.verbose_log.say("building-group", "flipped ")
             ctx.verbose_log.print_object(new_group, level="new")
-        new_group.proposal_level = new_group.BUILT
+        new_group.proposal_level = ctx.meta.vocabulary.proposal_level_built
         new_group.string.add_group(new_group)
         # ``build-group`` (groups.ss:925-930) claims the bonds and jolts every
         # description's descriptor, as the ordinary build does above.
@@ -1666,7 +1645,7 @@ def _record_group_event(
     if importance >= threshold:
         record_event(
             ctx,
-            GROUP_BUILT,
+            ctx.meta.vocabulary.event_type_group_built,
             structures=[group],
             description=(
                 # ``trace.ss:904-907`` titles a flipped group event differently: the
@@ -1808,7 +1787,7 @@ def _record_slippage_events(
         if importance >= threshold:
             record_event(
                 ctx,
-                CONCEPT_MAPPING_BUILT,
+                ctx.meta.vocabulary.event_type_concept_mapping_built,
                 structures=[bridge],
                 description=f"slippage {cm}",
                 # ``trace.ss:796`` — a concept-mapping event's strength is the
@@ -1865,7 +1844,7 @@ def _record_rule_event(ctx: EngineContext, rule: Rule) -> None:
     if importance >= threshold:
         record_event(
             ctx,
-            RULE_BUILT,
+            ctx.meta.vocabulary.event_type_rule_built,
             structures=[rule],
             description=rule.transcribe_to_english(ctx.meta),
             # ``trace.ss:965`` — a rule event's strength is its relative quality.
@@ -1892,17 +1871,12 @@ def _equivalent_structure_exists(ctx: EngineContext, structure: Any) -> bool:
         equivalent = structure.string.get_equivalent_group(structure)
         return equivalent is not None and equivalent is not structure
     if isinstance(structure, Bridge):
-        bridge_lists = {
-            "top": ctx.workspace.top_bridges,
-            "bottom": ctx.workspace.bottom_bridges,
-            "vertical": ctx.workspace.vertical_bridges,
-        }
         return any(
             b is not structure
             and b.is_built
             and b.object1 is structure.object1
             and b.object2 is structure.object2
-            for b in bridge_lists.get(structure.bridge_type, [])
+            for b in ctx.workspace.bridges_of(structure.bridge_type)
         )
     return False
 
@@ -1925,6 +1899,7 @@ def _get_incompatible_structures(
     the group's three (groups.ss:652-695), and the bridge's four
     (bridges.ss:1241-1313).
     """
+    vocab = ctx.meta.vocabulary
     incompatibles: list[tuple[Any, float, float]] = []
     k = constants()
 
@@ -1969,7 +1944,7 @@ def _get_incompatible_structures(
         if structure.directed and (
             structure.leftmost_in_string() or structure.rightmost_in_string()
         ):
-            for orientation in ("horizontal", "vertical"):
+            for orientation in (vocab.bridge_orientation_horizontal, vocab.bridge_orientation_vertical):
                 for bridge in structure.get_incompatible_bridges(orientation):
                     if bridge.is_built:
                         incompatibles.append(
@@ -2028,7 +2003,7 @@ def _get_incompatible_structures(
         # contradicts an existing bridge's string-position mapping has to beat it,
         # 1 vs 1, and breaks it on winning.  Vertical first, then horizontal, as
         # the Scheme appends them.
-        for orientation in ("vertical", "horizontal"):
+        for orientation in (vocab.bridge_orientation_vertical, vocab.bridge_orientation_horizontal):
             for bridge in structure.get_incompatible_bridges(orientation):
                 if bridge.is_built:
                     incompatibles.append(
@@ -2229,7 +2204,7 @@ def _break_structure_locked(ctx: EngineContext, structure: Any) -> None:
     elif isinstance(structure, Bridge):
         _break_bridge(ctx, structure)
     else:
-        structure.proposal_level = structure.PROPOSED
+        structure.proposal_level = ctx.meta.vocabulary.proposal_level_proposed
         if isinstance(structure, Rule):
             ctx.workspace.remove_rule(structure)
         _wrote(ctx, structure, *_structure_objects(structure))
@@ -2255,7 +2230,7 @@ def _retire(ctx: EngineContext, structure: Any) -> None:
     Subcognitive for the Trace, but not for Audit: reconstructing an intermediate
     Workspace in forward order needs removals as much as additions.
     """
-    structure.proposal_level = structure.PROPOSED
+    structure.proposal_level = ctx.meta.vocabulary.proposal_level_proposed
     _wrote(ctx, structure, *_structure_objects(structure))
     ctx.sink.on_structure_change(ctx, structure, STRUCTURE_BROKEN)
 
@@ -2268,7 +2243,7 @@ def _break_bond(ctx: EngineContext, bond: Bond) -> None:
     """
     if ctx.verbose:
         ctx.verbose_log.say("breaking-bond")
-        ctx.verbose_log.print_object(bond, level="built")
+        ctx.verbose_log.print_object(bond, level=ctx.meta.vocabulary.proposal_level_built)
     bond.string.remove_bond(bond)
     bond.from_object.remove_outgoing_bond(bond)
     bond.to_object.remove_incoming_bond(bond)
@@ -2280,7 +2255,7 @@ def _break_bridge(ctx: EngineContext, bridge: Bridge) -> None:
     """Scheme: ``break-bridge`` (bridges.ss:1437-1449)."""
     if ctx.verbose:
         ctx.verbose_log.say("breaking-bridge")
-        ctx.verbose_log.print_object(bridge, level="built")
+        ctx.verbose_log.print_object(bridge, level=ctx.meta.vocabulary.proposal_level_built)
     ctx.workspace.remove_bridge(bridge)
     _retire(ctx, bridge)
 
@@ -2313,7 +2288,7 @@ def _break_group(ctx: EngineContext, group: Group) -> None:
 
     if ctx.verbose:
         ctx.verbose_log.say("breaking-group")
-        ctx.verbose_log.print_object(group, level="built")
+        ctx.verbose_log.print_object(group, level=ctx.meta.vocabulary.proposal_level_built)
     if enclosing is not None and enclosing is not group:
         _break_group(ctx, enclosing)
 
@@ -2402,13 +2377,19 @@ def role(ctx: EngineContext, name: str) -> Any:
     """What the configuration binds to the role *name* (``"direction.left"``).
 
     The node; for an ordered role the tuple of what is bound, in ordinal order; for a
-    codelet-type role the type's spec; or the role's ``Absent`` token when nothing is bound
-    (falsy, node-shaped).  A name outside the role vocabulary is a mistake in the body and
+    codelet-type role the type's spec; the name of the bound row for a vocabulary role
+    (``"bridge_type.top"``); or the role's ``Absent`` token (``AbsentName`` for a vocabulary
+    role) when nothing is bound (falsy).  A name outside the role vocabulary is a mistake in the body and
     raises ``ValueError`` naming it.
     """
     spec = ROLE_BY_NAME.get(name)
     if spec is None:
-        raise ValueError(f"role({name!r}): not a name of the role vocabulary")
+        vocabulary_spec = VOCABULARY_BY_NAME.get(name)
+        if vocabulary_spec is None:
+            raise ValueError(f"role({name!r}): not a name of the role vocabulary")
+        # A role bound to a row of an enum table answers with the row's name (or the
+        # role's AbsentName), so a body compares against it and never spells the name.
+        return getattr(ctx.meta.vocabulary, vocabulary_spec.attr)
     return getattr(ctx.slipnet.roles, spec.attr)
 
 
@@ -2567,14 +2548,11 @@ def get_built_bonds(ctx: EngineContext, string: Any) -> list:
     return [b for b in string.bonds if b.is_built]
 
 
-def get_built_bridges(ctx: EngineContext, bridge_type: str = "top") -> list:
-    """Get built bridges of a given type."""
-    type_map = {
-        "top": ctx.workspace.top_bridges,
-        "bottom": ctx.workspace.bottom_bridges,
-        "vertical": ctx.workspace.vertical_bridges,
-    }
-    bridges = type_map.get(bridge_type, [])
+def get_built_bridges(ctx: EngineContext, bridge_type: str | None = None) -> list:
+    """Get built bridges of a given type (the top bridges when none is named)."""
+    if bridge_type is None:
+        bridge_type = ctx.meta.vocabulary.bridge_type_top
+    bridges = ctx.workspace.bridges_of(bridge_type)
     return [b for b in bridges if b.is_built]
 
 
@@ -2653,7 +2631,7 @@ def record_event(
         ctx.trace.record_event(event)
 
     # Emit commentary for snag events (Scheme: answers.ss:1164-1172)
-    if event_type == SNAG:
+    if event_type == ctx.meta.vocabulary.event_type_snag:
         from server.engine.commentary import emit_snag
         snag_count = ctx.trace.snag_count
         explanation = description or "The rule could not be applied"
@@ -2759,7 +2737,7 @@ def record_snag(ctx: EngineContext, top_rule: Any, translated_rule: Any) -> None
         failure_result=failure,
         explanation=explanation,
         description=explanation,
-        snag_type=getattr(ctx, "last_failure_kind", "change"),
+        snag_type=getattr(ctx, "last_failure_kind", ctx.meta.vocabulary.failure_kind_change),
         snag_objects=snag_objects,
         snag_bridges=snag_bridges,
         snag_concept_mappings=snag_concept_mappings,
@@ -2880,10 +2858,10 @@ def _theme_pattern_dict_for_picture(pattern: Any) -> dict | None:
     }
 
 
-def _answer_ref_objects(translation: Any, top: bool) -> list:
+def _answer_ref_objects(ctx: EngineContext, translation: Any, top: bool) -> list:
     """The reference objects of the answer's top (or bottom) rule: the translated rule's
     source side is the *top* when a top rule was translated (``justify.ss:50-51``)."""
-    from_is_top = translation.slippage_log.rule_type == "top"
+    from_is_top = translation.slippage_log.rule_type == ctx.meta.vocabulary.rule_type_top
     return list(
         translation.from_ref_objects if from_is_top == top else translation.to_ref_objects
     )
@@ -3062,7 +3040,7 @@ def _report_answer_locked(
             )
         if translated_string is None:
             translated_string = WorkspaceString(
-                answer_string, ctx.slipnet, string_type="answer"
+                answer_string, ctx.slipnet, string_type=ctx.meta.vocabulary.string_kind_answer
             )
 
     # What the rule translation left behind (``answers.ss:962-1000``, ``justify.ss:46-120``,
@@ -3149,8 +3127,8 @@ def _report_answer_locked(
             list(translation.supporting_vertical_bridges) if logged else None
         ),
         supporting_groups=answer_supporting_groups if logged else None,
-        top_rule_ref_objects=_answer_ref_objects(translation, True) if logged else None,
-        bottom_rule_ref_objects=_answer_ref_objects(translation, False) if logged else None,
+        top_rule_ref_objects=_answer_ref_objects(ctx, translation, True) if logged else None,
+        bottom_rule_ref_objects=_answer_ref_objects(ctx, translation, False) if logged else None,
         slippage_log=translation.slippage_log if logged else None,
         unjustified_slippages=list(unjustified_slippages or []),
         meta=ctx.meta,
@@ -3166,7 +3144,7 @@ def _report_answer_locked(
     quality_phrase = get_quality_phrase(quality, ctx.meta)
     templates = ctx.meta.commentary_templates
 
-    prior_answers = len(ctx.trace.get_events_by_type(ANSWER_FOUND)) - 1
+    prior_answers = len(ctx.trace.get_events_by_type(ctx.meta.vocabulary.event_type_answer_found)) - 1
     if unjustified_slippages:
         # Checked before the justify-mode branch (``answers.ss:35-45``): an answer the
         # program cannot account for is reported as such whichever mode it is in.
@@ -3310,7 +3288,7 @@ def _apply_rule_locked(ctx: EngineContext, rule: Any, string: Any = None) -> str
     # failure-result it carries.  Stash them so the ``record_snag`` that follows
     # names what actually failed rather than re-resolving every clause.
     ctx.last_failure_objects = []
-    ctx.last_failure_kind = "change"
+    ctx.last_failure_kind = ctx.meta.vocabulary.failure_kind_change
     ctx.last_failure = None
 
     def _remember(failure: Any) -> None:
@@ -3320,7 +3298,7 @@ def _apply_rule_locked(ctx: EngineContext, rule: Any, string: Any = None) -> str
         ctx.last_failure_objects = list(getattr(failure, "objects", []) or [])
         # And *which* of the three failure shapes it was, which decides the snag type
         # (``trace.ss:1053``) and hence the snag's explanation.
-        ctx.last_failure_kind = getattr(failure, "kind", "change")
+        ctx.last_failure_kind = getattr(failure, "kind", ctx.meta.vocabulary.failure_kind_change)
 
     result = apply_rule_to_string(rule, target, ctx.slipnet, failure_action=_remember)
     if result is None:

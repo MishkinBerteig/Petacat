@@ -25,6 +25,7 @@ import math
 from typing import TYPE_CHECKING, Any
 
 from server.engine.images import is_platonic_letter
+from server.engine.run_binding import constants as _constants
 from server.engine.answer_comparison import _fill
 from server.engine.slipnet import article_of, holds_role, lowercase_name as _lc
 
@@ -75,6 +76,9 @@ def _is_literal(node: Any) -> bool:
 class _Ctx:
     def __init__(self, string: Any, meta: MetadataProvider | None) -> None:
         self.string = string
+        #: The vocabulary the wording is keyed by: the provider's, so a rule can be put into
+        #: English with no run bound (the rule is already made).
+        self.vocab = meta.vocabulary if meta is not None else _constants().vocab
         self.phrases: dict[str, list[str]] = _param(
             meta, "rule_english_dimension_phrases"
         )
@@ -223,7 +227,8 @@ def _change_phrase(
     ctx: _Ctx, object_phrase: str, plural: bool, bond_facet_change: tuple | None, change: tuple
 ) -> str:
     scope, dimension, descriptor = change
-    subs = scope == "subobjects"
+    v = ctx.vocab
+    subs = scope == v.rule_scope_subobjects
     if holds_role(dimension, _DIM_DIRECTION):
         return ctx.say(
             "reverse",
@@ -232,7 +237,7 @@ def _change_phrase(
             object=object_phrase,
         )
     if holds_role(dimension, _DIM_GROUP_CATEGORY):
-        if scope == "self":
+        if scope == v.rule_scope_self:
             # The medium's plural, from the dimension phrases (no second copy of the words).
             what = _dimension_phrase(ctx, bond_facet_change[2], True) if bond_facet_change else ""
             return ctx.say("reverse_ends", facet=what, object=object_phrase)
@@ -308,9 +313,10 @@ def _change_length_of(
         "op": op,
     }
     relation = getattr(length, "relation", None)
-    if relation == "successor":
+    v = ctx.vocab
+    if relation == v.theme_relation_successor:
         return ctx.say("increase_length", **fields)
-    if relation == "predecessor":
+    if relation == v.theme_relation_predecessor:
         return ctx.say("decrease_length", **fields)
     return ctx.say("change_length", length=_lc(length), **fields)
 
@@ -319,12 +325,13 @@ def _objctgy_length_lettctgy_phrases(
     ctx: _Ctx, op: str, plural: bool, changes: list[tuple]
 ) -> list[str]:
     """The object-category / length / letter-category group of phrases."""
-    oc_self = _select_descriptor(_DIM_OBJECT_CATEGORY, "self", changes)
-    oc_subs = _select_descriptor(_DIM_OBJECT_CATEGORY, "subobjects", changes)
-    len_self = _select_descriptor(_DIM_LENGTH, "self", changes)
-    len_subs = _select_descriptor(_DIM_LENGTH, "subobjects", changes)
-    lc_self = _select_descriptor(_DIM_LETTER_CATEGORY, "self", changes)
-    lc_subs = _select_descriptor(_DIM_LETTER_CATEGORY, "subobjects", changes)
+    v = ctx.vocab
+    oc_self = _select_descriptor(_DIM_OBJECT_CATEGORY, v.rule_scope_self, changes)
+    oc_subs = _select_descriptor(_DIM_OBJECT_CATEGORY, v.rule_scope_subobjects, changes)
+    len_self = _select_descriptor(_DIM_LENGTH, v.rule_scope_self, changes)
+    len_subs = _select_descriptor(_DIM_LENGTH, v.rule_scope_subobjects, changes)
+    lc_self = _select_descriptor(_DIM_LETTER_CATEGORY, v.rule_scope_self, changes)
+    lc_subs = _select_descriptor(_DIM_LETTER_CATEGORY, v.rule_scope_subobjects, changes)
     length_change = _select_change(_DIM_LENGTH, None, changes)
     ldim = length_change[1] if length_change is not None else None
 
@@ -393,16 +400,16 @@ def _remove_lettctgy_change_if_necessary(changes: list[tuple]) -> list[tuple]:
 
 
 def _clause_phrases(ctx: _Ctx, clause: RuleClause) -> list[str]:
-    if clause.is_verbatim:
+    if clause.clause_type == ctx.vocab.clause_type_verbatim:
         return [_verbatim_phrase(ctx, list(clause.verbatim_letters or []))]
-    if clause.is_extrinsic:
+    if clause.clause_type == ctx.vocab.clause_type_extrinsic:
         return [_swap_phrase(ctx, clause.object_descriptions, clause.dimensions)]
     od = clause.object_descriptions[0]
     plural = _plural_object_phrase(od, ctx.string)
     object_phrase = _object_phrase(ctx, od, plural)
     changes = [_triple(c) for c in clause.changes]
     group_phrases = _objctgy_length_lettctgy_phrases(ctx, object_phrase, plural, changes)
-    bond_facet_change = _select_change(_DIM_BOND_FACET, "self", changes)
+    bond_facet_change = _select_change(_DIM_BOND_FACET, ctx.vocab.rule_scope_self, changes)
     remaining = [
         c
         for c in _remove_lettctgy_change_if_necessary(changes)
@@ -445,10 +452,13 @@ def transcribe_rule_to_english_lines(
 ) -> list[str]:
     """Scheme ``transcribe-to-english`` (``rules.ss:1723``): the rule's lines."""
     workspace = getattr(rule, "workspace", None)
-    string = None
+    ctx = _Ctx(None, meta)
     if workspace is not None:
-        string = workspace.initial_string if rule.is_top_rule else workspace.target_string
-    ctx = _Ctx(string, meta)
+        ctx.string = (
+            workspace.initial_string
+            if rule.rule_type == ctx.vocab.rule_type_top
+            else workspace.target_string
+        )
     if not rule.clauses:
         clause_strings = [ctx.say("no_change")]
     else:

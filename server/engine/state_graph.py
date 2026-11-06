@@ -129,8 +129,18 @@ _TYPES_BY_NAME = {cls.__name__: cls for cls in GRAPH_TYPES}
 #: restore; see the module docstring.
 _ENVIRONMENT_FIELDS = frozenset({"slipnet", "meta", "workspace", "rng"})
 
-#: The four Workspace strings, by the role that names them.
-_STRING_ROLES = ("initial", "modified", "target", "answer")
+def _string_slots(vocab: Any) -> tuple[tuple[str, str], ...]:
+    """The four Workspace strings: ``(key in the capture, attribute of the Workspace)``.
+
+    The key is the run's name for the string kind (its vocabulary), so the capture's words
+    follow whatever the configuration calls the kinds; the attribute is the engine's own.
+    """
+    return (
+        (vocab.string_kind_initial, "initial_string"),
+        (vocab.string_kind_modified, "modified_string"),
+        (vocab.string_kind_target, "target_string"),
+        (vocab.string_kind_answer, "answer_string"),
+    )
 
 
 class StateGraphError(RuntimeError):
@@ -300,38 +310,36 @@ def capture_run_state(ctx: Any) -> dict:
     identifiers it had already used.
     """
     ws = ctx.workspace
+    v = ctx.meta.vocabulary
+    slots = _string_slots(v)
     strings = {
-        id(ws.initial_string): "initial",
-        id(ws.modified_string): "modified",
-        id(ws.target_string): "target",
+        id(getattr(ws, attr)): key
+        for key, attr in slots
+        if getattr(ws, attr, None) is not None
     }
-    if ws.answer_string is not None:
-        strings[id(ws.answer_string)] = "answer"
 
     writer = _Writer(strings)
 
     workspace_state = {
         "strings": {
-            role: {
-                "text": getattr(ws, f"{role}_string").text,
-                "objects": [writer.ref(o) for o in getattr(ws, f"{role}_string").objects],
-                "bonds": [writer.ref(b) for b in getattr(ws, f"{role}_string").bonds],
-                "groups": [writer.ref(g) for g in getattr(ws, f"{role}_string").groups],
-                "justify_mode": getattr(ws, f"{role}_string").justify_mode,
-                "string_type": getattr(ws, f"{role}_string").string_type,
+            key: {
+                "text": getattr(ws, attr).text,
+                "objects": [writer.ref(o) for o in getattr(ws, attr).objects],
+                "bonds": [writer.ref(b) for b in getattr(ws, attr).bonds],
+                "groups": [writer.ref(g) for g in getattr(ws, attr).groups],
+                "justify_mode": getattr(ws, attr).justify_mode,
+                "string_type": getattr(ws, attr).string_type,
                 # Stored per-cycle value (workspace-strings.ss:335); None until the
                 # first update cycle.
                 "average_intra_string_unhappiness": getattr(
-                    getattr(ws, f"{role}_string"), "_average_intra_string_unhappiness", None
+                    getattr(ws, attr), "_average_intra_string_unhappiness", None
                 ),
                 # ``image`` is built lazily, so a string that has not needed one
                 # yet simply has no attribute rather than a null.
-                "image": writer.value(
-                    getattr(getattr(ws, f"{role}_string"), "image", None)
-                ),
+                "image": writer.value(getattr(getattr(ws, attr), "image", None)),
             }
-            for role in _STRING_ROLES
-            if getattr(ws, f"{role}_string", None) is not None
+            for key, attr in slots
+            if getattr(ws, attr, None) is not None
         },
         "top_bridges": [writer.ref(b) for b in ws.top_bridges],
         "bottom_bridges": [writer.ref(b) for b in ws.bottom_bridges],
@@ -347,21 +355,21 @@ def capture_run_state(ctx: Any) -> dict:
         # the next cycle — and a scout landing in that window picks a different
         # bridge type from the same random draw.
         "mapping_strengths": {
-            "top": ws.top_mapping_strength,
-            "bottom": ws.bottom_mapping_strength,
-            "vertical": ws.vertical_mapping_strength,
+            v.bridge_type_top: ws.top_mapping_strength,
+            v.bridge_type_bottom: ws.bottom_mapping_strength,
+            v.bridge_type_vertical: ws.vertical_mapping_strength,
         },
         # Same argument for the three inter-string averages: the thematic-scout
         # count reads ``get_max_inter_string_unhappiness`` off them, and for the
         # rule-possibility flags, which the rule-scout consults between cycles.
         "inter_string_unhappiness": {
-            "top": ws.average_top_inter_string_unhappiness,
-            "bottom": ws.average_bottom_inter_string_unhappiness,
-            "vertical": ws.average_vertical_inter_string_unhappiness,
+            v.bridge_type_top: ws.average_top_inter_string_unhappiness,
+            v.bridge_type_bottom: ws.average_bottom_inter_string_unhappiness,
+            v.bridge_type_vertical: ws.average_vertical_inter_string_unhappiness,
         },
         "rule_possible": {
-            "top": ws.top_rule_possible,
-            "bottom": ws.bottom_rule_possible,
+            v.rule_type_top: ws.top_rule_possible,
+            v.rule_type_bottom: ws.bottom_rule_possible,
         },
         # Fixed for the run, and *not* recoverable from ``answer_string``: a
         # discovery run that answered has one too.
@@ -398,10 +406,10 @@ def capture_run_state(ctx: Any) -> dict:
     return {
         "format_version": FORMAT_VERSION,
         "problem": {
-            "initial": ws.initial_string.text,
-            "modified": ws.modified_string.text,
-            "target": ws.target_string.text,
-            "answer": ws.answer_string.text if ws.answer_string else None,
+            v.string_kind_initial: ws.initial_string.text,
+            v.string_kind_modified: ws.modified_string.text,
+            v.string_kind_target: ws.target_string.text,
+            v.string_kind_answer: ws.answer_string.text if ws.answer_string else None,
         },
         "runner": {
             "codelet_count": ctx.codelet_count,
@@ -506,16 +514,18 @@ def _restore_run_state(runner: Any, state: dict) -> None:
     # to exist *before* the graph is read, because references to it were captured as
     # ``{"$string": "answer"}`` and resolve by role.  Built the way ``report_answer``
     # builds it; its fields are then overwritten from the capture like any other string.
-    if "answer" in ws_state["strings"] and ws.answer_string is None:
+    v = ctx.meta.vocabulary
+    answer_kind = v.string_kind_answer
+    if answer_kind in ws_state["strings"] and ws.answer_string is None:
         from server.engine.workspace import WorkspaceString
 
         ws.answer_string = WorkspaceString(
-            ws_state["strings"]["answer"]["text"], ctx.slipnet, string_type="answer"
+            ws_state["strings"][answer_kind]["text"], ctx.slipnet, string_type=answer_kind
         )
         ws.answer_string.workspace = ws
 
-    strings = {role: getattr(ws, f"{role}_string") for role in _STRING_ROLES
-               if getattr(ws, f"{role}_string", None) is not None}
+    strings = {key: getattr(ws, attr) for key, attr in _string_slots(v)
+               if getattr(ws, attr, None) is not None}
     reader = _Reader(state["graph"], ctx.slipnet, strings)
     rebuilt = reader.build()
 
@@ -564,16 +574,16 @@ def _restore_run_state(runner: Any, state: dict) -> None:
     # still restores — to the zeros a fresh Workspace starts at, which is what such
     # a capture would have restored anyway.
     strengths = ws_state.get("mapping_strengths") or {}
-    ws.top_mapping_strength = strengths.get("top", 0.0)
-    ws.bottom_mapping_strength = strengths.get("bottom", 0.0)
-    ws.vertical_mapping_strength = strengths.get("vertical", 0.0)
+    ws.top_mapping_strength = strengths.get(v.bridge_type_top, 0.0)
+    ws.bottom_mapping_strength = strengths.get(v.bridge_type_bottom, 0.0)
+    ws.vertical_mapping_strength = strengths.get(v.bridge_type_vertical, 0.0)
     inter = ws_state.get("inter_string_unhappiness") or {}
-    ws.average_top_inter_string_unhappiness = inter.get("top", 0.0)
-    ws.average_bottom_inter_string_unhappiness = inter.get("bottom", 0.0)
-    ws.average_vertical_inter_string_unhappiness = inter.get("vertical", 0.0)
+    ws.average_top_inter_string_unhappiness = inter.get(v.bridge_type_top, 0.0)
+    ws.average_bottom_inter_string_unhappiness = inter.get(v.bridge_type_bottom, 0.0)
+    ws.average_vertical_inter_string_unhappiness = inter.get(v.bridge_type_vertical, 0.0)
     possible = ws_state.get("rule_possible") or {}
-    ws.top_rule_possible = possible.get("top", False)
-    ws.bottom_rule_possible = possible.get("bottom", False)
+    ws.top_rule_possible = possible.get(v.rule_type_top, False)
+    ws.bottom_rule_possible = possible.get(v.rule_type_bottom, False)
     ws.justify_mode = ws_state.get("justify_mode", ws.answer_string is not None)
     ws._average_unhappiness = ws_state.get("average_unhappiness")
 

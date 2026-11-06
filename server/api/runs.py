@@ -10,8 +10,10 @@ from pydantic import BaseModel, model_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from server.engine.memory import clause_types_of
 from server.db import get_session
 from server.services.problem_text import check_problem
+from server.services.vocabulary_payload import run_vocabulary_payload
 from server.models.run import Run
 
 router = APIRouter(prefix="/api/runs", tags=["runs"])
@@ -102,6 +104,11 @@ class RunResponse(BaseModel):
     #: executor, which a seed reproduces identically for any count of 2 or more.  Null when nothing records it, as
     #: for runs created before the count was stored.
     workers: int | None = None
+    #: The run's bound vocabulary (role -> name) and each link type's behaviour, published
+    #: with the run so the client compares through them (``vocabulary_payload``).  Set by
+    #: create and get only; null elsewhere.
+    vocabulary: dict[str, str] | None = None
+    link_behaviours: dict[str, str | None] | None = None
 
 
 class RunListItem(RunResponse):
@@ -198,6 +205,7 @@ async def create_run(
         spreading_threshold=info.spreading_threshold,
         mode=info.mode,
         workers=info.workers,
+        **run_vocabulary_payload(svc, info.run_id),
     )
 
 
@@ -223,6 +231,7 @@ async def get_run(
         spreading_threshold=info.spreading_threshold,
         mode=info.mode,
         workers=info.workers,
+        **run_vocabulary_payload(svc, info.run_id),
     )
 
 
@@ -770,6 +779,7 @@ def _project_memory(memory) -> dict:
                 "temperature": a.temperature,
                 "themes": a.themes,
                 "unjustified_slippages": a.unjustified_slippages,
+                "clause_types": clause_types_of(a.top_rule_signature, a.bottom_rule_signature),
                 "activation": a.activation,
                 "top_themes": a.top_themes,
                 "vertical_themes": a.vertical_themes,
@@ -791,6 +801,7 @@ def _project_memory(memory) -> dict:
                 "codelet_count": s.codelet_count,
                 "temperature": s.temperature,
                 "theme_pattern": s.theme_pattern,
+                "clause_types": clause_types_of(s.rule_signature, s.translated_rule_signature),
                 "description": s.description,
                 "translated_rule_description": s.translated_rule_description,
                 "explanation": snag_explanation_text(s, _templates),

@@ -11,10 +11,10 @@ from __future__ import annotations
 from typing import Any
 
 from server.engine.bonds import Bond
+from server.engine.run_binding import vocab
 from tests.support.standard_configuration import standard_activation, standard_meta
 from server.engine.temperature import Temperature
 from server.engine.trace import (
-    SNAG,
     ClampEvent,
     SnagEvent,
     TemporalTrace,
@@ -22,6 +22,7 @@ from server.engine.trace import (
     get_snag_concept_pattern,
     get_snag_theme_pattern,
 )
+from tests.support.standard_names import SNAG
 from server.engine.workspace_objects import WorkspaceObject
 
 
@@ -560,6 +561,6 @@ def test_a_snag_event_still_has_a_type_and_a_number():
     """Nothing above should have disturbed the event's identity in the Trace."""
     trace = TemporalTrace()
     trace.add_snag_event(
-        SnagEvent(codelet_count=1, temperature=100.0, snag_type=SnagEvent.SWAP)
+        SnagEvent(codelet_count=1, temperature=100.0, snag_type=vocab().failure_kind_swap)
     )
-    assert trace.get_last_event(SNAG).snag_type == "swap"
+    assert trace.get_last_event(SNAG).snag_type == vocab().failure_kind_swap

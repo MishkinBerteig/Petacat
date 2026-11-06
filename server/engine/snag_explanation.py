@@ -29,6 +29,7 @@ from typing import Any
 
 from server.engine.answer_comparison import _fill, resolve_templates
 from server.engine.images import ImageFailure, is_platonic_relation
+from server.engine.run_binding import vocab
 from server.engine.slipnet import holds_role, lowercase_name as _lc
 
 
@@ -99,9 +100,10 @@ def failure_result_of(failure: ImageFailure | None) -> tuple | None:
     if failure is None or not failure.objects:
         return None
     objects = list(failure.objects)
-    if failure.kind == ImageFailure.SWAP:
+    v = vocab()
+    if failure.kind == v.failure_kind_swap:
         return ("SWAP", objects, failure.dimension)
-    if failure.kind == ImageFailure.CONFLICT:
+    if failure.kind == v.failure_kind_conflict:
         second = objects[1] if len(objects) > 1 else None
         return ("CONFLICT", objects[0], failure.dimension, second, failure.dimension2)
     return ("CHANGE", objects[0], failure.transform)
@@ -130,7 +132,7 @@ def explain_failure(
         if not objects or dimension is None:
             return None
         return _fill(
-            section.get("swap", ""),
+            section.get(vocab().failure_kind_swap, ""),
             dimension=_lc(dimension),
             objects=_punctuate([snag_object_phrase(o, templates) for o in objects], section),
             string=_print_name(_string_of(objects[0])),
@@ -141,7 +143,7 @@ def explain_failure(
         if None in (object1, object2, dimension1, dimension2):
             return None
         return _fill(
-            section.get("conflict", ""),
+            section.get(vocab().failure_kind_conflict, ""),
             dimension1=_lc(dimension1),
             object1=snag_object_phrase(object1, templates),
             dimension2=_lc(dimension2),
@@ -165,7 +167,7 @@ def explain_failure(
     descriptor = transform[1]
     template = "descriptor_relation" if is_platonic_relation(descriptor) else "descriptor_literal"
     return _fill(
-        section.get("change", ""),
+        section.get(vocab().failure_kind_change, ""),
         dimension=_lc(transform[0]),
         object=snag_object_phrase(obj, templates),
         descriptor=_fill(section.get(template, ""), name=_lc(descriptor)),

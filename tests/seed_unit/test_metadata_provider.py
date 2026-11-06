@@ -128,37 +128,57 @@ def test_spreading_activation_threshold_param(meta):
     assert meta.get_param("spreading_activation_threshold") == 100
 
 
-def test_loads_enum_values(meta):
-    """MetadataProvider should load enum_values from enums.json."""
-    assert len(meta.enum_values) == 13
-    assert "run_statuses" in meta.enum_values
-    assert "event_types" in meta.enum_values
-    assert "bridge_types" in meta.enum_values
-    assert "proposal_levels" in meta.enum_values
-    assert "initialized" in meta.enum_values["run_statuses"]
-    assert "bond_built" in meta.enum_values["event_types"]
-    assert "top" in meta.enum_values["bridge_types"]
-    assert "proposed" in meta.enum_values["proposal_levels"]
+def test_loads_the_vocabulary_bindings(meta):
+    """The provider holds the rows of the enum tables the engine names, bound by their ``role``
+    column in ``enums.json`` (and ``theme_relations.json``): every role of the vocabulary is
+    bound once, to the row Metacat calls it.  (The provider no longer mirrors every enum
+    table's names: the engine reads the ones it names through its bindings.)"""
+    from server.engine.roles import VOCABULARY
+
+    bound = {b.role: (b.table, b.name) for b in meta.vocabulary_bindings}
+    assert set(bound) == {s.name for s in VOCABULARY}
+    assert bound["event_type.bond_built"] == ("event_types", "bond_built")
+    assert bound["bridge_type.top"] == ("bridge_types", "top")
+    assert bound["proposal_level.proposed"] == ("proposal_levels", "proposed")
+    assert meta.vocabulary.bridge_type_top == "top"
+    assert meta.vocabulary.theme_relation_opposite == "opposite"
+    assert [(t.name, t.behaviour) for t in meta.link_types] == [
+        ("category", "category"), ("instance", "instance"), ("property", "property"),
+        ("lateral", "lateral"), ("lateral_sliplink", "slip")]
 
 
-def test_enum_values_match_expected_counts(meta):
-    """Each enum table should have the expected number of values."""
-    assert len(meta.enum_values["run_statuses"]) == 6
+def test_enum_tables_have_the_expected_counts():
+    """Each enum table of the Metacat Standard Configuration (``enums.json``) has the expected
+    number of values, and the file has every enum table of the registry (18)."""
+    import json
+    import os
+
+    from server.services.config_registry import ENUM_REGISTRY
+
+    with open(os.path.join(SEED_DIR, "enums.json")) as f:
+        enums = json.load(f)
+    assert set(enums) == set(ENUM_REGISTRY) and len(enums) == 18
+    assert len(enums["run_statuses"]) == 6
     # 15: the 14 types the engine records plus concept_activation, one of the seven
     # Temporal Trace event types of §4.4 (jootsing and theme_activated were never recorded
     # and were removed).
-    assert len(meta.enum_values["event_types"]) == 15
-    assert len(meta.enum_values["bridge_types"]) == 3
-    assert len(meta.enum_values["bridge_orientations"]) == 2
-    assert len(meta.enum_values["clause_types"]) == 3
-    assert len(meta.enum_values["rule_types"]) == 2
-    assert len(meta.enum_values["theme_types"]) == 3
-    assert len(meta.enum_values["proposal_levels"]) == 3
-    assert len(meta.enum_values["link_types"]) == 5
-    assert len(meta.enum_values["codelet_families"]) == 8
-    assert len(meta.enum_values["codelet_phases"]) == 4
-    assert len(meta.enum_values["posting_directions"]) == 3
-    assert len(meta.enum_values["param_value_types"]) == 6
+    assert len(enums["event_types"]) == 15
+    assert len(enums["bridge_types"]) == 3
+    assert len(enums["bridge_orientations"]) == 2
+    assert len(enums["clause_types"]) == 3
+    assert len(enums["rule_types"]) == 2
+    assert len(enums["theme_types"]) == 3
+    assert len(enums["proposal_levels"]) == 3
+    assert len(enums["link_types"]) == 5
+    assert len(enums["codelet_families"]) == 8
+    assert len(enums["codelet_phases"]) == 4
+    assert len(enums["posting_directions"]) == 3
+    assert len(enums["param_value_types"]) == 6
+    assert len(enums["string_kinds"]) == 4
+    assert len(enums["rule_scopes"]) == 2
+    assert len(enums["failure_kinds"]) == 3
+    assert len(enums["clamp_types"]) == 4
+    assert len(enums["progress_focuses"]) == 4
 
 
 def test_the_bottom_up_posting_rules_are_in_the_order_the_engine_posts_them():
@@ -357,7 +377,9 @@ _READ_BY_THE_ENGINE_BUT_NOT_OFFERED = {
     "initial_codelet_types",
     "initial_codelet_urgency",
     "initial_codelet_rounds",
+    "default_urgency_level",
     # Numbers that could be offered and are not yet.
+    "unlisted_clamp_jootsing_factor",
     "expiration_period",
     "num_youngest_structures",
     "distance_threshold",
@@ -412,6 +434,10 @@ _READ_BY_THE_ENGINE_BUT_NOT_OFFERED = {
 #: Read by the control API, never by a run.
 _READ_BY_ANOTHER_LAYER = {
     "clampable_codelet_patterns",
+    # Which clampable patterns a person's clamp holds against a background, and the urgency tier
+    # of that background (``RunService.clamp_codelets``; ``gui.ss:1221-1245``).
+    "manual_clamp_background_level",
+    "manual_clamp_background_patterns",
     # Display names served with the Themespace state (serialization.py).
     "theme_dimension_labels",
     "theme_relation_labels",

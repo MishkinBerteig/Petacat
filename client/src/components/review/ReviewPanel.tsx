@@ -15,6 +15,7 @@
 import { useEffect, useState } from 'react';
 import type { RecordedRun } from '@/types';
 import { ApiError, describeApiError, getRecordedRun } from '@/api/client';
+import { useVocabularyStore } from '@/store/vocabulary';
 import { ModeBadge } from '@/components/ModeBadge';
 import { EpisodicRunTimeline } from './EpisodicRunTimeline';
 import { NormalRunReview } from './NormalRunReview';
@@ -40,6 +41,7 @@ export function ReviewPanel({ initialRunId = null }: ReviewPanelProps) {
     getRecordedRun(initialRunId)
       .then((r) => {
         if (cancelled) return;
+        useVocabularyStore.getState().adopt(r);
         setRun(r);
         setOpenError(null);
       })

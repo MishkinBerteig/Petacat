@@ -20,6 +20,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 
 import { ReviewPanel } from './ReviewPanel'
+import { useVocabularyStore, v } from '@/store/vocabulary'
+import { renamed } from '@/test/standardVocabulary'
 import {
   ApiError,
   getCapture,
@@ -524,6 +526,21 @@ describe('ReviewPanel — a Run opened by id', () => {
 
     await waitFor(() => expect(mocked.getRecordedRun).toHaveBeenCalledWith(42))
     await waitFor(() => expect(screen.getByText('Run #42')).toBeTruthy())
+  })
+
+  it('takes the opened Run\'s own vocabulary for the displays it draws', async () => {
+    withRuns([recordedRun({ run_id: 42 })])
+    mocked.getRecordedRun.mockResolvedValue(
+      { ...recordedRun({ run_id: 42 }), ...renamed({ 'bridge_type.top': 'x17' }) },
+    )
+    mocked.getRunComparison.mockResolvedValue(runComparison())
+    mocked.getCapture.mockResolvedValue(recordedState())
+
+    render(<ReviewPanel initialRunId={42} />)
+
+    await waitFor(() => expect(screen.getByText('Run #42')).toBeTruthy())
+    expect(v('bridge_type.top')).toBe('x17')
+    useVocabularyStore.getState().clear()
   })
 
   it('says a Fast Run has no record rather than sitting on "select a Run"', async () => {

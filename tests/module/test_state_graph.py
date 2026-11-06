@@ -346,6 +346,7 @@ def test_a_capture_lists_memory_oldest_first_and_restores_it_newest_first(meta):
         problem=("abc", "abd", "xyz", "zzz"), top_rule_description="t",
         bottom_rule_description="b", top_rule_quality=0, bottom_rule_quality=0,
         quality=1, temperature=1, themes={}, unjustified_slippages=[],
+        top_rule_signature=[], bottom_rule_signature=[],
     )
     memory.store_answer(earlier)
     assert memory.answers[0] is earlier

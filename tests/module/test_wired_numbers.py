@@ -96,7 +96,7 @@ def test_concept_activation_events_all_obey_the_importance_threshold(base: Metad
 
     At 100000 none can: a clamp's own monitor used to take a literal 85, so 21 events still passed.
     """
-    from server.engine.trace import CONCEPT_ACTIVATION
+    from tests.support.standard_names import CONCEPT_ACTIVATION
 
     def concept_events(meta) -> int:
         runner = EngineRunner(meta)
@@ -152,7 +152,8 @@ def test_the_length_description_exponent_follows_the_ceiling() -> None:
 
 
 def test_theme_conjunction_admission_follows_the_theme_ceiling(base: MetadataProvider) -> None:
-    from server.engine.themes import THEME_VERTICAL_BRIDGE, Themespace, pick_theme_conjunction
+    from server.engine.themes import Themespace, pick_theme_conjunction
+    from tests.support.standard_names import THEME_VERTICAL_BRIDGE
     from tests.support.theme_fixtures import populate
 
     class Recorder:
@@ -190,7 +191,8 @@ def test_a_theme_pattern_from_a_list_is_set_at_the_theme_ceiling(base: MetadataP
 def test_a_clamped_theme_pattern_without_an_activation_is_set_at_the_theme_ceiling(
     base: MetadataProvider,
 ) -> None:
-    from server.engine.themes import THEME_VERTICAL_BRIDGE, Themespace
+    from server.engine.themes import Themespace
+    from tests.support.standard_names import THEME_VERTICAL_BRIDGE
     from server.engine.trace import clamp_theme_pattern
 
     meta = _params(base, max_theme_activation=40)

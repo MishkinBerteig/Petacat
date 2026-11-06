@@ -257,6 +257,11 @@ class RunConstants:
     snag_event_strength: Any = formula()
     bond_event_progress: Any = formula()
     clamp_suppressed_concept_activation: Any = formula()
+    # -- The vocabulary --------------------------------------------------------------
+    #: The names of the run's configuration, by role (``Vocabulary``, ``engine/roles.py``).
+    #: A hot path compares against ``constants().vocab.bridge_type_top``; a path that
+    #: holds the run's provider reads ``meta.vocabulary`` (the same object).
+    vocab: Any = derived(lambda m: m.vocabulary)
     #: The two salience averages' weights (``numeric/layout.py``), resolved once, where
     #: they had been rebuilt for every object twice per update.
     salience: Any = derived(_salience_weights)
@@ -382,6 +387,11 @@ def constants() -> RunConstants:
     except LookupError:
         current()  # raises NoRunBound with its message
         raise  # pragma: no cover
+
+
+def vocab() -> Any:
+    """The bound run's :class:`~server.engine.roles.Vocabulary` (names by role)."""
+    return constants().vocab
 
 
 def set_clock(codelet_count: int) -> None:

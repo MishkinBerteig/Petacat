@@ -290,7 +290,7 @@ def evaluate_urgency(rule: Any, context: PostingContext) -> int:
     (the tier is stored once, as Scheme's ``%low-urgency%`` is), or an ``urgency_formula``
     for the six whose urgency is computed from the run — the triggering node's depth and
     activation, the temperature, the theme pressure.  A rule stating neither posts at the
-    tier ``low``.
+    engine parameter ``default_urgency_level``.
     """
     meta = context.ctx.meta
     if rule is not None and rule.urgency_formula:
@@ -308,7 +308,7 @@ def evaluate_urgency(rule: Any, context: PostingContext) -> int:
             ) from exc
     if rule is not None and rule.urgency_level is not None:
         return int(meta.get_urgency(rule.urgency_level))
-    return int(meta.get_urgency("low"))
+    return int(meta.get_urgency(meta.get_param("default_urgency_level")))
 
 
 def evaluate_condition(rule: Any, context: PostingContext) -> bool:

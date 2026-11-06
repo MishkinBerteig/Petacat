@@ -37,6 +37,7 @@ def _answer(themes, *, quality=80.0, top_rule="top-rule"):
         temperature=0.0,
         themes=themes,
         unjustified_slippages=[],
+        top_rule_signature=[], bottom_rule_signature=[],
     )
 
 

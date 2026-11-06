@@ -17,6 +17,8 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 
 import { SlipnetGraphView } from './SlipnetGraphView'
 import { useRunStore } from '@/store/runStore'
+import { useVocabularyStore } from '@/store/vocabulary'
+import { renamed } from '@/test/standardVocabulary'
 
 /** The parts of a Response the API client's `request` reads. */
 function reply(body: unknown, status = 200, statusText = 'OK') {
@@ -236,5 +238,40 @@ describe('SlipnetGraphView — drawing a graph it was handed', () => {
     await waitFor(() => expect(document.querySelectorAll('.graph-node').length).toBe(3))
     rerender(<SlipnetGraphView graph={{ ...GRAPH, nodes: GRAPH.nodes.slice(0, 2) }} slipnet={null} readOnly />)
     await waitFor(() => expect(document.querySelectorAll('.graph-node').length).toBe(2))
+  })
+})
+
+describe('SlipnetGraphView — link types compared by behaviour', () => {
+  const lines = () => Array.from(document.querySelectorAll('line, path')).filter(
+    (e) => e.getAttribute('stroke') === '#ff6b8a',
+  )
+
+  it('draws a slip link in the slip colour under the standard name', async () => {
+    render(<SlipnetGraphView />)
+    await waitFor(() => expect(document.querySelector('.graph-node')).toBeTruthy())
+    expect(lines().length).toBeGreaterThan(0)
+  })
+
+  it('still draws it as a slip link when its type is renamed', async () => {
+    useVocabularyStore.getState().adopt(renamed({}, { lateral_sliplink: 'slip17' }))
+    handler = async (url) => {
+      if (url.endsWith('/api/admin/export')) return reply(EXPORT)
+      if (url.endsWith('/api/admin/slipnet/links')) {
+        return reply(LINKS.map((l) => ({ ...l, link_type: 'slip17' })))
+      }
+      return refusal(404, 'Not Found', `nothing serves ${url}`)
+    }
+    render(<SlipnetGraphView />)
+    await waitFor(() => expect(document.querySelector('.graph-node')).toBeTruthy())
+    expect(lines().length).toBeGreaterThan(0)
+    // The filter box carries the run's own name for the type.
+    expect(screen.getByText('slip17')).toBeTruthy()
+  })
+
+  it('draws a link of an undescribed type in grey, not as a slip link', async () => {
+    useVocabularyStore.getState().clear()
+    render(<SlipnetGraphView />)
+    await waitFor(() => expect(document.querySelector('.graph-node')).toBeTruthy())
+    expect(lines().length).toBe(0)
   })
 })

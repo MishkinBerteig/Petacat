@@ -3,7 +3,12 @@
 import os
 import pytest
 from server.engine.metadata import MetadataProvider
-from server.engine.themes import Themespace, THEME_TOP_BRIDGE, THEME_BOTTOM_BRIDGE, THEME_VERTICAL_BRIDGE
+from server.engine.themes import Themespace
+from tests.support.standard_names import (
+    THEME_TOP_BRIDGE,
+    THEME_BOTTOM_BRIDGE,
+    THEME_VERTICAL_BRIDGE,
+)
 from tests.support.theme_fixtures import populate
 
 # Every test here executes arithmetic the numeric substrate owns, so each one runs

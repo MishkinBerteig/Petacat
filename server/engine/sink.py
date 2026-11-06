@@ -49,9 +49,11 @@ if TYPE_CHECKING:
 
 #: How a structure's presence in the Workspace changed.  Audit reconstructs
 #: intermediate states from these, so the pair has to be exhaustive: every structure
-#: that enters or leaves the Workspace does so through one of them.
-STRUCTURE_BUILT = "built"
-STRUCTURE_BROKEN = "broken"
+#: that enters or leaves the Workspace does so through one of them.  The values are the
+#: Audit action types the persisting sink records (engine-owned: they are not the
+#: ``proposal_levels`` row ``built``).
+STRUCTURE_BUILT = "structure_built"
+STRUCTURE_BROKEN = "structure_broken"
 
 
 @runtime_checkable

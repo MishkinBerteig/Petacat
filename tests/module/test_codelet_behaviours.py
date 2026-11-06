@@ -16,7 +16,8 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from server.engine.bonds import Bond
-from server.engine.bridges import Bridge, BRIDGE_TOP, make_concept_mappings
+from server.engine.bridges import Bridge, make_concept_mappings
+from tests.support.standard_names import BRIDGE_TOP
 from server.engine.codelet_dsl.builtins import (
     build_structure,
     break_structure,
@@ -34,14 +35,17 @@ from server.engine.groups import Group, attach_length_description
 from server.engine.memory import EpisodicMemory
 from server.engine.metadata import MetadataProvider
 from server.engine.rng import RNG
-from server.engine.rules import Rule, RuleClause, RuleChange, RULE_TOP, RULE_BOTTOM, CLAUSE_INTRINSIC, CLAUSE_EXTRINSIC
+from server.engine.rules import Rule, RuleClause, RuleChange
+from tests.support.standard_names import RULE_TOP, RULE_BOTTOM, CLAUSE_INTRINSIC, CLAUSE_EXTRINSIC
 from server.engine.runner import EngineContext, EngineRunner
 from server.engine.slipnet import Slipnet
 from server.engine.temperature import Temperature
 from server.engine.themes import Themespace
-from server.engine.trace import BOND_BROKEN, BOND_BUILT, TemporalTrace
+from server.engine.trace import TemporalTrace
+from tests.support.standard_names import BOND_BROKEN, BOND_BUILT
 from server.engine.workspace import Workspace, WorkspaceString
 from server.engine.workspace_objects import Letter
+from tests.support import standard_names
 
 
 # ``init_mcat`` runs ``update-workspace-values`` before the first codelet
@@ -93,7 +97,7 @@ def ctx_abc_abd_xyz_with_group(meta, runner):
         # ``attach-length-description`` (groups.ss:816-818), so a fixture that
         # wants length-described groups has to ask for them by name.
         attach_length_description(group)
-        group.proposal_level = Group.BUILT
+        group.proposal_level = standard_names.BUILT
         target.add_group(group)
     return ctx
 
@@ -117,7 +121,7 @@ def ctx_abc_abd_xyz_with_bonds(ctx_abc_abd_xyz):
             letters[i].letter_category, letters[i + 1].letter_category,
             right,
         )
-        bond.proposal_level = Bond.BUILT
+        bond.proposal_level = standard_names.BUILT
         init.add_bond(bond)
 
     return ctx
@@ -314,7 +318,7 @@ class TestBondDescriptionRouting:
         description = Description(
             group, facet_type, ctx.slipnet.nodes["plato-letter-category"]
         )
-        description.proposal_level = Description.EVALUATED
+        description.proposal_level = standard_names.EVALUATED
         assert description.bond_description is True
 
         assert build_structure(ctx, description) is True
@@ -334,7 +338,7 @@ class TestBondDescriptionRouting:
             ctx.slipnet.nodes["plato-object-category"],
             ctx.slipnet.nodes["plato-group"],
         )
-        description.proposal_level = Description.EVALUATED
+        description.proposal_level = standard_names.EVALUATED
         assert description.bond_description is False
 
         assert build_structure(ctx, description) is True
@@ -430,7 +434,7 @@ class TestBondBuilder:
             letters[0].letter_category, letters[1].letter_category,
             slipnet.nodes["plato-right"],
         )
-        bond.proposal_level = Bond.EVALUATED
+        bond.proposal_level = standard_names.EVALUATED
 
         result = build_structure(ctx, bond)
         assert result is True
@@ -463,7 +467,7 @@ class TestBondBuilder:
                 slipnet.nodes["plato-letter-category"],
                 letters[0].letter_category, letters[1].letter_category, right,
             )
-            b.proposal_level = Bond.EVALUATED
+            b.proposal_level = standard_names.EVALUATED
             return b
 
         succ.activation_buffer = 0.0
@@ -499,7 +503,7 @@ class TestBondBuilder:
             b = Bond(
                 first, second, sameness, slipnet.nodes[facet_name], d1, d2, None,
             )
-            b.proposal_level = Bond.EVALUATED
+            b.proposal_level = standard_names.EVALUATED
             return b
 
         letter_bond = _bond(
@@ -539,14 +543,14 @@ class TestBondBuilder:
         lcat = slipnet.nodes["plato-letter-category"]
 
         yz = Bond(y, z, succ, lcat, y.letter_category, z.letter_category, right)
-        yz.proposal_level = Bond.BUILT
+        yz.proposal_level = standard_names.BUILT
         target.add_bond(yz)
 
         bridge = Bridge(
             a, z, "vertical",
             make_concept_mappings(a, z, "vertical"),
         )
-        bridge.proposal_level = Bridge.BUILT
+        bridge.proposal_level = standard_names.BUILT
         ctx.workspace.add_bridge(bridge)
         assert any(
             cm.description_type1.name == "plato-string-position-category"
@@ -573,7 +577,7 @@ class TestBondBuilder:
             letters[0].letter_category, letters[1].letter_category,
             ctx.slipnet.nodes["plato-right"],
         )
-        bond.proposal_level = Bond.EVALUATED
+        bond.proposal_level = standard_names.EVALUATED
         letters[0].string = None  # Remove from string
 
         interp.execute(compiled, ctx, structure=bond)
@@ -595,7 +599,7 @@ class TestBondBuilder:
             letters[0].letter_category, letters[1].letter_category,
             None,
         )
-        sameness_bond.proposal_level = Bond.BUILT
+        sameness_bond.proposal_level = standard_names.BUILT
         sameness_bond.strength = 50.0
         init.add_bond(sameness_bond)
 
@@ -607,7 +611,7 @@ class TestBondBuilder:
             letters[0].letter_category, letters[1].letter_category,
             slipnet.nodes["plato-right"],
         )
-        succ_bond.proposal_level = Bond.EVALUATED
+        succ_bond.proposal_level = standard_names.EVALUATED
         succ_bond.strength = 80.0
 
         incompatibles = _get_incompatible_structures(ctx, succ_bond)
@@ -649,7 +653,7 @@ class TestGroupBuilder:
             letters,
             list(init.bonds),
         )
-        group.proposal_level = Group.EVALUATED
+        group.proposal_level = standard_names.EVALUATED
 
         result = build_structure(ctx, group)
         assert result is True
@@ -680,7 +684,7 @@ class TestGroupBuilder:
             letters,
             bonds,
         )
-        group.proposal_level = Group.EVALUATED
+        group.proposal_level = standard_names.EVALUATED
 
         interp = CodeletInterpreter(builtins=_get_test_builtins())
         registry = CodeletRegistry.from_metadata(meta, interp)
@@ -761,7 +765,7 @@ def _sameness_group(ctx, string, members, *, facet="plato-letter-category"):
         list(members),
         [],
     )
-    group.proposal_level = Group.EVALUATED
+    group.proposal_level = standard_names.EVALUATED
     return group
 
 
@@ -849,7 +853,7 @@ class TestBreakGroupCascade:
             slipnet.nodes["plato-two"],
             slipnet.nodes["plato-right"],
         )
-        incident.proposal_level = Bond.BUILT
+        incident.proposal_level = standard_names.BUILT
         target.add_bond(incident)
 
         # A constituent bond *inside* [jjj], and a vertical bridge off [rr].
@@ -862,7 +866,7 @@ class TestBreakGroupCascade:
             slipnet.nodes["plato-j"],
             None,
         )
-        constituent.proposal_level = Bond.BUILT
+        constituent.proposal_level = standard_names.BUILT
         target.add_bond(constituent)
         jjj.group_bonds = [constituent]
         constituent.enclosing_group = jjj
@@ -873,7 +877,7 @@ class TestBreakGroupCascade:
             "vertical",
             make_concept_mappings(initial.letters[1], rr, ctx.workspace),
         )
-        bridge.proposal_level = Bridge.BUILT
+        bridge.proposal_level = standard_names.BUILT
         ctx.workspace.add_bridge(bridge)
         assert rr.vertical_bridge is bridge
 
@@ -907,7 +911,7 @@ class TestBreakGroupCascade:
             slipnet.nodes["plato-r"],
             None,
         )
-        constituent.proposal_level = Bond.BUILT
+        constituent.proposal_level = standard_names.BUILT
         target.add_bond(constituent)
         rr.group_bonds = [constituent]
         constituent.enclosing_group = rr
@@ -958,7 +962,7 @@ class TestBridgeBuilder:
             slipnet.nodes["plato-identity"],
         )
         bridge = Bridge(a_init, a_mod, BRIDGE_TOP, [cm])
-        bridge.proposal_level = Bridge.EVALUATED
+        bridge.proposal_level = standard_names.EVALUATED
 
         result = build_structure(ctx, bridge)
         assert result is True
@@ -983,7 +987,7 @@ class TestDescriptionBuilder:
             slipnet.nodes["plato-alphabetic-position-category"],
             slipnet.nodes["plato-alphabetic-first"],
         )
-        desc.proposal_level = Description.EVALUATED
+        desc.proposal_level = standard_names.EVALUATED
 
         before = len(a_letter.descriptions)
         result = build_structure(ctx, desc)
@@ -1004,7 +1008,7 @@ class TestDescriptionBuilder:
         # letter-category:a already exists from init
         existing = a_letter.descriptions[0]
         dup = Description(a_letter, existing.description_type, existing.descriptor)
-        dup.proposal_level = Description.EVALUATED
+        dup.proposal_level = standard_names.EVALUATED
 
         before = len(a_letter.descriptions)
         interp.execute(compiled, ctx, structure=dup)
@@ -1256,7 +1260,7 @@ class TestDescriptionBuilderReactivation:
         a_letter = ctx.workspace.initial_string.letters[0]
         existing = a_letter.descriptions[0]
         dup = Description(a_letter, existing.description_type, existing.descriptor)
-        dup.proposal_level = Description.EVALUATED
+        dup.proposal_level = standard_names.EVALUATED
 
         existing.description_type.activation_buffer = 0.0
         existing.descriptor.activation_buffer = 0.0
@@ -1309,7 +1313,7 @@ class TestRuleScout:
             bridge = Bridge(
                 init, mod, BRIDGE_TOP, make_concept_mappings(init, mod, BRIDGE_TOP)
             )
-            bridge.proposal_level = bridge.BUILT
+            bridge.proposal_level = standard_names.BUILT
             ws.add_bridge(bridge)
         ws.check_if_rules_possible()
 
@@ -1397,7 +1401,7 @@ class TestRuleBuilder:
             changes=[change],
         )
         rule = Rule(RULE_TOP, [clause], workspace=ctx.workspace)
-        rule.proposal_level = Rule.EVALUATED
+        rule.proposal_level = standard_names.EVALUATED
         rule.quality = 80.0
 
         # The initially-relevant description types are clamped at the start of a
@@ -1521,7 +1525,7 @@ class TestBreaker:
             letters[0].letter_category, letters[1].letter_category,
             ctx.slipnet.nodes["plato-right"],
         )
-        bond.proposal_level = Bond.BUILT
+        bond.proposal_level = standard_names.BUILT
         init.add_bond(bond)
 
         interp.execute(compiled, ctx)
@@ -1796,7 +1800,7 @@ class TestWorkspaceToThemespace:
             slipnet.nodes["plato-identity"],
         )
         bridge = Bridge(a_init, a_mod, BRIDGE_TOP, [cm])
-        bridge.proposal_level = Bridge.BUILT
+        bridge.proposal_level = standard_names.BUILT
         bridge.strength = 80.0
         ctx.workspace.top_bridges.append(bridge)
 
@@ -1808,6 +1812,18 @@ class TestWorkspaceToThemespace:
         assert len(pattern) > 0  # Bridge has a theme pattern
 
 
+def _answer_rules(ctx):
+    """The two rules every answer has (ruling 35): a verbatim rule saying "xye" on each side."""
+    from server.engine.codelet_dsl.builtins import letter_node
+    from tests.support.standard_names import CLAUSE_VERBATIM
+
+    letters = [letter_node(ctx, ch) for ch in "xye"]
+    return tuple(
+        Rule(kind, [RuleClause(clause_type=CLAUSE_VERBATIM, verbatim_letters=letters)], workspace=ctx.workspace)
+        for kind in (RULE_TOP, RULE_BOTTOM)
+    )
+
+
 class TestReportAnswer:
     def test_report_answer_sets_workspace_answer_string(self, ctx_abc_abd_xyz):
         """report_answer must set workspace.answer_string so the UI can display it."""
@@ -1817,7 +1833,7 @@ class TestReportAnswer:
         assert ctx.workspace.answer_string is None
 
         # Report an answer
-        report_answer(ctx, "xye", 75.0)
+        report_answer(ctx, "xye", 75.0, *_answer_rules(ctx))
 
         # workspace.answer_string must now be set
         assert ctx.workspace.answer_string is not None
@@ -1827,17 +1843,24 @@ class TestReportAnswer:
         """report_answer must set _pending_answer for the runner to detect."""
         ctx = ctx_abc_abd_xyz
 
-        report_answer(ctx, "xye", 75.0)
+        top_rule, bottom_rule = _answer_rules(ctx)
+        report_answer(ctx, "xye", 75.0, top_rule, bottom_rule)
 
         assert getattr(ctx, "_pending_answer", None) == "xye"
-        assert getattr(ctx, "_pending_answer_quality", None) == 75.0
+        # With the rules given, the quality is the one the top rule and the temperature make
+        # (``make-answer-event``, ``trace.ss:945``), not the one passed in.
+        from server.engine.answers import compute_answer_quality
+
+        assert getattr(ctx, "_pending_answer_quality", None) == compute_answer_quality(
+            top_rule.quality, ctx.temperature.value, ctx.meta
+        )
 
     def test_report_answer_stores_in_episodic_memory(self, ctx_abc_abd_xyz):
         """report_answer must add an answer description to episodic memory."""
         ctx = ctx_abc_abd_xyz
         initial_count = len(ctx.memory.answers)
 
-        report_answer(ctx, "xye", 75.0)
+        report_answer(ctx, "xye", 75.0, *_answer_rules(ctx))
 
         assert len(ctx.memory.answers) == initial_count + 1
 
@@ -1849,7 +1872,7 @@ class TestReportAnswer:
         from server.engine.serialization import serialize_workspace_state
         ctx = ctx_abc_abd_xyz
 
-        report_answer(ctx, "xye", 75.0)
+        report_answer(ctx, "xye", 75.0, *_answer_rules(ctx))
 
         state = serialize_workspace_state(ctx)
         assert state["answer"] == "xye"
@@ -1881,7 +1904,7 @@ def _letter_bond(ctx, left, right, category, direction, facet="plato-letter-cate
         right.letter_category,
         slipnet.nodes[direction] if direction else None,
     )
-    bond.proposal_level = Bond.BUILT
+    bond.proposal_level = standard_names.BUILT
     return bond
 
 
@@ -1909,7 +1932,7 @@ class TestScanBonds:
             b.letter_category,
             ctx_abc_abd_xyz.slipnet.nodes["plato-left"],
         )
-        second.proposal_level = Bond.BUILT
+        second.proposal_level = standard_names.BUILT
         init.add_bond(second)
 
         assert scan_bonds(ctx_abc_abd_xyz, 5, True, first) == [first]
@@ -1949,7 +1972,7 @@ class TestScanBonds:
             b.letter_category,
             ctx.slipnet.nodes["plato-left"],
         )
-        opposite.proposal_level = Bond.BUILT
+        opposite.proposal_level = standard_names.BUILT
         init.add_bond(opposite)
 
         scanned = scan_bonds(ctx, 5, True, first)
@@ -2128,7 +2151,7 @@ class TestDuplicateGroup:
             [],
         )
         attach_length_description(duplicate)
-        duplicate.proposal_level = Group.EVALUATED
+        duplicate.proposal_level = standard_names.EVALUATED
 
         assert build_structure(ctx, duplicate) is False
         assert duplicate not in target.groups
@@ -2157,7 +2180,7 @@ class TestBreaker:
             init.letters,
             bonds,
         )
-        group.proposal_level = Group.EVALUATED
+        group.proposal_level = standard_names.EVALUATED
         build_structure(ctx, group)
         assert bonds[0].enclosing_group is group
 

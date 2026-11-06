@@ -42,91 +42,106 @@
       "name": "bond_built",
       "display_label": "Bond Built",
       "sort_order": 0,
-      "description": "A bond was built between adjacent objects"
+      "description": "A bond was built between adjacent objects",
+      "role": "event_type.bond_built"
     },
     {
       "name": "bond_broken",
       "display_label": "Bond Broken",
       "sort_order": 1,
-      "description": "A bond was broken"
+      "description": "A bond was broken",
+      "role": "event_type.bond_broken"
     },
     {
       "name": "group_built",
       "display_label": "Group Built",
       "sort_order": 2,
-      "description": "A group was formed"
+      "description": "A group was formed",
+      "role": "event_type.group_built"
     },
     {
       "name": "group_broken",
       "display_label": "Group Broken",
       "sort_order": 3,
-      "description": "A group was broken"
+      "description": "A group was broken",
+      "role": "event_type.group_broken"
     },
     {
       "name": "bridge_built",
       "display_label": "Bridge Built",
       "sort_order": 4,
-      "description": "A bridge was established between strings"
+      "description": "A bridge was established between strings",
+      "role": "event_type.bridge_built"
     },
     {
       "name": "bridge_broken",
       "display_label": "Bridge Broken",
       "sort_order": 5,
-      "description": "A bridge was broken"
+      "description": "A bridge was broken",
+      "role": "event_type.bridge_broken"
     },
     {
       "name": "rule_built",
       "display_label": "Rule Built",
       "sort_order": 6,
-      "description": "A transformation rule was discovered"
+      "description": "A transformation rule was discovered",
+      "role": "event_type.rule_built"
     },
     {
       "name": "rule_broken",
       "display_label": "Rule Broken",
       "sort_order": 7,
-      "description": "A rule was broken"
+      "description": "A rule was broken",
+      "role": "event_type.rule_broken"
     },
     {
       "name": "description_built",
       "display_label": "Description Built",
       "sort_order": 8,
-      "description": "A description was attached to an object"
+      "description": "A description was attached to an object",
+      "role": "event_type.description_built"
     },
     {
       "name": "answer_found",
       "display_label": "Answer Found",
       "sort_order": 9,
-      "description": "An answer was discovered"
+      "description": "An answer was discovered",
+      "role": "event_type.answer_found"
     },
     {
       "name": "snag",
       "display_label": "Snag",
       "sort_order": 10,
-      "description": "A progress stall was detected"
+      "description": "A progress stall was detected",
+      "role": "event_type.snag"
     },
     {
       "name": "clamp_start",
       "display_label": "Clamp Start",
       "sort_order": 11,
-      "description": "A clamp period began"
+      "description": "A clamp period began",
+      "role": "event_type.clamp_start"
     },
     {
       "name": "clamp_end",
       "display_label": "Clamp End",
       "sort_order": 12,
-      "description": "A clamp period ended"
+      "description": "A clamp period ended",
+      "role": "event_type.clamp_end"
     },
     {
       "name": "concept_mapping_built",
       "display_label": "Concept Mapping Built",
       "sort_order": 15,
-      "description": "A concept mapping was established"
+      "description": "A concept mapping was established",
+      "role": "event_type.concept_mapping_built"
     },
     {
       "name": "concept_activation",
       "display_label": "Concept activation",
       "sort_order": 16,
-      "description": "A deep Slipnet concept's activation changed substantially. One of the seven Temporal Trace event types (S4.4); its importance is a function of the node's conceptual depth and the size of the activation change."
+      "description": "A deep Slipnet concept's activation changed substantially. One of the seven Temporal Trace event types (S4.4); its importance is a function of the node's conceptual depth and the size of the activation change.",
+      "role": "event_type.concept_activation"
     }
   ],
   "bridge_types": [
@@ -134,19 +149,22 @@
       "name": "top",
       "display_label": "Top",
       "sort_order": 0,
-      "description": "Horizontal bridge: initial <-> modified"
+      "description": "Horizontal bridge: initial <-> modified",
+      "role": "bridge_type.top"
     },
     {
       "name": "bottom",
       "display_label": "Bottom",
       "sort_order": 1,
-      "description": "Horizontal bridge: target <-> answer"
+      "description": "Horizontal bridge: target <-> answer",
+      "role": "bridge_type.bottom"
     },
     {
       "name": "vertical",
       "display_label": "Vertical",
       "sort_order": 2,
-      "description": "Vertical bridge: initial <-> target, modified <-> answer"
+      "description": "Vertical bridge: initial <-> target, modified <-> answer",
+      "role": "bridge_type.vertical"
     }
   ],
   "bridge_orientations": [
@@ -154,13 +172,15 @@
       "name": "horizontal",
       "display_label": "Horizontal",
       "sort_order": 0,
-      "description": "Top or bottom bridge (within a row)"
+      "description": "Top or bottom bridge (within a row)",
+      "role": "bridge_orientation.horizontal"
     },
     {
       "name": "vertical",
       "display_label": "Vertical",
       "sort_order": 1,
-      "description": "Cross-row bridge"
+      "description": "Cross-row bridge",
+      "role": "bridge_orientation.vertical"
     }
   ],
   "clause_types": [
@@ -168,19 +188,22 @@
       "name": "intrinsic",
       "display_label": "Intrinsic",
       "sort_order": 0,
-      "description": "Change to an individual object"
+      "description": "Change to an individual object",
+      "role": "clause_type.intrinsic"
     },
     {
       "name": "extrinsic",
       "display_label": "Extrinsic",
       "sort_order": 1,
-      "description": "Group-level change"
+      "description": "Group-level change",
+      "role": "clause_type.extrinsic"
     },
     {
       "name": "verbatim",
       "display_label": "Verbatim",
       "sort_order": 2,
-      "description": "Literal letter sequence"
+      "description": "Literal letter sequence",
+      "role": "clause_type.verbatim"
     }
   ],
   "rule_types": [
@@ -188,13 +211,15 @@
       "name": "top",
       "display_label": "Top",
       "sort_order": 0,
-      "description": "Describes initial -> modified transformation"
+      "description": "Describes initial -> modified transformation",
+      "role": "rule_type.top"
     },
     {
       "name": "bottom",
       "display_label": "Bottom",
       "sort_order": 1,
-      "description": "Describes target -> answer transformation"
+      "description": "Describes target -> answer transformation",
+      "role": "rule_type.bottom"
     }
   ],
   "theme_types": [
@@ -202,19 +227,22 @@
       "name": "top_bridge",
       "display_label": "Top Bridge",
       "sort_order": 0,
-      "description": "Theme cluster for top (initial<->modified) bridges"
+      "description": "Theme cluster for top (initial<->modified) bridges",
+      "role": "theme_type.top_bridge"
     },
     {
       "name": "bottom_bridge",
       "display_label": "Bottom Bridge",
       "sort_order": 1,
-      "description": "Theme cluster for bottom (target<->answer) bridges"
+      "description": "Theme cluster for bottom (target<->answer) bridges",
+      "role": "theme_type.bottom_bridge"
     },
     {
       "name": "vertical_bridge",
       "display_label": "Vertical Bridge",
       "sort_order": 2,
-      "description": "Theme cluster for vertical bridges"
+      "description": "Theme cluster for vertical bridges",
+      "role": "theme_type.vertical_bridge"
     }
   ],
   "proposal_levels": [
@@ -222,19 +250,22 @@
       "name": "proposed",
       "display_label": "Proposed",
       "sort_order": 1,
-      "description": "Structure has been proposed by a scout codelet"
+      "description": "Structure has been proposed by a scout codelet",
+      "role": "proposal_level.proposed"
     },
     {
       "name": "evaluated",
       "display_label": "Evaluated",
       "sort_order": 2,
-      "description": "Structure has been evaluated for strength"
+      "description": "Structure has been evaluated for strength",
+      "role": "proposal_level.evaluated"
     },
     {
       "name": "built",
       "display_label": "Built",
       "sort_order": 3,
-      "description": "Structure has been built into the workspace"
+      "description": "Structure has been built into the workspace",
+      "role": "proposal_level.built"
     }
   ],
   "link_types": [
@@ -242,31 +273,36 @@
       "name": "category",
       "display_label": "Category",
       "sort_order": 0,
-      "description": "Category link (e.g., letter -> letter-category)"
+      "description": "Category link (e.g., letter -> letter-category)",
+      "behaviour": "category"
     },
     {
       "name": "instance",
       "display_label": "Instance",
       "sort_order": 1,
-      "description": "Instance link (e.g., letter-category -> a)"
+      "description": "Instance link (e.g., letter-category -> a)",
+      "behaviour": "instance"
     },
     {
       "name": "property",
       "display_label": "Property",
       "sort_order": 2,
-      "description": "Property link"
+      "description": "Property link",
+      "behaviour": "property"
     },
     {
       "name": "lateral",
       "display_label": "Lateral",
       "sort_order": 3,
-      "description": "Lateral link between peers (e.g., a -> b via successor)"
+      "description": "Lateral link between peers (e.g., a -> b via successor)",
+      "behaviour": "lateral"
     },
     {
       "name": "lateral_sliplink",
       "display_label": "Lateral Sliplink",
       "sort_order": 4,
-      "description": "Lateral slippage link (e.g., leftmost <-> rightmost via opposite)"
+      "description": "Lateral slippage link (e.g., leftmost <-> rightmost via opposite)",
+      "behaviour": "slip"
     }
   ],
   "codelet_families": [
@@ -274,49 +310,57 @@
       "name": "answer",
       "display_label": "Answer",
       "sort_order": 0,
-      "description": "Answer-finding and justification codelets"
+      "description": "Answer-finding and justification codelets",
+      "serialised": true
     },
     {
       "name": "bond",
       "display_label": "Bond",
       "sort_order": 1,
-      "description": "Bond scout, evaluator, and builder codelets"
+      "description": "Bond scout, evaluator, and builder codelets",
+      "serialised": false
     },
     {
       "name": "breaker",
       "display_label": "Breaker",
       "sort_order": 2,
-      "description": "Structure-breaking codelets"
+      "description": "Structure-breaking codelets",
+      "serialised": false
     },
     {
       "name": "bridge",
       "display_label": "Bridge",
       "sort_order": 3,
-      "description": "Bridge scout, evaluator, and builder codelets"
+      "description": "Bridge scout, evaluator, and builder codelets",
+      "serialised": false
     },
     {
       "name": "description",
       "display_label": "Description",
       "sort_order": 4,
-      "description": "Description scout, evaluator, and builder codelets"
+      "description": "Description scout, evaluator, and builder codelets",
+      "serialised": false
     },
     {
       "name": "group",
       "display_label": "Group",
       "sort_order": 5,
-      "description": "Group scout, evaluator, and builder codelets"
+      "description": "Group scout, evaluator, and builder codelets",
+      "serialised": false
     },
     {
       "name": "meta",
       "display_label": "Meta",
       "sort_order": 6,
-      "description": "Meta-level codelets (progress-watcher, jootser)"
+      "description": "Meta-level codelets (progress-watcher, jootser)",
+      "serialised": true
     },
     {
       "name": "rule",
       "display_label": "Rule",
       "sort_order": 7,
-      "description": "Rule scout, evaluator, and builder codelets"
+      "description": "Rule scout, evaluator, and builder codelets",
+      "serialised": false
     }
   ],
   "codelet_phases": [
@@ -350,19 +394,22 @@
       "name": "bottom_up",
       "display_label": "Bottom-Up",
       "sort_order": 0,
-      "description": "Data-driven, posted based on workspace state"
+      "description": "Data-driven, posted based on workspace state",
+      "role": "posting_direction.bottom_up"
     },
     {
       "name": "top_down",
       "display_label": "Top-Down",
       "sort_order": 1,
-      "description": "Concept-driven, posted by active slipnet nodes"
+      "description": "Concept-driven, posted by active slipnet nodes",
+      "role": "posting_direction.top_down"
     },
     {
       "name": "thematic",
       "display_label": "Thematic",
       "sort_order": 2,
-      "description": "Theme-driven, posted by active themes"
+      "description": "Theme-driven, posted by active themes",
+      "role": "posting_direction.thematic"
     }
   ],
   "param_value_types": [
@@ -401,6 +448,165 @@
       "display_label": "Rational",
       "sort_order": 5,
       "description": "Exact rational parameter value, written n/m"
+    }
+  ],
+  "string_kinds": [
+    {
+      "name": "initial",
+      "display_label": "Initial",
+      "sort_order": 0,
+      "description": "The initial string of the problem (abc in abc -> abd; xyz -> ?)",
+      "role": "string_kind.initial"
+    },
+    {
+      "name": "modified",
+      "display_label": "Modified",
+      "sort_order": 1,
+      "description": "The modified string (abd)",
+      "role": "string_kind.modified"
+    },
+    {
+      "name": "target",
+      "display_label": "Target",
+      "sort_order": 2,
+      "description": "The target string (xyz)",
+      "role": "string_kind.target"
+    },
+    {
+      "name": "answer",
+      "display_label": "Answer",
+      "sort_order": 3,
+      "description": "The answer string, once one is found or supplied",
+      "role": "string_kind.answer"
+    }
+  ],
+  "rule_scopes": [
+    {
+      "name": "self",
+      "display_label": "Self",
+      "sort_order": 0,
+      "description": "The rule describes the object itself",
+      "role": "rule_scope.self"
+    },
+    {
+      "name": "subobjects",
+      "display_label": "Subobjects",
+      "sort_order": 1,
+      "description": "The rule describes the object's subobjects",
+      "role": "rule_scope.subobjects"
+    }
+  ],
+  "failure_kinds": [
+    {
+      "name": "swap",
+      "display_label": "Swap",
+      "sort_order": 0,
+      "description": "A snag in which the rule swaps the objects",
+      "role": "failure_kind.swap"
+    },
+    {
+      "name": "conflict",
+      "display_label": "Conflict",
+      "sort_order": 1,
+      "description": "A snag in which the rule conflicts with the structures built",
+      "role": "failure_kind.conflict"
+    },
+    {
+      "name": "change",
+      "display_label": "Change",
+      "sort_order": 2,
+      "description": "A snag in which the rule cannot change the object",
+      "role": "failure_kind.change"
+    }
+  ],
+  "clamp_types": [
+    {
+      "name": "rule_codelet_clamp",
+      "display_label": "Rule codelet clamp",
+      "sort_order": 0,
+      "description": "Holds the Coderack to rule codelets, against a background of very low urgency (jootsing.ss:326-327)",
+      "role": "clamp_type.rule_codelet",
+      "codelet_background_level": "very_low",
+      "jootsing_factor": 0.5,
+      "jootsing_only_when_latest": false,
+      "progress_focus": "rule",
+      "codelet_patterns": ["rule-codelet-pattern"]
+    },
+    {
+      "name": "snag_response_clamp",
+      "display_label": "Snag response clamp",
+      "sort_order": 1,
+      "description": "The jootser's response to a repeated snag",
+      "role": "clamp_type.snag_response",
+      "codelet_background_level": null,
+      "jootsing_factor": 1.0,
+      "jootsing_only_when_latest": false,
+      "progress_focus": "workspace",
+      "codelet_patterns": ["bottom-up-codelet-pattern"]
+    },
+    {
+      "name": "justify_clamp",
+      "display_label": "Justify clamp",
+      "sort_order": 2,
+      "description": "Opens justify mode; jootsing away from it is allowed only while it is still the newest event (jootsing.ss:135-139)",
+      "role": "clamp_type.justify",
+      "codelet_background_level": null,
+      "jootsing_factor": 1.0,
+      "jootsing_only_when_latest": true,
+      "progress_focus": "workspace",
+      "codelet_patterns": ["top-down-codelet-pattern", "thematic-codelet-pattern"]
+    },
+    {
+      "name": "manual_clamp",
+      "display_label": "Manual clamp",
+      "sort_order": 3,
+      "description": "A clamp a person set through the interface",
+      "role": "clamp_type.manual",
+      "codelet_background_level": null,
+      "jootsing_factor": 0.5,
+      "jootsing_only_when_latest": false,
+      "progress_focus": "workspace",
+      "codelet_patterns": []
+    }
+  ],
+  "progress_focuses": [
+    {
+      "name": "rule",
+      "display_label": "Rule",
+      "sort_order": 0,
+      "description": "Progress is a rule built",
+      "event_types": [
+        "rule_built"
+      ]
+    },
+    {
+      "name": "answer",
+      "display_label": "Answer",
+      "sort_order": 1,
+      "description": "Progress is an answer found",
+      "event_types": [
+        "answer_found"
+      ]
+    },
+    {
+      "name": "group",
+      "display_label": "Group",
+      "sort_order": 2,
+      "description": "Progress is a group built",
+      "event_types": [
+        "group_built"
+      ]
+    },
+    {
+      "name": "workspace",
+      "display_label": "Workspace",
+      "sort_order": 3,
+      "description": "Progress is a group, a rule or a concept mapping built (the Scheme's 'workspace pseudo-type, trace.ss:780, 860, 958)",
+      "event_types": [
+        "group_built",
+        "rule_built",
+        "concept_mapping_built"
+      ]
     }
   ]
 }

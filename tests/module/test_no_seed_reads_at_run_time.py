@@ -27,7 +27,8 @@ from server.engine.commentary import describe_answer, describe_answer_comparison
 from server.engine.memory import EpisodicMemory
 from server.engine.metadata import ConfigurationRequired, MetadataProvider, verbose_messages
 from server.engine.rule_english import _param, transcribe_rule_to_english_lines
-from server.engine.rules import Rule, RuleClause, RULE_TOP
+from server.engine.rules import Rule, RuleClause
+from tests.support.standard_names import RULE_TOP
 from server.engine.runner import EngineRunner
 from server.parallel.swarm import EpisodeTask, RunTask, run_inprocess
 

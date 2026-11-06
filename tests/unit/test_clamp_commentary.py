@@ -8,12 +8,8 @@ Progress achieved by snag-response clamp = 85."
 
 from server.engine.commentary import CommentaryLog, emit_comparing_answers
 from server.engine.concept_mappings import slippage_english_name
-from server.engine.trace import (
-    ClampEvent,
-    RULE_BUILT,
-    TemporalTrace,
-    TraceEvent,
-)
+from server.engine.trace import ClampEvent, TemporalTrace, TraceEvent
+from tests.support.standard_names import RULE_BUILT
 
 
 import os as _os
@@ -151,6 +147,7 @@ def _stored(memory, answer: str):
         problem=("abc", "abd", "mrrjjj", answer), top_rule_description="",
         bottom_rule_description="", top_rule_quality=0.0, bottom_rule_quality=0.0,
         quality=50.0, temperature=10.0, themes={}, unjustified_slippages=[],
+        top_rule_signature=[], bottom_rule_signature=[],
     )
     memory.store(desc)
     return desc

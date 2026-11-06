@@ -234,6 +234,18 @@ describe('runStore — the threshold belongs to the run on screen', () => {
     expect(store.getState().spreadingThreshold).toBe(30)
   })
 
+  it('adopts the vocabulary the loaded run was published with, and keeps it when a response has none', async () => {
+    const store = await freshStore()
+    const vocab = await import('./vocabulary')
+    const { renamed } = await import('@/test/standardVocabulary')
+
+    store.getState().adoptRun({ ...runInfo(), ...renamed({ 'bridge_type.top': 'x17' }) })
+    expect(vocab.v('bridge_type.top')).toBe('x17')
+
+    store.getState().adoptRun(runInfo({ run_id: 6 }))
+    expect(vocab.v('bridge_type.top')).toBe('x17')
+  })
+
   it('takes the worker count the loaded run was created with', async () => {
     const store = await freshStore()
 

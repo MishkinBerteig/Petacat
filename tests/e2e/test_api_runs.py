@@ -489,3 +489,17 @@ async def test_a_fast_run_contributes_its_answer_to_episodic_memory(app_client):
 
     # ...and nothing written down: a Fast Run has no ``runs`` row at all, which is
     # what ``test_a_fast_run_writes_nothing`` in test_persistence_modes.py asserts.
+
+
+@pytest.mark.asyncio
+async def test_run_carries_its_vocabulary_on_create_and_get(app_client):
+    resp = await app_client.post("/api/runs", json={
+        "initial": "abc", "modified": "abd", "target": "xyz", "seed": SEED,
+    })
+    created = resp.json()
+    assert created["vocabulary"]["bridge_type.top"] == "top"
+    assert created["link_behaviours"]["lateral_sliplink"] == "slip"
+
+    got = (await app_client.get(f"/api/runs/{created['run_id']}")).json()
+    assert got["vocabulary"] == created["vocabulary"]
+    assert got["link_behaviours"] == created["link_behaviours"]

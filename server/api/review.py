@@ -26,6 +26,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from server.db import get_session
 from server.models.run import AuditAction, Run, RunStateCapture
 from server.services.capture_projection import CaptureFormatError
+from server.api.runs import get_run_service
+from server.services.vocabulary_payload import run_vocabulary_payload
 from server.services.review_service import (
     BackwardsNotSupported,
     NotRecorded,
@@ -90,6 +92,10 @@ class RunSummary(BaseModel):
     #: statement about the mode rather than a fault.
     capture_count: int = 0
     action_count: int = 0
+    #: The bound vocabulary and link behaviours the client compares through
+    #: (``server/services/vocabulary_payload.py``); set by ``get_recorded_run`` only.
+    vocabulary: dict[str, str] | None = None
+    link_behaviours: dict[str, str | None] | None = None
 
 
 class RunTimelineItem(BaseModel):
@@ -237,6 +243,7 @@ async def get_recorded_run(
         created_at=row.created_at,
         capture_count=captures,
         action_count=actions,
+        **run_vocabulary_payload(get_run_service(), run_id),
     )
 
 

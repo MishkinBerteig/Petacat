@@ -415,7 +415,8 @@ def _(meta):
 
 
 def _identity_rule():
-    from server.engine.rules import RULE_TOP, Rule
+    from server.engine.rules import Rule
+    from tests.support.standard_names import RULE_TOP
 
     return Rule(rule_type=RULE_TOP, clauses=[])
 
@@ -472,7 +473,8 @@ class _Recorder:
 
 def _theme_probabilities(meta):
     from server.engine.slipnet import Slipnet
-    from server.engine.themes import THEME_TOP_BRIDGE, Themespace
+    from server.engine.themes import Themespace
+    from tests.support.standard_names import THEME_TOP_BRIDGE
 
     themespace = Themespace(meta)
     themespace.thematic_pressure_on()
@@ -497,7 +499,8 @@ def _(meta):
 
 @_site("theme_conjunction_admission_exponent")
 def _(meta):
-    from server.engine.themes import THEME_VERTICAL_BRIDGE, Themespace, pick_theme_conjunction
+    from server.engine.themes import Themespace, pick_theme_conjunction
+    from tests.support.standard_names import THEME_VERTICAL_BRIDGE
     from tests.support.theme_fixtures import populate
 
     themespace = populate(Themespace(meta))

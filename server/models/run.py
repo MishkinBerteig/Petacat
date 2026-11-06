@@ -167,7 +167,10 @@ class TraceEventRow(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     run_id = Column(Integer, nullable=False, index=True)
     event_number = Column(Integer, nullable=False)
-    event_type = Column(String(32), ForeignKey("event_types.name"), nullable=False)
+    #: The name of the event's type as the run recorded it.  Not a foreign key: a recorded trace
+    #: keeps the names it was made under when the configuration renames or removes an event
+    #: type (the row ``event_types`` has no say over history).
+    event_type = Column(Text, nullable=False)
     codelet_count = Column(Integer, nullable=False)
     temperature = Column(Float, nullable=False)
     description = Column(Text, default="")
@@ -222,8 +225,8 @@ class AnswerDescriptionRow(Base):
     theme_abstractness = Column(Float, default=0)
     activation = Column(Float, default=0)
     # The structural clause keys ``answer_present`` compares (``memory.ss:117``).
-    top_rule_signature = Column(JSONB, nullable=True)
-    bottom_rule_signature = Column(JSONB, nullable=True)
+    top_rule_signature = Column(JSONB, nullable=False)
+    bottom_rule_signature = Column(JSONB, nullable=False)
     # The picture clicking the answer redraws (``set-answer-description-pexp``,
     # ``memory.ss:438``).  NULL for a row written before pictures were kept.
     picture = Column(JSONB, nullable=True)

@@ -35,6 +35,7 @@ _ARGS: dict[str, dict[str, str]] = {
     "remove_node": {"name": "s*", "splice": "l"},
     "rename_node": {"old": "s*", "new": "s*"},
     "merge_nodes": {"keep": "s*", "drop": "s*"},
+    "rename_enum_value": {"table": "s*", "old": "s*", "new": "s*"},
     "add_link": {"from": "s", "to": "s", "type": "s", "label": "s", "length": "i", "fixed": "b",
                  "from_node": "s", "to_node": "s", "link_type": "s", "label_node": "s",
                  "link_length": "i", "fixed_length": "b"},

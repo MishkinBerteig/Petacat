@@ -185,6 +185,16 @@ def test_engine_params_value_type_column_is_right(db):
         assert rows[name]["value_type"] == expected(value), name
 
 
+def test_engine_params_refers_to_column_is_the_declaration_in_the_seed(db):
+    """``engine_params.refers_to`` is what ``engine_param_refs.json`` says, for every parameter."""
+    with open(os.path.join(SEED_DIR, "engine_param_refs.json")) as f:
+        declared = json.load(f)
+    rows = {r["name"]: r for r in db.tables["engine_params"]}
+    assert set(declared) <= set(rows)
+    for name, row in rows.items():
+        assert row["refers_to"] == declared.get(name), name
+
+
 # ---------------------------------------------------------------------------
 # Lossless first load: the rows read straight back from the tables equal the files.
 # ---------------------------------------------------------------------------
@@ -207,15 +217,14 @@ def _file(name):
 
 
 def _enum_rows(enums, table):
-    return [
-        {
-            "name": r["name"],
-            "display_label": r["display_label"],
-            "sort_order": r["sort_order"],
-            "description": r.get("description", ""),
-        }
-        for r in enums.get(table, [])
-    ]
+    """The rows of an enum table as the file says them: the four columns every enum table has,
+    and the table's own (``role``, ``behaviour``, ``serialised``, a clamp type's factors ...),
+    read off the model, a column the file leaves out being NULL."""
+    from server.models import metadata as models
+    from server.services.standard_configuration import ENUM_MODELS
+
+    columns = [c.name for c in getattr(models, ENUM_MODELS[table]).__table__.columns]
+    return [{c: ({"description": ""} | r).get(c) for c in columns} for r in enums.get(table, [])]
 
 
 def _expected_tables() -> dict[str, list[dict]]:
@@ -372,6 +381,7 @@ def _expected_tables() -> dict[str, list[dict]]:
                 "node_name": r.get("node_name"),
                 "abstractness": r.get("abstractness"),
                 "description": r.get("description", ""),
+                "role": r.get("role"),
             }
             for r in _file("theme_relations.json")
         ),

@@ -10,6 +10,7 @@ so the message is the check's and never a ``KeyError`` or a failed outcome.
 from __future__ import annotations
 
 import asyncio
+import json
 from dataclasses import replace
 from pathlib import Path
 
@@ -19,7 +20,8 @@ from server.engine import start_check as sc
 from server.engine.metadata import MetadataProvider
 from server.engine.start_check import RunStartError, check_run_start
 
-SEED_DIR = str(Path(__file__).resolve().parents[2] / "seed_data")
+SEED = Path(__file__).resolve().parents[2] / "seed_data"
+SEED_DIR = str(SEED)
 
 
 @pytest.fixture(scope="module")
@@ -42,7 +44,10 @@ def _declared():
         yield "parameter", name
     for name, _ in sc.REQUIRED_FORMULA_COEFFICIENTS:
         yield "coefficient", name
-    for name, _ in sc.REQUIRED_URGENCY_LEVELS:
+    # The tiers the Standard Configuration's own codelet bodies read: the run-start check derives
+    # them from the bodies in force, so no list of them stands in the engine.
+    bodies = json.loads((SEED / "codelet_types.json").read_text())
+    for name in sc.urgency_levels_read_by_bodies((b["name"], b["execute_body"]) for b in bodies):
         yield "urgency level", name
 
 

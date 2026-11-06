@@ -5,6 +5,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useMomentStore } from '@/store/momentStore';
 import { useRunStore } from '@/store/runStore';
+import { useLinkBehaviours } from '@/store/vocabulary';
 import { api } from '@/api/client';
 import { SlipnetGraphView } from './SlipnetGraphView';
 import type { DisplayPicture, SlipnetState } from '@/types';
@@ -18,13 +19,13 @@ interface LinkDef {
   link_length: number | null;
 }
 
-// Link type display colors (same palette as SlipnetGraphView)
-const LINK_TYPE_COLORS: Record<string, string> = {
+// Link display colours by link BEHAVIOUR (same palette as SlipnetGraphView)
+const LINK_BEHAVIOUR_COLORS: Record<string, string> = {
   category: '#7799cc',
   instance: '#4a9eff',
   property: '#5dce5d',
   lateral: '#ffb347',
-  lateral_sliplink: '#ff6b8a',
+  slip: '#ff6b8a',
 };
 
 function activationColor(activation: number): string {
@@ -118,6 +119,7 @@ interface FocusProps {
 }
 
 export function SlipnetNodeFocus({ nodeName, onClose }: FocusProps) {
+  const { behaviourOf } = useLinkBehaviours();
   const slipnet = useRunStore((s) => s.slipnet);
   const status = useRunStore((s) => s.status);
   const isProcessing = useRunStore((s) => s.isProcessing);
@@ -292,7 +294,7 @@ export function SlipnetNodeFocus({ nodeName, onClose }: FocusProps) {
                   </td>
                   <td style={{ padding: '3px 6px' }}>
                     <span style={{
-                      color: LINK_TYPE_COLORS[conn.linkType] ?? 'var(--text-secondary)',
+                      color: LINK_BEHAVIOUR_COLORS[behaviourOf(conn.linkType) ?? ''] ?? 'var(--text-secondary)',
                       fontFamily: 'var(--font-mono)',
                     }}>
                       {conn.linkType}

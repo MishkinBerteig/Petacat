@@ -16,6 +16,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from server.engine.formulas import weighted_average
+from server.engine import run_binding
 from server.engine.ids import KIND_TRACE_EVENT, next_id
 from server.engine.run_binding import constants
 
@@ -23,26 +24,6 @@ if TYPE_CHECKING:
     from server.engine.slipnet import Slipnet
     from server.engine.temperature import Temperature
     from server.engine.themes import Themespace
-
-
-# ---------------------------------------------------------------------------
-# Event type string constants (values live in DB event_types table)
-# ---------------------------------------------------------------------------
-BOND_BUILT = "bond_built"
-BOND_BROKEN = "bond_broken"
-GROUP_BUILT = "group_built"
-GROUP_BROKEN = "group_broken"
-BRIDGE_BUILT = "bridge_built"
-BRIDGE_BROKEN = "bridge_broken"
-RULE_BUILT = "rule_built"
-RULE_BROKEN = "rule_broken"
-DESCRIPTION_BUILT = "description_built"
-ANSWER_FOUND = "answer_found"
-SNAG = "snag"
-CLAMP_START = "clamp_start"
-CLAMP_END = "clamp_end"
-CONCEPT_MAPPING_BUILT = "concept_mapping_built"
-CONCEPT_ACTIVATION = "concept_activation"
 
 
 def _answer_quality_weights(meta: Any) -> list[float]:
@@ -56,20 +37,35 @@ def _answer_quality_weights(meta: Any) -> list[float]:
     ]
 
 
-#: The urgency level each clamp type puts its codelet pattern *against* — the Scheme's
-#: ``against-background`` (``trace.ss:1578-1581``), applied at the clamp site rather
-#: than baked into the pattern.
-#:
-#: One clamp uses it.  ``jootsing.ss:326-327`` builds the rule-codelet clamp from
-#: ``(against-background %very-low-urgency% %rule-codelet-pattern%)``: the three rule
-#: types at 77/91/91 **and all 24 other types at 21**, which — with the posting
-#: override in ``Coderack.clamped_posting_probability`` — throttles their posting to
-#: 0.21.  The clamp starves everything but rule work.  Petacat had no complement
-#: mechanism at all, so the stall-escape ("I still don't see a good way to describe…")
-#: was a mild boost to rule codelets instead of a redirection of the whole rack.
-CLAMP_TYPE_CODELET_BACKGROUNDS: dict[str, str] = {
-    "rule_codelet_clamp": "very_low",
-}
+# The urgency level each clamp type puts its codelet pattern *against* (the clamp type's
+# ``codelet_background_level``, read through ``clamp_type_spec``) — the Scheme's
+# ``against-background`` (``trace.ss:1578-1581``), applied at the clamp site rather
+# than baked into the pattern.
+#
+# One clamp uses it.  ``jootsing.ss:326-327`` builds the rule-codelet clamp from
+# ``(against-background %very-low-urgency% %rule-codelet-pattern%)``: the three rule
+# types at 77/91/91 **and all 24 other types at 21**, which — with the posting
+# override in ``Coderack.clamped_posting_probability`` — throttles their posting to
+# 0.21.  The clamp starves everything but rule work.  Petacat had no complement
+# mechanism at all, so the stall-escape ("I still don't see a good way to describe…")
+# was a mild boost to rule codelets instead of a redirection of the whole rack.
+def clamp_type_spec(name: str) -> Any:
+    """The ``meta.clamp_types`` row named *name* in the bound run's configuration, or None."""
+    for spec in run_binding.current().meta.clamp_types:
+        if spec.name == name:
+            return spec
+    return None
+
+
+def clamp_type_codelet_patterns(meta: Any, clamp_type: str) -> list[Any]:
+    """The codelet patterns (each a list of ``(codelet type, urgency level)``) a clamp of type
+    *clamp_type* clamps: the ``meta.clamp_types`` row's ``codelet_patterns``, looked up in
+    ``meta.codelet_patterns``.  A pattern the configuration lacks is an empty list, which clamps
+    nothing; a type the table lacks has no patterns."""
+    for spec in meta.clamp_types:
+        if spec.name == clamp_type:
+            return [meta.codelet_patterns.get(name, []) for name in spec.codelet_patterns]
+    return []
 
 
 # ---------------------------------------------------------------------------
@@ -183,7 +179,7 @@ class AnswerEvent(TraceEvent):
         meta: Any = None,
     ) -> None:
         super().__init__(
-            event_type=ANSWER_FOUND,
+            event_type=run_binding.vocab().event_type_answer_found,
             codelet_count=codelet_count,
             temperature=temperature,
             structures=structures,
@@ -270,13 +266,13 @@ class ClampEvent(TraceEvent):
         codelet_count: int,
         temperature: float,
         *,
-        clamp_type: str = "rule_codelet_clamp",
+        clamp_type: str | None = None,
         clamped_theme_patterns: list[Any] | None = None,
         clamped_concept_patterns: list[Any] | None = None,
         clamped_codelet_patterns: list[Any] | None = None,
         rules: list[Any] | None = None,
         unifying_slippages: list[Any] | None = None,
-        progress_focus: str = "rule",
+        progress_focus: str | None = None,
         theme_pattern: Any = None,
         structures: list[Any] | None = None,
         description: str = "",
@@ -284,14 +280,17 @@ class ClampEvent(TraceEvent):
         max_activation: float | None = None,
     ) -> None:
         super().__init__(
-            event_type=CLAMP_START,
+            event_type=run_binding.vocab().event_type_clamp_start,
             codelet_count=codelet_count,
             temperature=temperature,
             structures=structures,
             description=description,
             theme_pattern=theme_pattern,
         )
-        self.clamp_type = clamp_type
+        vocab = run_binding.vocab()
+        #: The clamp type's name (a vocabulary value); None means the rule-codelet clamp.
+        self.clamp_type = clamp_type if clamp_type is not None else vocab.clamp_type_rule_codelet
+        spec = clamp_type_spec(self.clamp_type)
         self.clamped_theme_patterns = clamped_theme_patterns or []
         # ``make-clamp-event`` (``trace.ss:526-530``) does not just store the concept
         # patterns it was handed: it *derives* one from every theme pattern and clamps
@@ -301,7 +300,9 @@ class ClampEvent(TraceEvent):
         # The derivation pins the relation's node too, which only the Slipnet can name:
         # pass ``slipnet`` and the pin is there from the start; without it the pin is added
         # when the event is activated (``activate`` derives again with its Slipnet).
-        opposite = slipnet.relation("opposite") if slipnet is not None else None
+        opposite = (
+            slipnet.relation(run_binding.vocab().theme_relation_opposite) if slipnet is not None else None
+        )
         # The concept pins are at ``%max-activation%``: the Slipnet's, or *max_activation* (the
         # configuration's) from a caller that has no Slipnet yet.
         ceiling = slipnet.activation_params.max_activation if slipnet is not None else max_activation
@@ -311,7 +312,11 @@ class ClampEvent(TraceEvent):
         self.clamped_codelet_patterns = clamped_codelet_patterns or []
         self.rules = rules or []
         self.unifying_slippages = unifying_slippages or []
-        self.progress_focus = progress_focus
+        #: The progress focus (a ``progress_focuses`` row): given, else the clamp type's own.
+        self.progress_focus = (
+            progress_focus if progress_focus is not None
+            else (spec.progress_focus if spec is not None else None)
+        )
         self.progress_achieved: float = 0.0
 
     # ------------------------------------------------------------------
@@ -327,21 +332,13 @@ class ClampEvent(TraceEvent):
         """
         if event.event_type == self.progress_focus:
             return event.get_strength()
-        # Also check by mapping clamp focus to event types
-        focus_to_types = {
-            "rule": (RULE_BUILT,),
-            "answer": (ANSWER_FOUND,),
-            "group": (GROUP_BUILT,),
-            # ``'workspace'`` is the Scheme's pseudo-type: group events, rule events
-            # and concept-mapping events all answer ``(type? 'workspace)``
-            # (``trace.ss:780, 860, 958``).  Both the snag-response clamp and the
-            # justify clamp use this focus, so without it neither could ever measure
-            # any progress at all.
-            "workspace": (GROUP_BUILT, RULE_BUILT, CONCEPT_MAPPING_BUILT),
-        }
-        matching_types = focus_to_types.get(self.progress_focus, ())
-        if event.event_type in matching_types:
-            return event.get_strength()
+        # Also check by mapping clamp focus to event types (``meta.progress_focuses``:
+        # ``'workspace'`` is the Scheme's pseudo-type, ``trace.ss:780, 860, 958``).
+        for focus in run_binding.current().meta.progress_focuses:
+            if focus.name == self.progress_focus:
+                if event.event_type in focus.event_types:
+                    return event.get_strength()
+                break
         return 0.0
 
     def get_strength(self) -> float:
@@ -418,9 +415,10 @@ class ClampEvent(TraceEvent):
             clamp_concept_pattern(pattern, slipnet, monitor)
 
         # Clamp codelet patterns (``trace.ss:636-640``), against this clamp type's own
-        # background (:data:`CLAMP_TYPE_CODELET_BACKGROUNDS`).
+        # background (``meta.clamp_types``: ``codelet_background_level``).
         if coderack is not None:
-            background = CLAMP_TYPE_CODELET_BACKGROUNDS.get(self.clamp_type)
+            spec = clamp_type_spec(self.clamp_type)
+            background = spec.codelet_background_level if spec is not None else None
             for pattern in self.clamped_codelet_patterns:
                 if pattern:
                     coderack.clamp_pattern(pattern, background)
@@ -464,17 +462,12 @@ class SnagEvent(TraceEvent):
     snag objects, and a progress evaluator.
     """
 
-    # Snag type constants (matching Scheme: SWAP, CONFLICT, CHANGE)
-    SWAP = "swap"
-    CONFLICT = "conflict"
-    CHANGE = "change"
-
     def __init__(
         self,
         codelet_count: int,
         temperature: float,
         *,
-        snag_type: str = "change",
+        snag_type: str | None = None,
         snag_theme_pattern: Any = None,
         snag_concept_pattern: Any = None,
         snag_rule: Any = None,
@@ -493,14 +486,14 @@ class SnagEvent(TraceEvent):
         explanation: str = "",
     ) -> None:
         super().__init__(
-            event_type=SNAG,
+            event_type=run_binding.vocab().event_type_snag,
             codelet_count=codelet_count,
             temperature=temperature,
             structures=structures,
             description=description,
             theme_pattern=theme_pattern if theme_pattern is not None else snag_theme_pattern,
         )
-        self.snag_type = snag_type
+        self.snag_type = snag_type if snag_type is not None else run_binding.vocab().failure_kind_change
         #: ``get-failure-result`` / ``get-explanation`` (``trace.ss:1127-1128``): the
         #: ``ImageFailure`` (kind, objects, dimension/transform) the rule application
         #: reported, and the sentence written from it.
@@ -912,7 +905,9 @@ def get_associated_concept_pattern(theme_pattern: Any, slipnet: Any) -> dict[str
     configuration there is no such node to pin and only the dimension nodes are.
     """
     return _associated_concept_pattern(
-        theme_pattern, slipnet.relation("opposite"), slipnet.activation_params.max_activation
+        theme_pattern,
+        slipnet.relation(run_binding.vocab().theme_relation_opposite),
+        slipnet.activation_params.max_activation,
     )
 
 
@@ -924,9 +919,10 @@ def _associated_concept_pattern(
     for a clamp event built before its Slipnet is known (``activate`` derives it again)."""
     pairs: list[tuple[str, float | None]] = []
     suppressed = constants().clamp_suppressed_concept_activation
+    opposite_name = run_binding.vocab().theme_relation_opposite
     for dimension, relation, activation in theme_pattern_entries(theme_pattern):
         pairs.append((dimension, ceiling))
-        if relation == "opposite" and opposite:
+        if relation == opposite_name and opposite:
             # An entry that names no activation is at full activation, so positive.
             positive = activation is None or activation > 0
             pairs.append((opposite.name, ceiling if positive else suppressed))
@@ -961,7 +957,7 @@ def get_snag_theme_pattern(concept_mappings: list[Any]) -> list[Any]:
     fires.  What the failed interpretation actually rested on is the complete set of
     (dimension, relation) pairs its mappings assert, dominant or not.
     """
-    from server.engine.themes import THEME_VERTICAL_BRIDGE, relation_name_for_label
+    from server.engine.themes import relation_name_for_label
 
     entries: list[tuple[str, str]] = []
     for cm in concept_mappings:
@@ -972,7 +968,7 @@ def get_snag_theme_pattern(concept_mappings: list[Any]) -> list[Any]:
     # ``remove-duplicates`` (utilities.ss:915-930) keeps the LAST of equal elements, in
     # list order; the jootser draws one coin per entry in this order (jootsing.ss:84-98).
     entries = [e for i, e in enumerate(entries) if e not in entries[i + 1:]]
-    return [THEME_VERTICAL_BRIDGE, *entries]
+    return [run_binding.vocab().theme_type_vertical_bridge, *entries]
 
 
 def get_snag_concept_pattern(snag_objects: list[Any], max_activation: float) -> dict[str, Any]:
@@ -1022,11 +1018,13 @@ def make_concept_activation_monitor(
     follows it, so a clamp never produced one.
     """
 
+    event_type = run_binding.vocab().event_type_concept_activation
+
     def monitor(node: Any, before: float, after: float) -> None:
         if concept_activation_importance(node, before, after) >= threshold:
             trace.record_event(
                 TraceEvent(
-                    event_type=CONCEPT_ACTIVATION,
+                    event_type=event_type,
                     codelet_count=codelet_count,
                     temperature=temperature,
                     description=(
@@ -1132,7 +1130,7 @@ class TemporalTrace:
         self.snag_count += 1
         self.record_event(
             TraceEvent(
-                SNAG,
+                run_binding.vocab().event_type_snag,
                 codelet_count,
                 temperature,
                 theme_pattern=theme_pattern,
@@ -1253,7 +1251,7 @@ class TemporalTrace:
         self.last_unclamp_time = codelet_count
 
         # Find the last ClampEvent and deactivate it
-        last_clamp = self.get_last_event(CLAMP_START)
+        last_clamp = self.get_last_event(run_binding.vocab().event_type_clamp_start)
         if last_clamp is not None and isinstance(last_clamp, ClampEvent):
             last_clamp.progress_achieved = progress
             # ``trace.ss:136-166``: the comment is made between booking the progress
@@ -1279,13 +1277,14 @@ class TemporalTrace:
             return
         from server.engine.commentary import emit_clamp_activate
 
-        if clamp.clamp_type == "manual_clamp":
+        manual = run_binding.vocab().clamp_type_manual
+        if clamp.clamp_type == manual:
             count = sum(
                 1 for e in self.events
-                if isinstance(e, ClampEvent) and e.clamp_type == "manual_clamp"
+                if isinstance(e, ClampEvent) and e.clamp_type == manual
             )
         else:
-            count = len(self.get_events_by_type(CLAMP_START))
+            count = len(self.get_events_by_type(run_binding.vocab().event_type_clamp_start))
         emit_clamp_activate(
             self.commentary, clamp.clamp_type, count, clamp.codelet_count,
             self.commentary_templates,
@@ -1298,11 +1297,11 @@ class TemporalTrace:
         Gets events since the last ClampEvent and evaluates each one
         using the clamp's progress evaluator. Returns the maximum.
         """
-        last_clamp = self.get_last_event(CLAMP_START)
+        last_clamp = self.get_last_event(run_binding.vocab().event_type_clamp_start)
         if last_clamp is None:
             return 0.0
 
-        new_events = self.get_new_events_since_last(CLAMP_START)
+        new_events = self.get_new_events_since_last(run_binding.vocab().event_type_clamp_start)
 
         if isinstance(last_clamp, ClampEvent):
             if not new_events:
@@ -1335,7 +1334,7 @@ class TemporalTrace:
         ordinary rebuilding invisible while making any post-snag clamp event an
         instant exit.
         """
-        last_snag = self.get_last_event(SNAG)
+        last_snag = self.get_last_event(run_binding.vocab().event_type_snag)
         if last_snag is None:
             return 0.0
 
@@ -1353,7 +1352,7 @@ class TemporalTrace:
         # Fallback for plain TraceEvents (``record_snag`` on the trace, used by tests
         # and by the legacy persistence path): nothing was snapshotted, so there is no
         # "since" to measure against.
-        new_events = self.get_new_events_since_last(SNAG)
+        new_events = self.get_new_events_since_last(run_binding.vocab().event_type_snag)
         if not new_events:
             return 0.0
         return max((e.get_strength() for e in new_events), default=0.0)
@@ -1385,7 +1384,7 @@ class TemporalTrace:
             self.ctx.verbose_log.say("undoing-snag", self.ctx.codelet_count)
         self.within_snag_period = False
 
-        last_snag = self.get_last_event(SNAG)
+        last_snag = self.get_last_event(run_binding.vocab().event_type_snag)
         if isinstance(last_snag, SnagEvent):
             if workspace is not None:
                 last_snag.progress_achieved = self.progress_since_last_snag(workspace)

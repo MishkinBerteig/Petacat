@@ -21,10 +21,10 @@ from server.engine.metadata import require_meta
 from server.engine.roles import Absent
 from server.engine.run_binding import constants
 from server.engine.rules import (
-    RULE_TOP, Rule, RuleClause, RuleChange, _TranslationFailure, rules_equal,
+    Rule, RuleClause, RuleChange, _TranslationFailure, rules_equal,
 )
-from server.engine.themes import RELATION_IDENTITY, THEME_VERTICAL_BRIDGE
-from server.engine.trace import ClampEvent
+from server.engine.run_binding import vocab
+from server.engine.trace import ClampEvent, clamp_type_codelet_patterns
 
 if TYPE_CHECKING:
     from server.engine.concept_mappings import ConceptMapping
@@ -148,8 +148,10 @@ def attempt_justification(
         vlog.say("chose-rule")
         vlog.print_object(chosen_rule)
 
-    rule_type = chosen_rule.rule_type  # "top" or "bottom"
-    other_type_top = rule_type != RULE_TOP
+    v = vocab()
+    rule_type = chosen_rule.rule_type  # the top or the bottom rule type's name
+    rule_is_top = rule_type == v.rule_type_top
+    other_type_top = not rule_is_top
     # ``(tell *workspace* 'get-rules (if (eq? rule-type 'top) 'bottom 'top))``
     # (justify.ss:44-45): every rule of the other type, in list order, supported or
     # not.  (The old supported-then-built concatenation reordered the list the
@@ -173,14 +175,14 @@ def attempt_justification(
         # ref-objs2 the target side, whichever rule was chosen.  ref-objs1 is what the
         # vacuous-translation guard below tests.
         from_string = (
-            workspace.initial_string if rule_type == RULE_TOP else workspace.target_string
+            workspace.initial_string if rule_is_top else workspace.target_string
         )
         to_string = (
-            workspace.target_string if rule_type == RULE_TOP else workspace.initial_string
+            workspace.target_string if rule_is_top else workspace.initial_string
         )
         from_ref_objects = _reference_objects(chosen_rule, from_string, slipnet)
         to_ref_objects = _reference_objects(translated_rule, to_string, slipnet)
-        ref_objects1 = from_ref_objects if rule_type == RULE_TOP else to_ref_objects
+        ref_objects1 = from_ref_objects if rule_is_top else to_ref_objects
 
         # Step 3a -- Look for a matching existing rule
         matching_rule = _find_matching_rule(other_rules, translated_rule)
@@ -446,7 +448,7 @@ def clamp_rules(
         # justify.ss:163-170 clamps the vertical pattern whatever it holds: a bare
         # ``(vertical-bridge)`` still clamps the vertical theme type and switches
         # its thematic pressure on (trace.ss:1530-1536) (G-J2).
-        vtp = themespace.get_dominant_theme_pattern(THEME_VERTICAL_BRIDGE)
+        vtp = themespace.get_dominant_theme_pattern(vocab().theme_type_vertical_bridge)
         if vtp:
             tp_dict = _theme_pattern_list_to_dict(vtp, meta)
             if tp_dict:
@@ -471,10 +473,7 @@ def clamp_rules(
     # clamped themes get acted on at all.
     clamped_codelet_patterns: list[Any] = [
         pattern
-        for pattern in (
-            meta.codelet_patterns.get("top-down-codelet-pattern", []),
-            meta.codelet_patterns.get("thematic-codelet-pattern", []),
-        )
+        for pattern in clamp_type_codelet_patterns(meta, vocab().clamp_type_justify)
         if pattern
     ]
 
@@ -487,12 +486,11 @@ def clamp_rules(
     clamp_event = ClampEvent(
         codelet_count=codelet_count,
         temperature=temperature,
-        clamp_type="justify_clamp",
+        clamp_type=vocab().clamp_type_justify,
         clamped_theme_patterns=clamped_theme_patterns,
         clamped_concept_patterns=clamped_concept_patterns,
         clamped_codelet_patterns=clamped_codelet_patterns,
         rules=list(rules),
-        progress_focus="workspace",
         slipnet=slipnet,
         max_activation=float(meta.get_param("max_activation")),
     )
@@ -549,7 +547,7 @@ def unify_rules(
         if cm_type:
             entries.append((cm_type, label))
 
-    return [THEME_VERTICAL_BRIDGE] + entries
+    return [vocab().theme_type_vertical_bridge] + entries
 
 
 def get_unifying_slippages(
@@ -894,12 +892,9 @@ def _translate_rule(
     # objects carry no vertical bridge passes through unchanged
     # (``answers.ss:1442-1448``), so with no vertical bridges at all the rule still
     # translates to its literal counterpart.
-    from_string = (
-        workspace.initial_string if rule.rule_type == RULE_TOP else workspace.target_string
-    )
-    to_string = (
-        workspace.target_string if rule.rule_type == RULE_TOP else workspace.initial_string
-    )
+    rule_is_top = rule.rule_type == vocab().rule_type_top
+    from_string = workspace.initial_string if rule_is_top else workspace.target_string
+    to_string = workspace.target_string if rule_is_top else workspace.initial_string
     translated = rule.translate(
         from_string, to_string, slipnet, rng=rng, meta=meta
     )
@@ -982,7 +977,7 @@ def _monitor_new_rule(
     (``trace.ss:1359-1363``) — a perfectly uniform rule is maximally important whatever
     its relative quality; otherwise importance *is* the relative quality.
     """
-    from server.engine.trace import RULE_BUILT, TraceEvent
+    from server.engine.trace import TraceEvent
 
     if trace is None:
         return
@@ -996,7 +991,7 @@ def _monitor_new_rule(
         return
     trace.record_event(
         TraceEvent(
-            event_type=RULE_BUILT,
+            event_type=vocab().event_type_rule_built,
             codelet_count=codelet_count,
             temperature=temperature,
             structures=[rule],
@@ -1034,7 +1029,7 @@ def _order_rules(
     chosen_rule: Rule, other_rule: Rule, chosen_type: str
 ) -> tuple[Rule, Rule]:
     """Return (top_rule, bottom_rule) regardless of which was chosen."""
-    if chosen_type == RULE_TOP:
+    if chosen_type == vocab().rule_type_top:
         return (chosen_rule, other_rule)
     return (other_rule, chosen_rule)
 
@@ -1209,9 +1204,10 @@ def _get_label(n1: Any, n2: Any, slipnet: Slipnet) -> str | None:
     if n1 is n2:
         # The identity relation is spelled as the Themespace does.  A configuration
         # without it labels no mapping identity (the mapping is a slippage, "different").
-        if not slipnet.relation(RELATION_IDENTITY):
+        identity = vocab().theme_relation_identity
+        if not slipnet.relation(identity):
             return None
-        return RELATION_IDENTITY
+        return identity
     return slipnet.get_label(n1, n2)
 
 
@@ -1242,9 +1238,10 @@ def _is_identity_label(label: Any) -> bool:
     """True for the identity relation: its name in the Themespace's spelling, or its node."""
     if label is None:
         return False
+    identity = vocab().theme_relation_identity
     if isinstance(label, str):
-        return label == RELATION_IDENTITY
-    return getattr(label, "relation", None) == RELATION_IDENTITY
+        return label == identity
+    return getattr(label, "relation", None) == identity
 
 
 def _remove_whole_single_concept_mappings(
@@ -1352,12 +1349,10 @@ def _theme_relation(relation: Any) -> Any:
     """A pattern entry's relation as a Themespace theme spells it.
 
     An unlabelled concept mapping (``#f``, e.g. object-category letter=>group) is the
-    *different* relation (``themes.py`` ``RELATION_DIFFERENT``); left as ``None`` the
+    *different* relation (the vocabulary's ``theme_relation.diff``); left as ``None`` the
     clamp created no theme for the entry at all.
     """
-    from server.engine.themes import RELATION_DIFFERENT
-
-    return RELATION_DIFFERENT if relation is None else relation
+    return vocab().theme_relation_diff if relation is None else relation
 
 
 def _build_theme_pattern_dict(

@@ -31,8 +31,9 @@ Two facts about the shape of the output are worth stating before the code:
 
 from __future__ import annotations
 
-from functools import lru_cache
 from typing import TYPE_CHECKING, Any, NamedTuple
+
+from server.engine.run_binding import vocab
 
 if TYPE_CHECKING:
     from server.engine.memory import AnswerDescription, EpisodicMemory
@@ -462,40 +463,40 @@ def coherence_score(answer: AnswerDescription) -> float:
 
 
 #: The symbols a rule signature holds that are not Slipnet nodes: the clause types and the
-#: scope word ``rule_signature`` (``server/engine/rules.py``) writes.  ``rule_signature``
+#: scope word ``rule_signature`` (``server/engine/rules.py``) writes, as the run's
+#: configuration names them (``clause_type.*`` and ``rule_scope.subobjects`` of the
+#: vocabulary, read per call because another run may have other names).  ``rule_signature``
 #: renders a clause as a nest of plain strings, which flattens the Scheme's distinction
 #: between a *symbol* leaf (the clause type ``'intrinsic``) and a *slipnode* leaf;
 #: ``traverse-rule-clauses`` treats the two completely differently, so the walk below has
-#: to recover the distinction.  The symbols are the engine's own closed set; every other
+#: to recover the distinction.  The symbols are that closed set; every other
 #: string is read as the name of a node.  A name the configuration no longer has is still
 #: a name (stored memory keeps it), and the depth lookup then says it is not available.
-@lru_cache(maxsize=1)
-def _signature_symbols() -> frozenset[str]:
-    from server.engine.rules import (
-        CLAUSE_EXTRINSIC,
-        CLAUSE_INTRINSIC,
-        CLAUSE_VERBATIM,
-        SCOPE_SUBOBJECTS,
-    )
-
+def _signature_symbols(v: Any = None) -> frozenset[str]:
+    v = vocab() if v is None else v
     return frozenset(
-        {CLAUSE_INTRINSIC, CLAUSE_EXTRINSIC, CLAUSE_VERBATIM, SCOPE_SUBOBJECTS}
+        {
+            v.clause_type_intrinsic,
+            v.clause_type_extrinsic,
+            v.clause_type_verbatim,
+            v.rule_scope_subobjects,
+        }
     )
 
 
-def _is_concept(leaf: Any) -> bool:
+def _is_concept(leaf: Any, symbols: frozenset[str]) -> bool:
     """Is this leaf a Slipnet node's name, as opposed to one of the Scheme's bare symbols?"""
-    return isinstance(leaf, str) and leaf not in _signature_symbols()
+    return isinstance(leaf, str) and leaf not in symbols
 
 
-def _is_verbatim_signature(signature: Any) -> bool:
+def _is_verbatim_signature(signature: Any, v: Any = None) -> bool:
     """Scheme: ``verbatim-rule-clause-list?`` (``justify.ss:250-253``)."""
     return (
         isinstance(signature, (list, tuple))
         and len(signature) == 1
         and isinstance(signature[0], (list, tuple))
         and len(signature[0]) > 0
-        and signature[0][0] == "verbatim"
+        and signature[0][0] == (vocab() if v is None else v).clause_type_verbatim
     )
 
 
@@ -525,7 +526,9 @@ def _without_empty_slots(value: Any) -> Any:
     return value
 
 
-def _traverse(x1: Any, x2: Any, differences: list[tuple[str, str]]) -> bool:
+def _traverse(
+    x1: Any, x2: Any, differences: list[tuple[str, str]], symbols: frozenset[str]
+) -> bool:
     """Scheme: ``traverse-rule-clauses`` (``justify.ss:232-247``) under
     ``rule-clause-comparison-proc`` (``justify.ss:269-273``).
 
@@ -541,13 +544,13 @@ def _traverse(x1: Any, x2: Any, differences: list[tuple[str, str]]) -> bool:
         if len(x1) != len(x2):
             return False
         for item1, item2 in zip(x1, x2):
-            if not _traverse(item1, item2, differences):
+            if not _traverse(item1, item2, differences, symbols):
                 return False
         return True
     if x1_is_list or x2_is_list:
         # ``justify.ss:241``: a list against an atom.
         return False
-    concept1, concept2 = _is_concept(x1), _is_concept(x2)
+    concept1, concept2 = _is_concept(x1, symbols), _is_concept(x2, symbols)
     if concept1 and concept2:
         # ``justify.ss:246``: both leaves are Slipnet nodes, so the proc decides.
         if x1 != x2:
@@ -561,7 +564,7 @@ def _traverse(x1: Any, x2: Any, differences: list[tuple[str, str]]) -> bool:
 
 
 def compare_rule_signatures(
-    signature_a: list | None, signature_b: list | None
+    signature_a: list | None, signature_b: list | None, v: Any = None
 ) -> list[tuple[str, str]] | None:
     """Scheme: ``compare-rule-clause-lists`` (``justify.ss:256-266``), used at
     ``answers.ss:603-604`` and ``memory.ss:556-559``.
@@ -585,6 +588,9 @@ def compare_rule_signatures(
       letters, so two different verbatim rules take the abstractness fallback instead of
       contributing a pile of same-depth letter pairs that the filter then discards.
 
+    *v* is the vocabulary the signatures were written under (a provider's ``vocabulary``); without
+    it the bound run's is read.
+
     (The Scheme tests ``rc-list1`` twice at ``justify.ss:258-259`` where it plainly means
     ``rc-list1`` and ``rc-list2``.  The typo is inert: whenever exactly one side is
     verbatim, the walk it falls through to fails on ``verbatim`` against ``intrinsic``
@@ -595,10 +601,10 @@ def compare_rule_signatures(
         return None
     clauses_a = _without_empty_slots(signature_a)
     clauses_b = _without_empty_slots(signature_b)
-    if _is_verbatim_signature(clauses_a) or _is_verbatim_signature(clauses_b):
+    if _is_verbatim_signature(clauses_a, v) or _is_verbatim_signature(clauses_b, v):
         return [] if clauses_a == clauses_b else None
     differences: list[tuple[str, str]] = []
-    if not _traverse(clauses_a, clauses_b, differences):
+    if not _traverse(clauses_a, clauses_b, differences, _signature_symbols(v)):
         return None
     return differences
 
@@ -772,17 +778,17 @@ def _available_check(meta: Any, unresolved: set[str]):
 
     A dimension is a Slipnet node; a relation is a ``theme_relations`` row.  A relation
     is unavailable when its row is gone (a removal deletes the row with its node) or the
-    row's node is; ``diff``, the relation of an unlabelled link, needs no node.  A
+    row's node is; the relation bound to the vocabulary role ``theme_relation.diff`` (the
+    relation of an unlabelled link) needs no node.  A
     provider that lists no node specs at all is not asked.
     """
-    from server.engine.themes import RELATION_DIFFERENT
-
     specs = getattr(meta, "slipnet_node_specs", None)
     if specs is None:
         return lambda theme: True
     relation_node = {
         row.name: row.node_name for row in getattr(meta, "theme_relations", ()) or ()
     }
+    diff = meta.vocabulary.theme_relation_diff
 
     def available(theme: Theme) -> bool:
         dimension, relation = theme
@@ -790,7 +796,7 @@ def _available_check(meta: Any, unresolved: set[str]):
         if dimension not in specs:
             unresolved.add(dimension)
             ok = False
-        if relation != RELATION_DIFFERENT:
+        if relation != diff:
             if relation not in relation_node:
                 unresolved.add(str(relation))
                 ok = False
@@ -860,10 +866,10 @@ class AnswerComparison:
             target=self.target2,
         )
         self.change1 = _fill(
-            cmp_tpl.get("change", ""), initial=self.initial1, modified=self.modified1
+            cmp_tpl.get("problem_change", ""), initial=self.initial1, modified=self.modified1
         )
         self.change2 = _fill(
-            cmp_tpl.get("change", ""), initial=self.initial2, modified=self.modified2
+            cmp_tpl.get("problem_change", ""), initial=self.initial2, modified=self.modified2
         )
         self.full_answer1 = _fill(
             cmp_tpl.get("full_answer", ""), answer=self.answer1, problem=self.problem1
@@ -952,7 +958,7 @@ class AnswerComparison:
 
         # ---- rule comparison (answers.ss:597-620) ----
         self.rule_differences = compare_rule_signatures(
-            self_answer.top_rule_signature, other_answer.top_rule_signature
+            self_answer.top_rule_signature, other_answer.top_rule_signature, meta.vocabulary
         )
         self.num_rule_differences = count_rule_differences(
             self.rule_differences, meta, self.unresolved_names
@@ -1377,7 +1383,7 @@ class AnswerComparison:
                 answer=answer_ref,
                 reason=reason,
             ),
-            "answer": self.answer1 if first else self.answer2,
+            "preferred_answer": self.answer1 if first else self.answer2,
             "answer_ref": answer_ref,
         }
 
@@ -1408,7 +1414,7 @@ class AnswerComparison:
             "eliza_text": text,
             "technical_text": text,
             "preferred": {
-                "answer": verdict.get("answer"),
+                "answer": verdict.get("preferred_answer"),
                 "reason": verdict.get("criterion", ""),
             },
             "warnings": sorted(self.warnings),
@@ -1439,7 +1445,7 @@ def _neither_better(
             answer2=ctx.answer2_ref,
             quality2=phrase2,
         )
-    return {"text": text, "answer": None, "answer_ref": None}
+    return {"text": text, "preferred_answer": None, "answer_ref": None}
 
 
 def _criterion_both_incoherent(

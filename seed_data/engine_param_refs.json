@@ -1,0 +1,12 @@
+{
+  "initially_clamped_slipnodes": "node_list",
+  "top_down_slipnodes": "trigger_node_list",
+  "intrinsic_link_lengths": "node_map",
+  "theme_dimension_labels": "node_map",
+  "rule_english_dimension_phrases": "node_map",
+  "initial_codelet_types": "codelet_type_list",
+  "initial_codelet_urgency": "urgency_level",
+  "bridge_recruit_urgency_level": "urgency_level",
+  "default_urgency_level": "urgency_level",
+  "manual_clamp_background_level": "urgency_level"
+}

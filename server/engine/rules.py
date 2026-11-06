@@ -60,19 +60,6 @@ if TYPE_CHECKING:
     from server.engine.workspace import Workspace, WorkspaceString
     from server.engine.workspace_objects import WorkspaceObject
 
-# Clause type string constants (values live in DB clause_types table)
-CLAUSE_INTRINSIC = "intrinsic"
-CLAUSE_EXTRINSIC = "extrinsic"
-CLAUSE_VERBATIM = "verbatim"
-
-# Rule type string constants (values live in DB rule_types table)
-RULE_TOP = "top"
-RULE_BOTTOM = "bottom"
-
-# Scope constants for change descriptions / change templates
-SCOPE_SELF = "self"
-SCOPE_SUBOBJECTS = "subobjects"
-
 # The roles this module reads (``server/engine/roles.py``).  The engine names no node: it asks
 # which node plays a role, either through ``slipnet.roles`` or, where only a node is in scope,
 # through ``node.roles``.  A role nothing holds is never matched, so a case that needs it is
@@ -194,7 +181,7 @@ def _translate_rule_clause(
 
     if clause.is_extrinsic:
         return RuleClause(
-            clause_type=CLAUSE_EXTRINSIC,
+            clause_type=constants().vocab.clause_type_extrinsic,
             object_description=translated_ods[0] if len(translated_ods) == 1 else None,
             extrinsic_objects=translated_ods if len(translated_ods) > 1 else None,
             dimensions=_chez_map(
@@ -204,7 +191,7 @@ def _translate_rule_clause(
         )
 
     return RuleClause(
-        clause_type=CLAUSE_INTRINSIC,
+        clause_type=constants().vocab.clause_type_intrinsic,
         object_description=translated_ods[0] if translated_ods else None,
         changes=_chez_map(
             lambda change: _translate_change(
@@ -285,7 +272,8 @@ def _translate_object_description(
     # bridge's slippages are excluded; translating upward the forward ones are.
     # Either way a slippage labelled ``opposite`` survives, because opposition
     # reads the same in both directions.
-    going_down = getattr(from_string, "string_type", "") in ("initial", "modified")
+    v = constants().vocab
+    going_down = getattr(from_string, "string_type", "") in (v.string_kind_initial, v.string_kind_modified)
     directional: list[Any] = []
     for bridge in vertical_bridges:
         directional.extend(
@@ -296,7 +284,9 @@ def _translate_object_description(
     # With no opposite relation in the configuration the token is falsy and identical only
     # to itself, so a slippage whose label is missing (``None``) is never taken for one.
     opposite = (
-        slipnet.relation("opposite") if slipnet is not None else absent("relation.opposite")
+        slipnet.relation(v.theme_relation_opposite)
+        if slipnet is not None
+        else absent("relation.opposite")
     )
     applicable = [
         s
@@ -534,7 +524,7 @@ class IntrinsicChangeDescription:
         The object (letter or group) whose property changed, or its
         enclosing string.
     scope : str
-        SCOPE_SELF or SCOPE_SUBOBJECTS.
+        The vocabulary's ``rule_scope.self`` or ``rule_scope.subobjects`` name.
     dimension : SlipnetNode
         The conceptual dimension that changed (e.g., the letter-category dimension).
     descriptor1 : SlipnetNode | None
@@ -589,10 +579,10 @@ class IntrinsicChangeDescription:
         return self.scope == other.scope
 
     def change_self(self) -> bool:
-        return self.scope == SCOPE_SELF
+        return self.scope == constants().vocab.rule_scope_self
 
     def change_subobjects(self) -> bool:
-        return self.scope == SCOPE_SUBOBJECTS
+        return self.scope == constants().vocab.rule_scope_subobjects
 
     def same_dimension(self, other: IntrinsicChangeDescription) -> bool:
         return self.dimension is other.dimension
@@ -640,7 +630,7 @@ class IntrinsicChangeDescription:
         """
         if not isinstance(self.reference_object, Group):
             return None
-        if not _holds(self.dimension, _DIM_GROUP_CATEGORY) or self.scope != SCOPE_SELF:
+        if not _holds(self.dimension, _DIM_GROUP_CATEGORY) or self.scope != constants().vocab.rule_scope_self:
             return None
         bf = getattr(self.reference_object, "bond_facet", None)
         if bf is None:
@@ -651,7 +641,7 @@ class IntrinsicChangeDescription:
         facet_dim = slipnet.roles.dimension_bond_facet
         if not facet_dim:
             return None
-        return (SCOPE_SELF, facet_dim, [bf])
+        return (constants().vocab.rule_scope_self, facet_dim, [bf])
 
     def make_change_template(self) -> tuple:
         """Scheme: make-change-template.
@@ -721,7 +711,7 @@ class ExtrinsicChangeDescription:
                 to_desc = descriptors[0]
             self.equivalent_intrinsic_changes.append(
                 IntrinsicChangeDescription(
-                    obj, SCOPE_SELF, dimension, None, None, to_desc
+                    obj, constants().vocab.rule_scope_self, dimension, None, None, to_desc
                 )
             )
 
@@ -989,7 +979,7 @@ class RuleChange:
         from_descriptor: SlipnetNode | None = None,
         to_descriptor: SlipnetNode | None = None,
         relation: SlipnetNode | None = None,
-        referent: str = SCOPE_SELF,
+        referent: str | None = None,
     ) -> None:
         self.dimension = dimension
         self.from_descriptor = from_descriptor
@@ -998,11 +988,11 @@ class RuleChange:
         # Fig. 3.2's <referent>: does the change apply to the object itself, or
         # to all of its components?  "Increase lengths of all objects in whole
         # group by one" is the components form, and is what turns abc -> aabbcc.
-        self.referent = referent
+        self.referent = constants().vocab.rule_scope_self if referent is None else referent
 
     @property
     def changes_components(self) -> bool:
-        return self.referent == SCOPE_SUBOBJECTS
+        return self.referent == constants().vocab.rule_scope_subobjects
 
     @property
     def is_relation(self) -> bool:
@@ -1084,15 +1074,15 @@ class RuleClause:
 
     @property
     def is_intrinsic(self) -> bool:
-        return self.clause_type == CLAUSE_INTRINSIC
+        return self.clause_type == constants().vocab.clause_type_intrinsic
 
     @property
     def is_extrinsic(self) -> bool:
-        return self.clause_type == CLAUSE_EXTRINSIC
+        return self.clause_type == constants().vocab.clause_type_extrinsic
 
     @property
     def is_verbatim(self) -> bool:
-        return self.clause_type == CLAUSE_VERBATIM
+        return self.clause_type == constants().vocab.clause_type_verbatim
 
     def __repr__(self) -> str:
         return f"RuleClause({self.clause_type}, {len(self.changes)} changes)"
@@ -1142,7 +1132,7 @@ class Rule(WorkspaceStructure):
 
     @property
     def is_top_rule(self) -> bool:
-        return self.rule_type == RULE_TOP
+        return self.rule_type == constants().vocab.rule_type_top
 
     @property
     def intrinsic_clauses(self) -> list[RuleClause]:
@@ -1168,7 +1158,9 @@ class Rule(WorkspaceStructure):
         had.  ``themes.theme_type_for_bridge_type`` accepts it, ``top-bridge`` and ``top_bridge``
         alike, and gives the Themespace's underscore spelling (B3); the value itself is part of
         a stored theme pattern (``[bridge_theme_type]``) and so is not respelled here."""
-        return "top-bridge" if self.rule_type == RULE_TOP else "bottom-bridge"
+        v = constants().vocab
+        theme_type = v.theme_type_top_bridge if self.rule_type == v.rule_type_top else v.theme_type_bottom_bridge
+        return theme_type.replace("_", "-")
 
     def get_verbatim_letter_categories(self) -> list[Any]:
         """Scheme: get-verbatim-letter-categories."""
@@ -1675,7 +1667,8 @@ class Rule(WorkspaceStructure):
         # ``themes.py`` names the three theme types with underscores; ``bridge_theme_type``
         # spells them with hyphens, and ``clamp_theme_pattern`` matches a cluster by an
         # exact string, so a hyphenated type clamps nothing at all.
-        theme_type = "top_bridge" if self.is_top_rule else "bottom_bridge"
+        v = constants().vocab
+        theme_type = v.theme_type_top_bridge if self.is_top_rule else v.theme_type_bottom_bridge
         relations: list[tuple[str, str]] = []
         for bridge in bridges:
             for relation in bridge.get_associated_thematic_relations():
@@ -1711,10 +1704,12 @@ class Rule(WorkspaceStructure):
         mapping shadow the one that counts, and let *horizontal* mappings rewrite a
         rule during a vertical translation.
         """
-        direction = "top-to-bottom" if self.is_top_rule else "bottom-to-top"
+        v = constants().vocab
+        new_rule_type = v.rule_type_bottom if self.is_top_rule else v.rule_type_top
+        direction = f"{self.rule_type}-to-{new_rule_type}"
         # ``(slippage-log (make-slippage-log rule-type))`` (answers.ss:1296): a record of
         # the slippages this translation applies.  It draws nothing.
-        slippage_log = SlippageLog("top" if self.is_top_rule else "bottom")
+        slippage_log = SlippageLog(self.rule_type)
         # ``(map (translate-rule-clause ...) rule-clauses)`` (answers.ss:1297-1298) is
         # Chez's ``map`` and a failure aborts at once through ``(return #f)``, so the
         # clauses before it in *application* order have already drawn their coins.
@@ -1735,7 +1730,6 @@ class Rule(WorkspaceStructure):
         if not all(_valid_rule_clause(c) for c in new_clauses):
             return None
 
-        new_rule_type = RULE_BOTTOM if self.is_top_rule else RULE_TOP
         translated = Rule(
             rule_type=new_rule_type,
             clauses=new_clauses,
@@ -1771,8 +1765,7 @@ class Rule(WorkspaceStructure):
         return self.english_transcription
 
     def __repr__(self) -> str:
-        rt = "top" if self.is_top_rule else "bottom"
-        return f"Rule({rt}, {len(self.clauses)} clauses, quality={self.quality:.0f})"
+        return f"Rule({self.rule_type}, {len(self.clauses)} clauses, quality={self.quality:.0f})"
 
 
 @dataclass
@@ -1983,7 +1976,7 @@ def _clause_signature(clause: RuleClause, token: str) -> list:
                 # ``self`` vs ``subobjects`` (``rules.ss:381``).  Written only for the
                 # non-default scope, so signatures already stored in a database for
                 # ``self`` changes keep matching.
-                *(["subobjects"] if change.changes_components else []),
+                *([constants().vocab.rule_scope_subobjects] if change.changes_components else []),
             ]
             for change in clause.changes
         ],
@@ -2100,7 +2093,7 @@ def abstract_change_descriptions(
                 continue
             icd = IntrinsicChangeDescription(
                 reference_object=b.object1,
-                scope=SCOPE_SELF,
+                scope=constants().vocab.rule_scope_self,
                 dimension=dim,
                 descriptor1=slip.descriptor1,
                 relation=slip.label,
@@ -2178,10 +2171,10 @@ def abstract_change_descriptions(
                 # and before nothing else is drawn, so the draw order is unchanged; with
                 # either missing from the configuration no reversal is abstracted.
                 dir_dim = slipnet.roles.dimension_direction if slipnet is not None else None
-                opp_rel = slipnet.relation("opposite") if slipnet is not None else None
+                opp_rel = slipnet.relation(constants().vocab.theme_relation_opposite) if slipnet is not None else None
                 if dir_dim and opp_rel:
                     all_cds.append(IntrinsicChangeDescription(
-                        left_enclosing, SCOPE_SELF, dir_dim, None, opp_rel, None
+                        left_enclosing, constants().vocab.rule_scope_self, dir_dim, None, opp_rel, None
                     ))
 
         # Common change schemas across all bridges in cluster
@@ -2198,7 +2191,7 @@ def abstract_change_descriptions(
             # the draw above, which is outside it.
             if should_add and not _holds(s_dim, _DIM_STRING_POSITION):
                 all_cds.append(IntrinsicChangeDescription(
-                    left_enclosing, SCOPE_SUBOBJECTS,
+                    left_enclosing, constants().vocab.rule_scope_subobjects,
                     s_dim, s_desc1, s_rel, s_desc2,
                 ))
 
@@ -2301,7 +2294,7 @@ def change_descriptions_to_rule_clause_template(
         templates = [cd.make_change_template() for cd in change_descriptions]
         if bf_change is not None:
             templates = [bf_change] + templates
-        return (CLAUSE_INTRINSIC, ref_obj, templates)
+        return (constants().vocab.clause_type_intrinsic, ref_obj, templates)
     else:
         # Extrinsic
         if any(getattr(cd, "subobjects_swap", False) for cd in change_descriptions):
@@ -2312,7 +2305,7 @@ def change_descriptions_to_rule_clause_template(
                 key=lambda o: getattr(o, "left_string_pos", 0),
             )
         dimensions = [cd.dimension for cd in change_descriptions]
-        return (CLAUSE_EXTRINSIC, ref_objects, dimensions)
+        return (constants().vocab.clause_type_extrinsic, ref_objects, dimensions)
 
 
 def _template_less(t1: tuple, t2: tuple) -> bool:
@@ -2324,8 +2317,8 @@ def _template_less(t1: tuple, t2: tuple) -> bool:
     left string position.  This is not a strict weak order, so the sort is :func:`chez_sort`
     (Chez's own merge steps) rather than a key function.
     """
-    i1 = t1[0] == CLAUSE_INTRINSIC
-    i2 = t2[0] == CLAUSE_INTRINSIC
+    i1 = t1[0] == constants().vocab.clause_type_intrinsic
+    i2 = t2[0] == constants().vocab.clause_type_intrinsic
     if i1 and not i2:
         return True
     if not i1 and not i2:
@@ -2543,7 +2536,7 @@ def instantiate_rule_clause_template(
     Scheme: instantiate-rule-clause-template (rules.ss:862-875).
     """
     clause_type = template[0]
-    if clause_type == CLAUSE_INTRINSIC:
+    if clause_type == constants().vocab.clause_type_intrinsic:
         ref_object = template[1]
         change_templates = template[2]
         obj_desc = reference_object_to_object_description(
@@ -2556,7 +2549,7 @@ def instantiate_rule_clause_template(
             sorted_cts,
         )
         return RuleClause(
-            clause_type=CLAUSE_INTRINSIC,
+            clause_type=constants().vocab.clause_type_intrinsic,
             object_description=obj_desc,
             changes=changes,
         )
@@ -2573,7 +2566,7 @@ def instantiate_rule_clause_template(
         order = _dimension_order(slipnet)
         sorted_dims = sorted(dimensions, key=lambda dim: _dim_sort_key(dim, order))
         return RuleClause(
-            clause_type=CLAUSE_EXTRINSIC,
+            clause_type=constants().vocab.clause_type_extrinsic,
             object_description=obj_descs[0] if len(obj_descs) == 1 else None,
             extrinsic_objects=obj_descs if len(obj_descs) > 1 else None,
             changes=[],  # Extrinsic clauses carry dimensions, not changes.
@@ -2642,9 +2635,10 @@ def _sort_change_templates(change_templates: list[tuple], slipnet: Any = None) -
     self < subobjects; within same scope, sort by dimension order.
     """
     order = _dimension_order(slipnet)
+    self_scope = constants().vocab.rule_scope_self
 
     def key(ct: tuple) -> tuple:
-        scope_key = 0 if ct[0] == SCOPE_SELF else 1
+        scope_key = 0 if ct[0] == self_scope else 1
         dim_key = _dim_sort_key(ct[1], order)
         return (scope_key, dim_key)
     return sorted(change_templates, key=key)
@@ -2662,12 +2656,14 @@ def get_tagged_supporting_horizontal_bridges(template: tuple) -> tuple:
     Returns (unsupported_self_change?, [bridges]).
     """
     clause_type = template[0]
-    if clause_type == CLAUSE_EXTRINSIC:
+    v = constants().vocab
+    horizontal = v.bridge_orientation_horizontal
+    if clause_type == v.clause_type_extrinsic:
         ref_objects = template[1]
         if len(ref_objects) == 1:
-            bridges = _get_subobject_bridges(ref_objects[0], "horizontal")
+            bridges = _get_subobject_bridges(ref_objects[0], horizontal)
         else:
-            bridges = [_get_bridge(obj, "horizontal") for obj in ref_objects]
+            bridges = [_get_bridge(obj, horizontal) for obj in ref_objects]
             bridges = [b for b in bridges if b is not None]
         return (False, bridges)
     else:
@@ -2677,15 +2673,15 @@ def get_tagged_supporting_horizontal_bridges(template: tuple) -> tuple:
 
         self_bridge = None
         if not _is_workspace_string(ref_object):
-            self_bridge = _get_bridge(ref_object, "horizontal")
+            self_bridge = _get_bridge(ref_object, horizontal)
 
-        has_subobject_changes = any(ct[0] == SCOPE_SUBOBJECTS for ct in change_templates)
+        has_subobject_changes = any(ct[0] == v.rule_scope_subobjects for ct in change_templates)
         subobject_bridges = (
-            _get_subobject_bridges(ref_object, "horizontal")
+            _get_subobject_bridges(ref_object, horizontal)
             if has_subobject_changes else []
         )
 
-        has_self_changes = any(ct[0] == SCOPE_SELF for ct in change_templates)
+        has_self_changes = any(ct[0] == v.rule_scope_self for ct in change_templates)
 
         if has_self_changes:
             if self_bridge is not None:
@@ -2693,14 +2689,14 @@ def get_tagged_supporting_horizontal_bridges(template: tuple) -> tuple:
                 return (False, supporting)
             else:
                 # Unsupported self change — use subobject bridges instead
-                return (True, _get_subobject_bridges(ref_object, "horizontal"))
+                return (True, _get_subobject_bridges(ref_object, horizontal))
         else:
             return (False, subobject_bridges)
 
 
 def _get_bridge(obj: Any, orientation: str) -> Any:
     """Get the bridge of the given orientation on an object."""
-    if orientation == "horizontal":
+    if orientation == constants().vocab.bridge_orientation_horizontal:
         return getattr(obj, "horizontal_bridge", None)
     return getattr(obj, "vertical_bridge", None)
 
@@ -2813,7 +2809,7 @@ def apply_rule(
             except ImageFailure as e:
                 if not e.objects:
                     e.objects = [swap[1], swap[2]]
-                e.kind = ImageFailure.SWAP
+                e.kind = constants().vocab.failure_kind_swap
                 raise
 
         return grouped
@@ -2911,7 +2907,7 @@ def _get_extrinsic_transforms(
             raise ImageFailure(
                 "Swap objects are not disjoint",
                 objects=list(denoted),
-                kind=ImageFailure.SWAP,
+                kind=constants().vocab.failure_kind_swap,
                 dimension=dimensions[0] if dimensions else None,
             )
 
@@ -2924,7 +2920,7 @@ def _get_extrinsic_transforms(
                     raise ImageFailure(
                         "String-position swap needs exactly two objects",
                         objects=list(denoted),
-                        kind=ImageFailure.SWAP,
+                        kind=constants().vocab.failure_kind_swap,
                         dimension=dim,
                     )
                 result.append((dim, denoted[0], denoted[1]))
@@ -2946,7 +2942,7 @@ def _get_extrinsic_transforms(
                     raise ImageFailure(
                         f"No {dim_name} descriptor for every swap object",
                         objects=list(denoted),
-                        kind=ImageFailure.SWAP,
+                        kind=constants().vocab.failure_kind_swap,
                         dimension=dim,
                     )
                 unique_descs: list[Any] = []
@@ -2957,7 +2953,7 @@ def _get_extrinsic_transforms(
                     raise ImageFailure(
                         f"More than two {dim_name} descriptors to swap",
                         objects=list(denoted),
-                        kind=ImageFailure.SWAP,
+                        kind=constants().vocab.failure_kind_swap,
                         dimension=dim,
                     )
                 sd1 = unique_descs[0]
@@ -3196,7 +3192,7 @@ def _check_for_conflicts(transforms: list[tuple]) -> None:
         obj, (dim, descriptor) = t
         descriptions.append(
             (
-                IntrinsicChangeDescription(obj, SCOPE_SELF, dim, None, None, descriptor),
+                IntrinsicChangeDescription(obj, constants().vocab.rule_scope_self, dim, None, None, descriptor),
                 obj,
             )
         )
@@ -3218,7 +3214,7 @@ def _check_for_conflicts(transforms: list[tuple]) -> None:
                 f"{getattr(ic2.dimension, 'short_name', '?')} of "
                 f"{_ascii_name(ic2.reference_object)}",
                 objects=[ic1.reference_object, ic2.reference_object],
-                kind=ImageFailure.CONFLICT,
+                kind=constants().vocab.failure_kind_conflict,
                 dimension=ic1.dimension,
                 dimension2=ic2.dimension,
             )
@@ -3284,7 +3280,7 @@ def _apply_transforms(
                         (d for td, d in transforms if _holds(td, _DIM_BOND_FACET)),
                         None,
                     )
-                    e.transform = (dim, slipnet.relation("opposite") or None, medium)
+                    e.transform = (dim, slipnet.relation(constants().vocab.theme_relation_opposite) or None, medium)
                 else:
                     e.transform = (dim, desc)
             raise
@@ -3427,24 +3423,10 @@ def _get_equivalent_bridge(workspace: Workspace, bridge: Bridge) -> Any:
     unsupported.  The Scheme asks a different question: does the Workspace, on its own
     account, already relate these objects the way the translation says it does?
     """
-    bridge_lists = {
-        "top": workspace.top_bridges,
-        "bottom": workspace.bottom_bridges,
-        "vertical": workspace.vertical_bridges,
-    }
-    own_list = bridge_lists.get(bridge.bridge_type)
-    if own_list is not None and any(b is bridge for b in own_list):
+    if any(b is bridge for b in workspace.bridges_of(bridge.bridge_type)):
         return bridge
 
-    strings = {
-        "top": (workspace.initial_string, workspace.modified_string),
-        "bottom": (workspace.target_string, workspace.answer_string),
-        "vertical": (workspace.initial_string, workspace.target_string),
-    }
-    pair = strings.get(bridge.bridge_type)
-    if pair is None:
-        return None
-    string1, string2 = pair
+    string1, string2 = workspace.bridge_strings(bridge.bridge_type)
     if string1 is None or string2 is None:
         return None
 
@@ -3453,10 +3435,9 @@ def _get_equivalent_bridge(workspace: Workspace, bridge: Bridge) -> Any:
     if equivalent1 is None or equivalent2 is None:
         return None
 
-    orientation = "vertical" if bridge.bridge_type == "vertical" else "horizontal"
     existing = (
         equivalent1.vertical_bridge
-        if orientation == "vertical"
+        if bridge.bridge_type == constants().vocab.bridge_type_vertical
         else equivalent1.horizontal_bridge
     )
     if existing is not None and existing.object2 is equivalent2:
@@ -3706,7 +3687,7 @@ def _count_strposctgy_opposite_slippages(bridges: list[Bridge]) -> int:
         for cm in b.concept_mappings:
             if (
                 _holds(cm.description_type1, _DIM_STRING_POSITION)
-                and getattr(cm.label, "relation", None) == "opposite"
+                and getattr(cm.label, "relation", None) == constants().vocab.theme_relation_opposite
             ):
                 count += 1
                 break
@@ -3779,7 +3760,7 @@ def _get_common_change_schemas(cluster: list[Bridge]) -> list[tuple]:
     common = _get_common_schemas(cluster)
     return [
         s for s in common
-        if s[2] is None or getattr(s[2], "relation", None) != "identity"
+        if s[2] is None or getattr(s[2], "relation", None) != constants().vocab.theme_relation_identity
     ]
 
 
@@ -3860,10 +3841,10 @@ def possible_to_instantiate(templates: list[tuple], slipnet: Any = None) -> bool
     to name it by; a configuration without them cannot build such a clause.
     """
     for t in templates:
-        if t[0] == CLAUSE_INTRINSIC:
+        if t[0] == constants().vocab.clause_type_intrinsic:
             if not _object_description_possible(t[1], slipnet):
                 return False
-        elif t[0] == CLAUSE_EXTRINSIC:
+        elif t[0] == constants().vocab.clause_type_extrinsic:
             for obj in t[1]:
                 if not _object_description_possible(obj, slipnet):
                     return False
@@ -3912,7 +3893,7 @@ def build_rule_from_bridges(
     Parameters
     ----------
     rule_type : str
-        RULE_TOP or RULE_BOTTOM.
+        a ``rule_type.*`` vocabulary name (top or bottom).
     bridges : list[Bridge]
         Describable horizontal bridges.
     slipnet : Slipnet

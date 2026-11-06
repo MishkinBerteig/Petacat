@@ -1,12 +1,11 @@
 """Tests for Theme/Themespace with string type constants."""
 
-from server.engine.themes import (
+from server.engine.themes import Theme, ThemeCluster
+from tests.support.standard_names import (
     ALL_THEME_TYPES,
     THEME_BOTTOM_BRIDGE,
     THEME_TOP_BRIDGE,
     THEME_VERTICAL_BRIDGE,
-    Theme,
-    ThemeCluster,
 )
 from tests.support.theme_fixtures import populate
 

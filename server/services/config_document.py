@@ -46,6 +46,7 @@ from server.engine.hashing import HASH_EXCLUDED_FIELDS, _field_digest, combine
 from server.engine.metadata import MetadataProvider
 from server.services.metadata_service import (
     ENUM_TABLE_MODELS,
+    PROVIDER_FIELD_COLUMNS,
     PROVIDER_FIELD_TABLES,
     build_provider_field,
     load_rows_from_db,
@@ -244,6 +245,18 @@ def _apply_to_table(table: str, current: Table, ops: Sequence[Op]) -> Table:
     return _freeze(table, rows.items(), sort=resort)
 
 
+def _op_touches_field(field_name: str, table: str, ops: Sequence[Op]) -> bool:
+    """Whether *ops* on *table* can change provider field *field_name*.
+
+    A field that reads only some of the table's columns (``PROVIDER_FIELD_COLUMNS``) is not
+    touched by an update that sets none of them; an insert or a delete always touches it.
+    """
+    columns = PROVIDER_FIELD_COLUMNS.get(field_name, {}).get(table)
+    if columns is None:
+        return True
+    return any(op["op"] != "update" or columns & op["set"].keys() for op in ops)
+
+
 def apply_resolved(cfg: ConfigDocument, ops: Sequence[Op], version: int | None = None) -> ConfigDocument:
     """The document after the resolved *ops*, applied in order.  Pure; no validation.
 
@@ -267,7 +280,12 @@ def apply_resolved(cfg: ConfigDocument, ops: Sequence[Op], version: int | None =
     tables = dict(cfg.tables)
     for t, t_ops in by_table.items():
         tables[t] = _apply_to_table(t, cfg.tables[t], t_ops)
-    touched = {f for t in by_table for f in _TABLE_FIELDS.get(t, ())}
+    touched = {
+        f
+        for t, t_ops in by_table.items()
+        for f in _TABLE_FIELDS.get(t, ())
+        if _op_touches_field(f, t, t_ops)
+    }
     return ConfigDocument(
         tables=MappingProxyType(tables),
         version=version,
@@ -447,6 +465,7 @@ def rows_from_standard_files(seed_dir: str) -> dict[str, list[dict[str, Any]]]:
     writes to the database, so a document from the files equals one from a freshly loaded
     database.
     """
+    from server.services.config_registry import LAYER_REGISTRY
     from server.services.standard_configuration import _coefficient_columns, _param_columns
 
     def load(filename: str) -> Any:
@@ -456,14 +475,11 @@ def rows_from_standard_files(seed_dir: str) -> dict[str, list[dict[str, Any]]]:
     rows: dict[str, list[dict[str, Any]]] = {}
     enums = load("enums.json")
     for name in ENUM_TABLE_MODELS:
+        # Every column of the table: the file gives the four every enum table has and the
+        # table's own (``role``, ``behaviour``, ``serialised`` ...); one it leaves out is NULL.
+        columns = LAYER_REGISTRY[name].columns
         rows[name] = [
-            {
-                "name": r["name"],
-                "display_label": r["display_label"],
-                "sort_order": r["sort_order"],
-                "description": r.get("description", ""),
-            }
-            for r in enums.get(name, [])
+            {c: ({"description": ""} | r).get(c) for c in columns} for r in enums.get(name, [])
         ]
     rows["slipnet_node_defs"] = [
         {
@@ -507,8 +523,9 @@ def rows_from_standard_files(seed_dir: str) -> dict[str, list[dict[str, Any]]]:
         }
         for pos, c in enumerate(load("codelet_types.json"))
     ]
+    refers_to = load("engine_param_refs.json")
     rows["engine_params"] = [
-        {"name": k, "sort_order": pos, **_param_columns(v)}
+        {"name": k, "sort_order": pos, **_param_columns(v), "refers_to": refers_to.get(k)}
         for pos, (k, v) in enumerate(load("engine_params.json").items())
     ]
     rows["urgency_levels"] = [
@@ -584,6 +601,7 @@ def rows_from_standard_files(seed_dir: str) -> dict[str, list[dict[str, Any]]]:
             "node_name": r.get("node_name"),
             "abstractness": r.get("abstractness"),
             "description": r.get("description", ""),
+            "role": r.get("role"),
         }
         for r in load("theme_relations.json")
     ]

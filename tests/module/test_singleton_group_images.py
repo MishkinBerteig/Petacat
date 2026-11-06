@@ -27,15 +27,10 @@ from server.engine.descriptions import Description
 from server.engine.groups import Group
 from server.engine.images import ImageFailure
 from server.engine.metadata import MetadataProvider
-from server.engine.rules import (
-    CLAUSE_INTRINSIC,
-    Rule,
-    RuleChange,
-    RuleClause,
-    _generate_image_letters,
-    apply_rule,
-)
+from server.engine.rules import Rule, RuleChange, RuleClause, _generate_image_letters, apply_rule
+from tests.support.standard_names import CLAUSE_INTRINSIC
 from server.engine.runner import EngineRunner
+from tests.support import standard_names
 
 # Every test here reaches the numeric seam through ``init_mcat``'s first
 # ``update-workspace-values``, so each runs once per backend. See tests/conftest.py.
@@ -66,7 +61,7 @@ def _same_group(ctx, string, letters, *, length_node=None):
         objects=list(letters),
         bonds=[],
     )
-    group.proposal_level = group.BUILT
+    group.proposal_level = standard_names.BUILT
     group.add_description(
         Description(group, node["plato-object-category"], node["plato-group"])
     )

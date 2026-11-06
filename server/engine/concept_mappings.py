@@ -325,7 +325,7 @@ class ConceptMapping:
         predicate the whole/single clause belongs to is
         :attr:`identity_or_opposite_mapping`.
         """
-        return _relation_of(self.label) == "opposite"
+        return _relation_of(self.label) == constants().vocab.theme_relation_opposite
 
     @property
     def identity_or_opposite_mapping(self) -> bool:
@@ -335,7 +335,8 @@ class ConceptMapping:
         the mappings that relate two descriptors by a *named* correspondence
         rather than by mere linkage.
         """
-        if _relation_of(self.label) in ("identity", "opposite"):
+        vocab = constants().vocab
+        if _relation_of(self.label) in (vocab.theme_relation_identity, vocab.theme_relation_opposite):
             return True
         d1, d2 = self.descriptor1, self.descriptor2
         return (holds_role(d1, "position.whole") and holds_role(d2, "position.single")) or (
@@ -478,8 +479,8 @@ class SlippageLog:
     slippages the translation really used (``trace.ss:497``, ``trace.ss:1235``).
     """
 
-    def __init__(self, rule_type: str = "top") -> None:
-        self.rule_type = rule_type
+    def __init__(self, rule_type: str | None = None) -> None:
+        self.rule_type = constants().vocab.rule_type_top if rule_type is None else rule_type
         #: ``directly-applied-slippages``: newest first.
         self.directly_applied_slippages: list[ConceptMapping] = []
         #: ``coattail-slippage-table``: ``(coattail-slippage, inducing-slippage)``, newest first.
@@ -512,7 +513,13 @@ class SlippageLog:
         from server.engine.trace_display import concept_mapping_print_name
 
         text = "\nTranslation direction: "
-        text += "top-to-bottom\n" if self.rule_type == "top" else "bottom-to-top\n"
+        vocab = constants().vocab
+        # The rule types' names, so the wording follows a rename (``rule_type.top`` to
+        # ``rule_type.bottom`` is the direction of a top rule's translation).
+        if self.rule_type == vocab.rule_type_top:
+            text += f"{vocab.rule_type_top}-to-{vocab.rule_type_bottom}\n"
+        else:
+            text += f"{vocab.rule_type_bottom}-to-{vocab.rule_type_top}\n"
         text += "Directly-applied slippages:\n"
         if not self.directly_applied_slippages:
             text += "  None\n"

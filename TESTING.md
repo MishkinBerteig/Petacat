@@ -145,14 +145,14 @@ outside the matrix take it too and the run is entirely what it says it is.
   gpu  mlx      float32    1005 tests
   whole suite requested: the full matrix is required of this run
 
-  unit          1809 collected   1809 run   1809 passed      0 failed      0 skipped  complete
+  unit          1936 collected   1936 run   1936 passed      0 failed      0 skipped  complete
   seed_unit     1465 collected   1465 run   1465 passed      0 failed      0 skipped  complete
   module        1049 collected   1049 run   1049 passed      0 failed      0 skipped  complete
-  architecture    92 collected     92 run     92 passed      0 failed      0 skipped  complete
-  integration    358 collected    358 run    358 passed      0 failed      0 skipped  complete
+  architecture    97 collected     97 run     97 passed      0 failed      0 skipped  complete
+  integration    366 collected    366 run    366 passed      0 failed      0 skipped  complete
   parallel       304 collected    304 run    304 passed      0 failed      0 skipped  complete
   lockstep       247 collected    247 run    247 passed      0 failed      0 skipped  complete
-  e2e            630 collected    630 run    630 passed      0 failed      0 skipped  complete
+  e2e            643 collected    643 run    643 passed      0 failed      0 skipped  complete
 
   run complete in 13.9 min against a 60 min ceiling
 ```
@@ -224,14 +224,14 @@ that allowance.
 
 | Layer | Directory | Scope | May depend on | Cases |
 |-------|-----------|-------|---------------|-------|
-| **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 1809 |
+| **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 1936 |
 | **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 1465 |
 | **module** | `tests/module/` | Several real components assembled and driven | Real engine objects and `seed_data/*.json`; no DB, no HTTP | 1049 |
-| **architecture** | `tests/architecture/` | How the source tree is allowed to depend on itself | The repository's source, `seed_data/*.json`, child interpreters | 92 |
-| **integration** | `tests/integration/` | Agreement between the repository's artifacts, and the harness's own rules | Real `seed_data/*.json`, the ORM declarations, the generated client files, the documentation, a real pytest session | 358 |
+| **architecture** | `tests/architecture/` | How the source tree is allowed to depend on itself | The repository's source, `seed_data/*.json`, child interpreters | 97 |
+| **integration** | `tests/integration/` | Agreement between the repository's artifacts, and the harness's own rules | Real `seed_data/*.json`, the ORM declarations, the generated client files, the documentation, a real pytest session | 366 |
 | **parallel** | `tests/parallel/` | The detachable multi-core plugin (`server/parallel/`): each executor against the serial run it claims to equal | Real engine objects and `seed_data/*.json`, worker processes and threads; each test pins the backend it compares on | 304 |
 | **lockstep** | `tests/lockstep/` | Petacat's decision traces against Metacat's: naming, helper conformance, tracing/replay RNGs, determinism guards, the comparer | Real engine in faithful mode (numeric backend off, or a named backend); recorded Metacat traces | 247 |
-| **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 630 |
+| **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 643 |
 
 Those counts are cases, so they include the second pass the numeric matrix makes
 over the 1005 backend-sensitive tests.
@@ -266,7 +266,7 @@ first**, then move up toward the API and GUI.
 
 All eight layers run in one command — the
 [required command](#the-required-command) — and, since Petacat runs natively, all
-eight actually run: **5,954 cases**, every one of them executed. A layer that is
+eight actually run: **6,107 cases**, every one of them executed. A layer that is
 normally skipped is not a layer that is normally green, and none of these is.
 
 Wall-clock time depends heavily on the machine and on what else it is doing. The
@@ -438,7 +438,7 @@ changing what it records.
 | `test_arithmetic_fidelity.py` | 10 | Metacat's exact roundings and orders: spreading, urgencies and bins, jootser, descriptor support, single-letter groups (DISCREPANCIES5 B-1…B-5, D-4, D-11) |
 | `test_rationals.py` | 13 | The rational value kind: `n/m` parsed exactly, refused unless it is two integers over a positive denominator, and stored in lowest terms; the configuration hash follows it. The Metacat Standard Configuration holds `enclosed_group_importance_factor`, `edge_object_bond_factor` and `interior_object_bond_factor` as `2/3`, `1/3` and `1/6`, on the declared read list; under them importance and intra-string unhappiness are the old arithmetic, and a non-standard rational changes them as it implies |
 | `test_config_document.py` | 26 | S0: the pure `ConfigDocument` (`server/services/config_document.py`): identity with the files' provider and the engine's `config_hash`, order, structure sharing between versions, errors, codecs (int, float and rational typing), replay against a naive reference model, the incremental hash against the whole hash, and `diff` followed by `apply_resolved` |
-| `test_config_registry.py` | 5 | C6: the configuration table registry (`server/services/config_registry.py`): natural keys, order columns, code and JSON columns, a NULL link label read as `''`, the frozen spec |
+| `test_config_registry.py` | 5 | C6: the configuration table registry (`server/services/config_registry.py`): natural keys, order columns, code and JSON columns, the 18 enum tables (the first 13 and the string kinds, rule scopes, failure kinds, clamp types and progress focuses), a NULL link label read as `''`, the frozen spec |
 | `test_journal_replay.py` | 5 | C6: pure journal replay, reconstruction from before-images and inverse ops; an update and its undo keep the row's place |
 | `test_session_episodic_memory_always.py` | 4 | S11: a Training Mode Session always has an Episodic Memory: no memory, status or `closed_at` columns and non-null episode columns; no shared or independent branch and no `close`; no route clears the memory; the create request forbids extra fields |
 | `test_no_training_entity_name.py` | 2 | S12: the grep guard: the old entity name is used nowhere outside Training Mode, Training episode and `training_memory_merges`, in code, UI strings and current docs; and the old modules, routes and component folder are gone |
@@ -451,9 +451,12 @@ changing what it records.
 | `test_change_resolve_convenience.py` | 36 | C14a: every convenience op equals its expansion into generic ops; cascades, rename, merge, relative ops without clamping, role and trigger ops, and a posting rule naming a tier of the urgency levels (rename rewrites it, removal is reported as a run-start gap and refused at the run, an unknown tier is an unknown reference) |
 | `test_change_resolve_property.py` | 6 | C14a: random op sequences keep the document well-formed (no dangling reference, no duplicate key, deterministic, replays); single ops equal one batch; memory-named nodes can be removed, renamed and merged from every source |
 | `test_change_resolve_patch_schema.py` | 9 | C14a: the JSON Patch subset, `schema()`, and the refusal type with its status map |
+| `test_change_resolve_vocabulary.py` | 25 | Stage 4: `rename_enum_value` over every enum table and `theme_relations` (every referencing column rewritten, the role and the place kept, the keyed commentary sections renamed, what still spells the old name listed as dangling, the refusals); the vocabulary rules (a role is a name of the table's vocabulary and held by one row, a bound row is not deleted); Episodic Memory's names (accepted, from every source); `engine_params.refers_to` (the lists derived from it, the trigger-node parameter found by the column) |
+| `test_configuration_admin_order.py` | 2 | Stage 4: the order a reset or restore writes its ops in: an enum row's inserts first, its deletes last, the role handed over last; other deletes still children before parents |
 | `test_configuration_writer.py` | 7 | C5: `ChangeService`'s envelope check, the `ChangeError` type and its HTTP mapping, and the translation of journal errors |
 | `test_bonds.py` | 22 | `Bond`: direction, facet, strength, flipping |
 | `test_bridge_types.py` | 2 | The bridge-type and orientation constants |
+| `test_vocabulary_payload.py` | 4 | The vocabulary payload the client compares through (`server/services/vocabulary_payload.py`): every binding and every link type's behaviour, a renamed binding, an unbound role absent, and a loaded runner's own provider against the store's current one |
 | `test_codelet_dsl.py` | 3 | Compiling a codelet body: what the interpreter accepts and refuses |
 | `test_clamp_commentary.py` | 12 | A clamp announces itself and its undoing in Metacat's words; remindings newest first with a whole-number strength; the "stumped" answer |
 | `test_commentary.py` | 29 | The `CommentaryLog`, and the emit helpers whose English is written in Python |
@@ -503,6 +506,8 @@ changing what it records.
 | `test_workspace_object.py` | 35 | `WorkspaceObject` and `Letter`: geometry, importance, unhappiness |
 | `test_workspace_string.py` | 25 | `WorkspaceString`: bond and group management, spanning, relevance |
 | `test_workspace_structure.py` | 10 | The base structure class and its proposal levels |
+| `test_vocabulary_reduced.py` | 3 | Stage 4: every vocabulary role that is not required, unbound in turn, still runs every demo problem; unbinding a required role gives `RunStartError` at the start |
+| `test_vocabulary_rename.py` | 6 | Stage 4 (the vocabulary comes from the database): every bound row of the enum tables, each link type and each theme relation renamed to an opaque name (`v_17`) changes nothing a run does: six cases, a justification run, a three-run episode, Self-watching off and three intervention schedules match the Standard Configuration in status, answer, codelet count, RNG draws, codelet types and English, with the trace's names mapped back; renaming urgency tiers (probes M11, M24) changes nothing either |
 
 **`tests/seed_unit/` — one class or function against the shipped values**
 
@@ -592,11 +597,12 @@ changing what it records.
 | File | Fns | Covers |
 |------|----:|--------|
 | `test_engine_purity.py` | 18 | Nothing under `server/engine/**` imports `sqlalchemy`, `server.models`, `server.db` or `server.services`, and the serializers run in an interpreter where those cannot be imported |
-| `test_declared_read_list.py` | 8 | EN10: every literal name passed to `get_param`, `get_formula_coeff` or `get_urgency` in `server/` is on the declared read list, and every declared name exists in the Metacat Standard Configuration; and the converse (stage W): every name stored in `engine_params`, `formula_coefficients` and `urgency_levels` is read, by an accessor, a codelet body, or (for a tier) a posting rule, a codelet pattern, a level-naming parameter or the clamp background, with no list of exceptions |
+| `test_declared_read_list.py` | 9 | EN10: every literal name passed to `get_param`, `get_formula_coeff` or `get_urgency` in `server/` is on the declared read list, and every declared name exists in the Metacat Standard Configuration; and the converse (stage W): every name stored in `engine_params`, `formula_coefficients` and `urgency_levels` is read, by an accessor, a codelet body, or (for a tier) a posting rule, a codelet pattern, a level-naming parameter or the clamp background, with no list of exceptions |
 | `test_journal_only_writer.py` | 10 | C6: only the journal layer writes a configuration or journal table (an AST check over the table list from model introspection), the checker on planted snippets, the two doors `write_immediate` and `write_deferred`, and nothing in `engine/` or `parallel/` imports the journal |
 | `test_no_node_literals_in_engine.py` | 5 | The EN0 lint: no line of `server/engine/**` names a node or codelet type of the Metacat Standard Configuration (`plato-` literals and compositions, `name[6:]`, node names, codelet types), and none reads the seed files outside the one door (`MetadataProvider.from_standard_configuration`); a read anywhere else, even in `metadata.py`, is caught. The allow-list `no_node_literals_allowlist.txt` is empty and may only shrink: an entry that no longer matches fails, and a new violation cannot be added to it |
 | `test_parallel_detachable.py` | 4 | Nothing under `server/engine/**` imports the parallel plugin, and a serial run and the service layer work in an interpreter where `server.parallel` cannot be imported; a Training Mode Session run there chooses the serial executor and produces the plugin's runs, run for run |
 | `test_v2_guards.py` | 8 | C10: the engine tree is the baseline commit's, touched after EN11 only by the allowed packages; the retired term for the Starting Conceptual State is used nowhere, and the word for a session's Episodic Memory class means nothing else (with the checker seen catching planted words); no table named for the old session entity and no `session_id` column on `runs`; the worker-side code never imports the journal layer |
+| `test_vocabulary_literals.py` | 4 | Stage 4: no string literal in `server/engine/` or `server/parallel/` equals a name the vocabulary binds (outside a short allow-list, each entry with its reason); the Standard Configuration's codelet bodies, descriptor predicates and posting formulas write `role('...')`; every role is bound once to the row Metacat names |
 
 **`tests/integration/` — the repository's artifacts agree**
 
@@ -607,7 +613,7 @@ changing what it records.
 | `test_no_ambient_run.py` | 3 | Only `unit`, `seed_unit` and `module` get an ambient run bound around their tests; `architecture`, `integration`, `parallel`, `lockstep` and `e2e` run with none, so a real path that forgot to open its run's scope raises `NoRunBound` there as in production |
 | `test_configuration_input.py` | 31 | The four input-check classes of the configuration input library (C0, `server/services/configuration_input.py`) as pure functions, with no database, engine or routes: unknown reference, key exists, malformed, does-not-compile, stale base version, and applying operations to a copy |
 | `test_configuration_source.py` | 15 | C2, start-up tests 1-6 of the plan's 3.6, through `server/services/configuration_startup.py` (what `lifespan` calls): the database is the source and not the files; an empty database first-loads with a `configuration_state` row; a loaded database is never re-seeded (edits and deletions survive a restart) even when a seed file changes; the start-up reference equals the seed files whatever the database holds; refusals (unreachable database, rows without a state row, a state that is not `ready`, a state row over empty tables, an older schema, an unparseable parameter, an unreadable seed file); two simultaneous start-ups load once; start-up never writes the seed files. Uses its own scratch database `petacat_c2` (`C2_DATABASE_URL` overrides) |
-| `test_db_seed_equivalence.py` | 16 | C0 gate G4: a database loaded from the Metacat Standard Configuration with no edits yields a provider equal, field by field (order and JSON number typing included), to `MetadataProvider.from_standard_configuration`. `RECORDED_STORAGE_LIMITS` lists what the database cannot carry and may only shrink; EN2 removed the last three (ordinals on the name-keyed tables, `value_type` on formula coefficients, `json` rather than `jsonb`), so it is empty and the providers and `config_hash` must be equal in full. A new table must be added to `_expected_tables`. Uses its own scratch database `petacat_c0` (`C0_HARNESS_DATABASE_URL` overrides), built by `equivalence_harness.py` |
+| `test_db_seed_equivalence.py` | 17 | C0 gate G4: a database loaded from the Metacat Standard Configuration with no edits yields a provider equal, field by field (order and JSON number typing included), to `MetadataProvider.from_standard_configuration`. `RECORDED_STORAGE_LIMITS` lists what the database cannot carry and may only shrink; EN2 removed the last three (ordinals on the name-keyed tables, `value_type` on formula coefficients, `json` rather than `jsonb`), so it is empty and the providers and `config_hash` must be equal in full. A new table must be added to `_expected_tables`. Uses its own scratch database `petacat_c0` (`C0_HARNESS_DATABASE_URL` overrides), built by `equivalence_harness.py` |
 | `test_config_document_db.py` | 4 | S0: the `ConfigDocument` from the database equals the one from the Metacat Standard Configuration files (tables, rows, order), its provider equals the database provider, its hash the engine's, and rows carry no surrogate id |
 | `test_config_document_runs.py` | 2 | S0: an unedited document runs exactly as the files' provider, and an evolved one (a coefficient edit by `apply_resolved`) exactly as the hand-evolved provider |
 | `test_journal_layer.py` | 20 | C6: the journal layer on its own scratch database (`C6_DATABASE_URL`): the first load as the `standard_load` entry, cascades, atomicity, the global configuration refusing Training Mode sources (M2), re-keying, replay equal to before-image reconstruction at every revision, `verify_journal`, restore, undo, provenance, both doors, append-only |
@@ -618,7 +624,7 @@ changing what it records.
 | `test_history_views.py` | 12 | C13: views of the journal: filters and order (table and key, including a re-key; time; across configurations), one entry in full, as-of by time; restore and undo of a batch and of a group as new entries equal to their target, with `verify_journal`; as-of, restore and undo on a session configuration; a name's story after delete, rename and merge; `check_names`; pending entries of a live source merged and labelled |
 | `test_db_seed_parallel_equivalence.py` | 2 | C0 gate G4: a swarm (real process pool) and a speculative run with `workers >= 2` equal the seed-file provider's runs on the database-loaded provider; slow, CPU float64 pinned by the tests themselves |
 | `test_db_seed_run_equivalence.py` | 2 | C0 gate G4: Metacat Mode runs per (problem, seed) on the database-loaded provider are identical to the seed-file provider's (answers, codelet count, draw count, final temperature, step/structure/trace hashes, final state); in the numeric matrix, with bit-identity down to the draw asserted on the float64 CPU half |
-| `test_enum_constants.py` | 16 | Engine string constants match `seed_data/enums.json` |
+| `test_enum_constants.py` | 12 | Engine string constants match `seed_data/enums.json` |
 | `test_tie_order.py` | 4 | Rows that tie on `sort_order` or `ordinal` come out in the same order from the database and from a `ConfigDocument` (total order: order columns, then the rest of the natural key; byte-order collation) |
 | `test_help_topics.py` | 13 | The help JSON, the generated TypeScript and the panels that reference them |
 | `test_metadata_seeding.py` | 13 | Every seed file is well-formed, and the `MetadataProvider` round-trip holds |
@@ -660,6 +666,7 @@ changing what it records.
 | `test_configurations_api.py` | 7 | C4: `/api/configurations/{id}/status`, `diff`, `reset-to-standard` (typed confirmation), `restore-selected`, `verify-journal`, their refusals, and the seed-export endpoint gone |
 | `test_configuration_entities_api.py` | 5 | C8: `GET /api/configurations`, `GET` and `PATCH /{id}`, rows and export, and status, diff, reset and verify on a session configuration |
 | `test_change_api_endpoints.py` | 19 | C14b: `POST /api/configurations/{id}/changes` (the report and journal entry, `dry_run`, `strict`, `rebase` and `head`, `expect`, `skip`, the G6 classes with status and op index, a bad envelope, the Metacat Mode refusal of Training Mode sources, an unknown configuration), `GET /{id}/schema`, the Admin editors' journal entries, `?configuration=`, and a Stopped session's configuration |
+| `test_enum_vocabulary.py` | 12 | Stage 4: the Admin enum editor over the engine's vocabulary: the roles per table and the table's own columns, an unbound row freely added and deleted, a role checked (`unknown_reference`, `role_taken`), a bound row refused (`422 role_bound`), the columns that name another table checked, a rename rewriting every referencing column (and reset-to-standard putting it back), the journal's story of a renamed theme type, the journal undoing a rename, and a session's configuration renamed through the change API |
 | `test_database_tab.py` | 24 | C7: the Database tab: table classes, paging and filters, a configuration edit as a journal entry, refusals per class (journal, session-managed, session Episodic Memory and its run columns, deleting a session row), `help_topics` writes, runtime expert mode and active rows, and the read-only SQL box |
 | `test_configuration_compare_api.py` | 6 | C9a: compare any two configurations or one with the Metacat Standard Configuration (diff by table and natural key), and apply-from (a dry-run preview, then add, remove and update rows through the change API as a `restore`), with their refusals |
 | `test_journal_api.py` | 6 | C13: `/api/journal` (list, filters, one entry, errors), as-of by revision and time, where-did-name-go and check-names, the restore and undo round trip, bad restore requests, and a session configuration's history with a live source |
@@ -677,7 +684,7 @@ changing what it records.
 | `test_api_docs.py` | 11 | The documentation endpoints |
 | `test_api_extended.py` | 59 | Extended runs, memory, docs and admin endpoints |
 | `test_api_review.py` | 26 | The review surfaces read back what the persistence modes wrote, and the episodic-run timeline places each Episodic Memory clear exactly between the runs, page by page, with its note |
-| `test_api_runs.py` | 25 | The runs API with persistence |
+| `test_api_runs.py` | 26 | The runs API with persistence |
 | `test_api_system.py` | 8 | The system endpoints: what is executing, not what was recorded |
 | `test_help_api.py` | 7 | The help topics API |
 | `test_help_regenerate_route.py` | 1 | `POST /api/admin/help/regenerate` syncs the help topic rows and commits them (`regenerate_all` patched) |
@@ -724,6 +731,7 @@ changing what it records.
 | `tests/unit/_fakes.py` | The shared hand-rolled doubles |
 | `tests/support/expected_range.py` | A sampling pool over the demo problems, pointable at a modified engine through a `run_one` callable |
 | `tests/support/standard_configuration.py` | The Metacat Standard Configuration as one cached `MetadataProvider` and its `ActivationParams`, and builders (`make_node`, `bare_slipnet`, `synthetic`) for the objects tests construct by hand, so no engine object carries a code default for a number the configuration holds |
+| `tests/support/standard_names.py` | The Metacat Standard Configuration's vocabulary names as plain strings (`BRIDGE_TOP = "top"`, `BOND_BUILT = "bond_built"`, `PROPOSED`/`EVALUATED`/`BUILT`, the failure kinds ...), for tests that build structures by hand against the Standard Configuration. The engine spells none of them (it reads the run's vocabulary); a test that runs under a renamed vocabulary reads the vocabulary instead |
 
 Almost every file in `tests/module/` is in the
 [numeric backend matrix](#the-numeric-backend-matrix), because driving the engine
@@ -821,7 +829,7 @@ nothing consults them now.
 
 `client/` carries a Vitest suite covering the store, the panels, the admin
 editors and the review surfaces. Run it with `cd client && npx vitest run`, and
-`npx tsc --noEmit` alongside it. **717 cases across 50 files**, all passing, in
+`npx tsc --noEmit` alongside it. **744 cases across 52 files**, all passing, in
 3.1 s on an Apple M-series machine.
 
 | File (`client/src/`) | Cases | Covers |
@@ -829,7 +837,8 @@ editors and the review surfaces. Run it with `cd client && npx vitest run`, and
 | `api/errors.test.ts` | 5 | One failure, one sentence a reader can act on |
 | `api/ws.test.ts` | 4 | The URL the client opens is the route the server serves |
 | `store/displayStore.test.ts` | 7 | Panel visibility (an entry for every panel including the EEG, Verbose hidden by default, toggling, show or hide all, remembered in localStorage, and surviving storage that throws) and the graphics switches that stop and resume the Slipnet and Coderack polls independently |
-| `store/runStore.test.ts` | 44 | The spreading threshold outliving a page reload, and the store's run lifecycle |
+| `store/runStore.test.ts` | 45 | The spreading threshold outliving a page reload, the run's vocabulary adopted with the run, and the store's run lifecycle |
+| `store/vocabulary.test.ts` | 6 | The run's bound vocabulary: `v(role)` follows a renamed binding, an unbound role is a name nothing equals (no crash), link types compare by behaviour, and a response without a vocabulary leaves the current one |
 | `hooks/useWorkspaceClick.test.ts` | 3 | Clicking the Workspace steps when idle, stops a running run and resumes it on the next click, and ignores other buttons and a missing run |
 | `App.test.tsx` | 4 | App's routing: `#/config?configuration=<id>` opens the configuration editors on that configuration (on load and on a hashchange), `#/config/slipnet/<node>` and `#/admin` still route, and the Configurations view's header and menu entry are neutral between the modes |
 | `components/AdminPanel.test.tsx` | 6 | The Admin panel's operations report what became of them, and it says it edits the global configuration Metacat Mode uses |
@@ -851,15 +860,16 @@ editors and the review surfaces. Run it with `cd client && npx vitest run`, and
 | `components/RunParametersPanel.test.tsx` | 14 | The twenty-six run parameters, settable before a run |
 | `components/SearchPalette.test.tsx` | 7 | Cmd+K search reaches every kind of help topic |
 | `components/SelfWatchingWarning.test.tsx` | 4 | The red warning shown whenever self-watching is off: absent while it is on, and separate warnings for the next run and the loaded run, following a catalogue default of off |
-| `components/SlipnetGraphView.test.tsx` | 10 | The Slipnet graph says what it could not do |
-| `components/SlipnetView.test.tsx` | 8 | The node-focus Edit button's visibility |
+| `components/SlipnetGraphView.test.tsx` | 13 | The Slipnet graph says what it could not do; links are drawn and filtered by behaviour, so a renamed slip link type still draws as a slip link |
+| `components/SlipnetView.test.tsx` | 11 | The node-focus Edit button's visibility; a connection is coloured by its link type's behaviour |
 | `components/SubstrateBadge.test.tsx` | 5 | The header says which processor the arithmetic runs on |
 | `components/SwarmPanel.test.tsx` | 6 | The Swarm group: it sends the form's problem with the chosen seeds, shows the distribution and telemetry returned, uses justification mode when there is an answer, disables itself with a reason when the plugin is detached or the seed count is over the limit or there is no problem, and shows a server error without losing the form |
 | `components/TemperatureGauge.test.tsx` | 8 | The gauge reports the engine's temperature clamp |
-| `components/ThemespaceView.test.tsx` | 14 | The Themespace grid is clampable, as MetaCat's theme windows are; its theme-edit mode |
+| `components/ThemespaceView.test.tsx` | 17 | The Themespace grid is clampable, as MetaCat's theme windows are; its theme-edit mode; column headings follow the bound theme-type names |
+| `components/TraceView.test.tsx` | 5 | The Trace's icons, labels and filter follow the event-type names the run binds; an unbound or renamed name falls back to the plain form |
 | `components/VerbosePanel.test.tsx` | 11 | The Verbose panel and the store's narration: polled from where the last reply ended, bounded on both sides, the Step button sent as step mode, the mode remembered with no run loaded |
 | `components/WindowsMenu.test.tsx` | 3 | The Windows menu lists Hide/Show for each panel including EEG, hides and shows all windows, and carries the Slipnet and Coderack graphics switches |
-| `components/WorkspaceView.test.tsx` | 12 | Workspace labels do not print on top of each other |
+| `components/WorkspaceView.test.tsx` | 17 | Workspace labels do not print on top of each other; bridge types and string kinds are the run's bound names |
 | `components/admin/AdminEditors.test.tsx` | 43 | Every Configuration tab edits the collection it shows; opening a cell selects its value |
 | `components/admin/AdminHttpFailures.test.tsx` | 10 | The Configuration screen reports what the server refused |
 | `components/admin/ConfigurationManager.test.tsx` | 44 | The configuration manager: the chip's exact wording on every tab for global, Stopped, live and changing-state configurations, the list's badges, columns, filter and sort, Open, Freeze and Unfreeze, History, New session from this configuration (and the form's `configuration_base`), Compare and Apply from, and the deep link `#/admin?configuration=<id>` |
@@ -867,12 +877,14 @@ editors and the review surfaces. Run it with `cd client && npx vitest run`, and
 | `components/admin/database/DatabasePanel.test.tsx` | 17 | The Database tab: class badges and banners, no edit control on read-only classes, the change batch built from the row editor, expert mode and its typed confirmation, refusals named by code, the SQL box |
 | `components/admin/EditorSaveRefresh.test.tsx` | 1 | A successful Engine Params save refreshes the difference banner and the header chip without a tab change |
 | `components/admin/EditAll.test.tsx` | 17 | Edit all: the scope picker (This, Chosen, All), the preview request, each per-target result, Overwrite, Apply the rest, Preview again, all-or-nothing and the reason, cancel, and Undo this group |
+| `components/admin/EnumEditor.test.tsx` | 5 | The enum editor: the role column as a pick from the engine's list for the table with its note, no note for a table the engine names nothing of, a picked role saved and unbound, a refused delete of a bound row named, a rename as one request |
+| `components/admin/ParamsEditorRefersTo.test.tsx` | 1 | The Engine Params tab shows what a parameter refers to and saves a picked value |
 | `components/admin/history/HistoryPanel.test.tsx` | 9 | History: entries with source, actor, channel, note, version and counts, a live session's pending entries marked "not yet saved" and not undoable, entry detail, undo of a batch or group as a new entry, filters, and a refusal explained |
 | `components/admin/history/mounting.test.tsx` | 2 | The names panel is mounted on a Training Mode Session's Memory tab (checked against that session's configuration) and on Metacat Mode's Episodic Memory view (checked against the global configuration) |
 | `components/admin/history/NamesPanel.test.tsx` | 4 | Names that no longer resolve: the names of an Episodic Memory's theme patterns, each missing name with its story from the journal, finding a session's configuration, and showing nothing when all resolve |
 | `components/admin/history/NodeHistory.test.tsx` | 5 | A node's History and restoring a deleted node with its dependents as a new entry, undoing the batch that removed it, and the deletion preview listing what cascades, dangles or is affected |
 | `components/review/EpisodicRunTimeline.test.tsx` | 3 | A note being typed on an Episodic Memory clear survives a late refresh, and an untouched note follows the server |
-| `components/review/ReviewPanel.test.tsx` | 34 | The review surfaces read the record back, and the episodic-run timeline shows each Episodic Memory clear between the runs with an editable note |
+| `components/review/ReviewPanel.test.tsx` | 35 | The review surfaces read the record back, and the episodic-run timeline shows each Episodic Memory clear between the runs with an editable note |
 | `components/session/ConfigurationTab.test.tsx` | 12 | A Training Mode Session's Configuration tab: the version slider and the Live (in memory) or Stored (as of last stop) label, the Slipnet graph redrawn per version, the timeline and its source filter, Compare versions, Table rows, the link to the configuration manager, and no edit controls |
 | `components/session/problemText.test.ts` | 52 | Parsing pasted or uploaded problems (any Unicode text, kept exactly and case-sensitive; double-quoted fields with JSON escapes in every line form; JSON entries with their own seeds, answer and tag) and the preview the Training Mode Session view shows before adding them |
 | `components/session/SessionPanel.test.tsx` | 71 | The Training Mode Session view: the list and the selected Training Mode Session, creating one, adding problems, the error-policy fields, the problems table searched and sorted through the server, the Memory and Configuration tabs, the controls (start, pause, resume, stop, cancel, export), and Delete behind the session's name typed exactly; a session name of any length is sent whole on create and rename |

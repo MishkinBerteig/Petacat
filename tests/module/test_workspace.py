@@ -88,7 +88,8 @@ def test_update_object_values(slipnet):
 
 def _bridge_everything(w):
     """Give every object of the top and vertical pairs a full-strength bridge."""
-    from server.engine.bridges import BRIDGE_TOP, BRIDGE_VERTICAL, Bridge
+    from server.engine.bridges import Bridge
+    from tests.support.standard_names import BRIDGE_TOP, BRIDGE_VERTICAL
 
     for i in range(3):
         for other, kind in (
@@ -215,7 +216,8 @@ def test_target_object_salience_responds_to_a_bottom_bridge_when_justifying(slip
     """With the flag unset, a target object's horizontal unhappiness stayed frozen
     at its initial 100 for the whole of every justify run, whatever the bottom
     mapping did — and its average salience used the two-term non-justify formula."""
-    from server.engine.bridges import BRIDGE_BOTTOM, Bridge
+    from server.engine.bridges import Bridge
+    from tests.support.standard_names import BRIDGE_BOTTOM
 
     w = Workspace("abc", "abd", "xyz", "wyz", slipnet)
     w.update_all_object_values()
@@ -247,7 +249,8 @@ def test_rule_factor_wants_a_rule_both_possible_and_supported(slipnet):
     """Scheme: ``formulas.ss:65-75``.  A supported rule alone is not enough — a
     verbatim rule is vacuously supported, and would otherwise take 30 points off
     the temperature the moment it was built."""
-    from server.engine.rules import RULE_TOP, Rule
+    from server.engine.rules import Rule
+    from tests.support.standard_names import RULE_TOP
 
     w = Workspace("abc", "abd", "xyz", None, slipnet)
     rule = Rule(RULE_TOP, [])
@@ -261,7 +264,8 @@ def test_rule_factor_wants_a_rule_both_possible_and_supported(slipnet):
 
 
 def test_justify_mode_rule_factor_needs_both_pairs(slipnet):
-    from server.engine.rules import RULE_BOTTOM, RULE_TOP, Rule
+    from server.engine.rules import Rule
+    from tests.support.standard_names import RULE_BOTTOM, RULE_TOP
 
     w = Workspace("abc", "abd", "xyz", "wyz", slipnet)
     w.add_rule(Rule(RULE_TOP, []))

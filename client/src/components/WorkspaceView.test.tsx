@@ -15,7 +15,9 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 
-import { WorkspaceView } from './WorkspaceView'
+import { WorkspaceDiagram, WorkspaceView } from './WorkspaceView'
+import { useVocabularyStore } from '@/store/vocabulary'
+import { renamed } from '@/test/standardVocabulary'
 import { useRunStore } from '@/store/runStore'
 import abcWyz from './__fixtures__/abc_wyz.json'
 import eeqee from './__fixtures__/eeqee.json'
@@ -194,5 +196,64 @@ describe('WorkspaceView — rules (rule-graphics.ss)', () => {
     useRunStore.setState({ workspace: { ...abcWyz, top_rules: [], bottom_rules: [] } as any })
     render(<WorkspaceView />)
     expect(screen.queryByTestId('rule-box')).toBeNull()
+  })
+})
+
+describe('WorkspaceView — the run\'s own vocabulary', () => {
+  const picture = (bridgeKey: string): any => ({
+    version: 1, kind: 'event', header: 'x', codelet_count: 1, temperature: 50, faded: true,
+    workspace: abcWyz, question_mark: false,
+    slipnet: { title: '', entries: [] }, coderack: { title: '', entries: [] }, themes: [],
+    highlights: {
+      groups: [], objects: [], concept_mappings: [],
+      bridges: [{ key: bridgeKey, role: 'snag' }],
+    },
+  })
+  const SNAG = '#ef5350'
+  const strokes = (c: Element) =>
+    Array.from(c.querySelectorAll('path')).map((p) => p.getAttribute('stroke'))
+
+  it('finds a highlighted bridge by the bound bridge-type name', () => {
+    useVocabularyStore.getState().adopt(renamed({ 'bridge_type.top': 'x17' }))
+    const { container } = render(
+      <WorkspaceDiagram workspace={abcWyz as any} picture={picture('x17:0-0:0-0')} />,
+    )
+    expect(strokes(container)).toContain(SNAG)
+  })
+
+  it('does not find it by the old name once the row is renamed', () => {
+    useVocabularyStore.getState().adopt(renamed({ 'bridge_type.top': 'x17' }))
+    const { container } = render(
+      <WorkspaceDiagram workspace={abcWyz as any} picture={picture('top:0-0:0-0')} />,
+    )
+    expect(strokes(container)).not.toContain(SNAG)
+  })
+
+  it('labels the bridge legend and the strings with the bound names', () => {
+    useVocabularyStore.getState().adopt(
+      renamed({ 'bridge_type.top': 'x17', 'string_kind.initial': 'first' }),
+    )
+    const { container } = render(<WorkspaceDiagram workspace={abcWyz as any} />)
+    const texts = Array.from(container.querySelectorAll('text')).map(ownText)
+    expect(texts).toContain('x17')
+    expect(texts).toContain('first')
+    expect(texts).not.toContain('top')
+    expect(texts).not.toContain('initial')
+  })
+
+  it('draws a highlighted group of the bound string kind', () => {
+    useVocabularyStore.getState().adopt(renamed({ 'string_kind.initial': 'first' }))
+    const pic = picture('none')
+    pic.highlights.groups = [{ string: 'first', left: 0, right: 1, role: 'snag' }]
+    const g = { ...(abcWyz as any), groups: { abc: [{ left_pos: 0, right_pos: 1, strength: 80, category: 'successor', depth: 0 }] } }
+    const { container } = render(<WorkspaceDiagram workspace={g} picture={pic} />)
+    const rects = Array.from(container.querySelectorAll('rect')).map((r) => r.getAttribute('stroke'))
+    expect(rects).toContain(SNAG)
+  })
+
+  it('draws nothing wrong and does not crash with no vocabulary at all', () => {
+    useVocabularyStore.getState().clear()
+    const { container } = render(<WorkspaceDiagram workspace={abcWyz as any} />)
+    expect(container.querySelector('svg')).toBeTruthy()
   })
 })

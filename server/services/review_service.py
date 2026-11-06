@@ -681,11 +681,12 @@ class ReviewService:
         # The inspector's runner binds its own run (its provider, constants and
         # Themespace) whenever it executes, so opening or stepping it cannot touch a live
         # run; nothing here swaps a process-wide binding.
+        kinds = use.provider.vocabulary
         runner.init_mcat(
-            problem["initial"],
-            problem["modified"],
-            problem["target"],
-            problem["answer"],
+            problem[kinds.string_kind_initial],
+            problem[kinds.string_kind_modified],
+            problem[kinds.string_kind_target],
+            problem[kinds.string_kind_answer],
             seed=state["rng"]["seed"],
             sink=sink,
         )

@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Callable, Mapping
 
+from server.engine import run_binding
 from server.engine.formulas import round_exact
 from server.engine.numeric.backend import exact_backend_for, select_backend
 from server.engine.roles import Roles, absent, resolve_roles
@@ -635,7 +636,7 @@ class SlipnetNode:
         - If none, return None.
 
         *relation* may be given as a node, as a node name, **or** as a theme relation
-        name (``"opposite"``): callers deep in the Workspace -- group and bond
+        name (``vocabulary.theme_relation_opposite``): callers deep in the Workspace -- group and bond
         flipping -- hold no Slipnet handle to reach the opposite relation's node with.
         A relation name is looked up in ``self.relations`` (the ``theme_relations``
         table), so no node name is spelled in the engine.  A relation the configuration
@@ -648,7 +649,7 @@ class SlipnetNode:
         else:
             relation_name = getattr(relation, "name", "")
         # Identity relation -> return self
-        identity = self.relations.get("identity")
+        identity = self.relations.get(run_binding.vocab().theme_relation_identity)
         if identity is not None and relation_name == identity.name:
             return self
 
@@ -836,7 +837,7 @@ def opposite_node(node: Any) -> Any:
     ``theme_relations`` row, or its node removed): nothing is the opposite of anything,
     every concept is its own reflection, and a flipped bond or group equals the original.
     This is the defined behaviour (ABSENCE-BEHAVIOUR.md 2.3), not a silent fallback; a
-    caller that must tell the two cases apart asks ``slipnet.relation("opposite")``.
+    caller that must tell the two cases apart asks ``slipnet.relation(vocabulary.theme_relation_opposite)``.
 
     Resolved through ``getattr`` because flipping is also exercised against
     stand-in descriptor objects that carry a name and nothing else; a stand-in
@@ -848,7 +849,7 @@ def opposite_node(node: Any) -> Any:
     get_related_node = getattr(node, "get_related_node", None)
     if get_related_node is None:
         return node
-    related = get_related_node("opposite")
+    related = get_related_node(run_binding.vocab().theme_relation_opposite)
     return related if related is not None else node
 
 
@@ -1052,7 +1053,10 @@ class Slipnet:
             if node_name in slipnet.nodes:
                 slipnet.nodes[node_name].intrinsic_link_length = length
 
-        # Create links
+        # Create links.  A link is attached by its type's behaviour (``meta.link_types``:
+        # ``category``, ``instance``, ``property``, ``lateral``, ``slip``), never by the type's
+        # name; a type with no behaviour (or none the engine knows) is attached to no list.
+        behaviour_of = {t.name: t.behaviour for t in meta.link_types}
         for link_spec in meta.slipnet_link_specs:
             from_node = slipnet.nodes.get(link_spec.from_node)
             to_node = slipnet.nodes.get(link_spec.to_node)
@@ -1071,16 +1075,17 @@ class Slipnet:
                 fixed_link_length=link_spec.link_length if link_spec.fixed_length else None,
             )
 
-            # Attach to appropriate list on from_node
-            if link_spec.link_type == "category":
+            # Attach to the list of the type's behaviour on from_node
+            behaviour = behaviour_of.get(link_spec.link_type)
+            if behaviour == "category":
                 from_node.category_links.append(link)
-            elif link_spec.link_type == "instance":
+            elif behaviour == "instance":
                 from_node.instance_links.append(link)
-            elif link_spec.link_type == "property":
+            elif behaviour == "property":
                 from_node.property_links.append(link)
-            elif link_spec.link_type == "lateral":
+            elif behaviour == "lateral":
                 from_node.lateral_links.append(link)
-            elif link_spec.link_type == "lateral_sliplink":
+            elif behaviour == "slip":
                 from_node.lateral_sliplinks.append(link)
 
             to_node.incoming_links.append(link)
@@ -1295,7 +1300,7 @@ class Slipnet:
         if from_node is to_node:
             # No identity relation in the configuration: no label (``None``), so the
             # mapping counts as a slippage (ABSENCE-BEHAVIOUR.md 2.3).
-            return self.relations.get("identity")
+            return self.relations.get(run_binding.vocab().theme_relation_identity)
 
         for link in to_node.incoming_links:
             if link.from_node is from_node:

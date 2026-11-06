@@ -159,16 +159,16 @@ def _serialize_group(group: Any) -> dict:
     }
 
 
-def _serialize_rule(rule: Any) -> dict:
-    """Serialize a rule, including its three quality measures (§3.3.5)."""
+def _serialize_rule(rule: Any, v: Any) -> dict:
+    """Serialize a rule, including its three quality measures (§3.3.5); *v* is the vocabulary."""
     return {
-        "type": "top" if rule.is_top_rule else "bottom",
+        "type": v.rule_type_top if rule.rule_type == v.rule_type_top else v.rule_type_bottom,
         "quality": round(rule.quality),
         "uniformity": round(rule.uniformity),
         "abstractness": round(rule.abstractness),
         "succinctness": round(rule.succinctness),
         "clause_count": len(rule.clauses),
-        "verbatim": rule.is_verbatim_rule,
+        "verbatim": len(rule.clauses) == 1 and rule.clauses[0].clause_type == v.clause_type_verbatim,
         "english": rule.english_transcription,
         "built": rule.is_built,
         "theme_pattern": rule.theme_pattern[1:] if rule.theme_pattern else [],
@@ -215,8 +215,8 @@ def serialize_workspace_state(ctx: EngineContext) -> dict:
         # above counts them: justify mode adds its translated rule (``justify.ss:110``)
         # without building it, and it is still one of the Workspace's rules, the one
         # the answer it justifies rests on.
-        "top_rules": [_serialize_rule(r) for r in ws.top_rules],
-        "bottom_rules": [_serialize_rule(r) for r in ws.bottom_rules],
+        "top_rules": [_serialize_rule(r, ctx.meta.vocabulary) for r in ws.top_rules],
+        "bottom_rules": [_serialize_rule(r, ctx.meta.vocabulary) for r in ws.bottom_rules],
     }
 
 

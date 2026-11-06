@@ -99,7 +99,7 @@ class Group(WorkspaceObject, WorkspaceStructure):
             if not dt or descriptor is None or not descriptor:
                 return
             desc = Description(self, dt, descriptor)
-            desc.proposal_level = Description.BUILT
+            desc.proposal_level = constants().vocab.proposal_level_built
             if bond_description:
                 self.bond_descriptions.insert(0, desc)
             else:
@@ -411,7 +411,9 @@ class Group(WorkspaceObject, WorkspaceStructure):
         """
         bridge = getattr(
             obj,
-            "horizontal_bridge" if bridge_orientation == "horizontal" else "vertical_bridge",
+            "horizontal_bridge"
+            if bridge_orientation == constants().vocab.bridge_orientation_horizontal
+            else "vertical_bridge",
             None,
         )
         if bridge is None:
@@ -571,7 +573,7 @@ def attach_length_description(group: Group) -> bool:
         return False
 
     description = Description(group, length_type, descriptor)
-    description.proposal_level = Description.BUILT
+    description.proposal_level = constants().vocab.proposal_level_built
     group.descriptions.insert(0, description)
     return True
 

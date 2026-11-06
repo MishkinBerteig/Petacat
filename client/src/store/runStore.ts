@@ -4,6 +4,7 @@
 
 import { useDisplayStore } from '@/store/displayStore';
 import { create } from 'zustand';
+import { useVocabularyStore } from './vocabulary';
 
 import type {
   PersistenceMode,
@@ -501,6 +502,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
     // Blank the panels as well as swapping the id. Without this the previous
     // problem's workspace, trace and commentary stay on screen until every
     // refresh lands — and stay forever if one of them fails.
+    useVocabularyStore.getState().adopt(info);
     set({
       themeEdit: null,
       runId: info.run_id,
@@ -542,6 +544,8 @@ export const useRunStore = create<RunStore>((set, get) => ({
   },
 
   adoptRun: (info: RunInfo): void => {
+    // The vocabulary is the run's own: published once, with the run (store/vocabulary.ts).
+    useVocabularyStore.getState().adopt(info);
     set({
       runId: info.run_id,
       // Carried over so the run controls know whether pressing Run would continue

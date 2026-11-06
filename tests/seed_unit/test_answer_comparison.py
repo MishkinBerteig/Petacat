@@ -71,6 +71,7 @@ def _answer(
         top_rule_abstractness=rule_abstractness,
         theme_abstractness=theme_abstractness,
         top_rule_signature=signature,
+        bottom_rule_signature=[],
     )
 
 

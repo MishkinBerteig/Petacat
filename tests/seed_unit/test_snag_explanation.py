@@ -39,6 +39,7 @@ from server.engine.snag_explanation import (
 from server.engine.workspace import WorkspaceString
 
 import os
+from tests.support import standard_names
 
 SEED_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
 
@@ -84,12 +85,12 @@ def _letter(string, i):
 
 
 def _swap(objects, dimension):
-    return ImageFailure("swap", objects=objects, kind=ImageFailure.SWAP, dimension=dimension)
+    return ImageFailure("swap", objects=objects, kind=standard_names.FAILURE_SWAP, dimension=dimension)
 
 
 def _change(obj, dimension, descriptor, *extra):
     return ImageFailure(
-        "change", objects=[obj], kind=ImageFailure.CHANGE,
+        "change", objects=[obj], kind=standard_names.FAILURE_CHANGE,
         transform=(dimension, descriptor, *extra),
     )
 
@@ -214,7 +215,7 @@ def test_conflict_names_both_changes(nodes, slipnet):
     s = _string(slipnet, "xyz")
     g = _Group(s, 0, 2)
     failure = ImageFailure(
-        "conflict", objects=[g, g], kind=ImageFailure.CONFLICT,
+        "conflict", objects=[g, g], kind=standard_names.FAILURE_CONFLICT,
         dimension=nodes["plato-group-category"], dimension2=nodes["plato-letter-category"],
     )
     assert explain_failure(failure, T) == (

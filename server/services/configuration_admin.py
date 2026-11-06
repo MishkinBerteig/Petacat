@@ -32,6 +32,8 @@ from server.models.configuration_state import ConfigurationState
 from server.models.journal import GLOBAL_CONFIGURATION_ID, KIND_GLOBAL, Configuration
 from server.services import config_document as cd
 from server.services import configurations, journal, journal_views
+from server.services.change_resolve.vocabulary import VOCABULARY_TABLES
+from server.services.metadata_service import ENUM_TABLE_MODELS
 
 SOURCE_RESET = "reset"
 SOURCE_RESTORE = "restore"
@@ -123,12 +125,33 @@ def _order(ops: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
     The journal layer deletes a row's ``ON DELETE CASCADE`` dependents itself, so a later
     delete of one of them would find nothing; deleting the later tables first avoids that.
+
+    An enum row is the exception, because other rows name it by foreign key and its ``role``
+    is unique within the table (a renamed enum row is an insert, the rows that name it moved,
+    a delete, and the role handed to the new row): an enum table's inserts and updates come
+    before every other table's ops and its deletes after them all, and a role it gives a row is
+    set last, once the row that held it has gone.
     """
     position = {t: i for i, t in enumerate(cd.TABLE_NAMES)}
-    deletes = [o for o in ops if o["op"] == "delete"]
+    enum = set(ENUM_TABLE_MODELS)
+    deletes = [o for o in ops if o["op"] == "delete" and o["table"] not in enum]
+    enum_deletes = [o for o in ops if o["op"] == "delete" and o["table"] in enum]
     rest = [o for o in ops if o["op"] != "delete"]
     deletes.sort(key=lambda o: -position[o["table"]])  # stable: keeps a table's own order
-    return deletes + rest
+    rest.sort(key=lambda o: o["table"] not in enum)  # stable: enum rows first
+    last: list[dict[str, Any]] = []
+    for i, o in enumerate(rest):
+        vocabulary = VOCABULARY_TABLES.get(o["table"])
+        if o["table"] not in enum or vocabulary is None or not vocabulary.unique:
+            continue
+        column = vocabulary.column
+        data = o["row"] if o["op"] == "insert" else o["set"]
+        if data.get(column) is None:
+            continue
+        key = o["key"] if o["op"] == "update" else {"name": o["row"]["name"]}
+        last.append({"op": "update", "table": o["table"], "key": key, "set": {column: data[column]}})
+        rest[i] = {**o, ("row" if o["op"] == "insert" else "set"): {**data, column: None}}
+    return deletes + rest + enum_deletes + last
 
 
 def _ops_for_rows(

@@ -38,6 +38,7 @@ from server.engine.groups import Group
 from server.engine.images import ImageFailure, make_string_image
 from server.engine.metadata import MetadataProvider
 from server.engine.runner import EngineRunner
+from tests.support import standard_names
 
 # ``init_mcat``'s first ``update-workspace-values`` crosses the numeric seam, so
 # each of these runs once per backend. See tests/conftest.py.
@@ -75,7 +76,7 @@ def _directed_group(ctx, category, direction):
         objects=letters,
         bonds=[],
     )
-    group.proposal_level = group.BUILT
+    group.proposal_level = standard_names.BUILT
     group.add_description(
         Description(group, node["plato-object-category"], node["plato-group"])
     )
@@ -242,7 +243,7 @@ def test_the_length_relation_is_read_in_direction_order_too(meta):
         objects=letters[1:3],
         bonds=[],
     )
-    inner.proposal_level = inner.BUILT
+    inner.proposal_level = standard_names.BUILT
     inner.add_description(
         Description(inner, node["plato-letter-category"], node["plato-b"])
     )
@@ -258,7 +259,7 @@ def test_the_length_relation_is_read_in_direction_order_too(meta):
         objects=[letters[0], inner],
         bonds=[],
     )
-    outer.proposal_level = outer.BUILT
+    outer.proposal_level = standard_names.BUILT
     string.add_group(outer)
     letters[0].enclosing_group = outer
     inner.enclosing_group = outer

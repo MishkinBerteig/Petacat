@@ -40,7 +40,6 @@ from server.engine.temperature import Temperature
 from server.engine.verbose import VerboseLog
 from server.engine.themes import Themespace
 from server.engine.trace import (
-    CONCEPT_ACTIVATION,
     TemporalTrace,
     TraceEvent,
     concept_activation_importance,
@@ -211,8 +210,8 @@ class EngineContext:
         #: application produced — ``"swap"``, ``"conflict"`` or ``"change"``
         #: (``answers.ss:1145-1150``).  ``make-snag-event`` records it as the snag
         #: type, which is what the snag's own explanation and the memory's
-        #: snag-equality test are written against.  Petacat hard-coded ``"change"``.
-        self.last_failure_kind: str = "change"
+        #: snag-equality test are written against.  Petacat hard-coded ``change``.
+        self.last_failure_kind: str = meta.vocabulary.failure_kind_change
         #: The whole ``<failure-result>`` (``answers.ss:1145-1150``) of that rule
         #: application as plain data -- ``("CHANGE", object, transform)`` and so on --
         #: which the snag's explanation (``trace.ss:1097``) is written from.
@@ -570,6 +569,7 @@ class EngineRunner:
         # The description program stays in code, over roles.  A role nothing holds is an
         # ``Absent`` token (falsy), so each guard below drops that description: what has no
         # node is not perceived.
+        built_level = self.meta.vocabulary.proposal_level_built
         roles = slipnet.roles
         letter_cat_node = roles.dimension_letter_category
         obj_cat_node = roles.dimension_object_category
@@ -605,7 +605,7 @@ class EngineRunner:
                 # so the order is part of what the run does rather than presentation.
                 if obj_cat_node and letter_obj_node:
                     desc = Description(letter, obj_cat_node, letter_obj_node)
-                    desc.proposal_level = desc.BUILT
+                    desc.proposal_level = built_level
                     letter.descriptions.insert(0, desc)
                     # ``run.ss:227-232`` activates *every* descriptor of every
                     # initial description, which includes ``plato-letter`` — the
@@ -618,7 +618,7 @@ class EngineRunner:
                 # Letter-category description (e.g., letter-category: a)
                 if letter_cat_node and letter.letter_category:
                     desc = Description(letter, letter_cat_node, letter.letter_category)
-                    desc.proposal_level = desc.BUILT
+                    desc.proposal_level = built_level
                     letter.descriptions.insert(0, desc)
                     # Activate the descriptor
                     letter.letter_category.activation = max_act
@@ -628,23 +628,23 @@ class EngineRunner:
                     # Single-letter string
                     if single_node:
                         desc = Description(letter, str_pos_node, single_node)
-                        desc.proposal_level = desc.BUILT
+                        desc.proposal_level = built_level
                         letter.descriptions.insert(0, desc)
                         single_node.activation = max_act
                 elif str_pos_node:
                     if letter.left_string_pos == 0 and leftmost_node:
                         desc = Description(letter, str_pos_node, leftmost_node)
-                        desc.proposal_level = desc.BUILT
+                        desc.proposal_level = built_level
                         letter.descriptions.insert(0, desc)
                         leftmost_node.activation = max_act
                     if letter.right_string_pos == len(letters) - 1 and rightmost_node:
                         desc = Description(letter, str_pos_node, rightmost_node)
-                        desc.proposal_level = desc.BUILT
+                        desc.proposal_level = built_level
                         letter.descriptions.insert(0, desc)
                         rightmost_node.activation = max_act
                     if len(letters) % 2 == 1 and letter.left_string_pos == len(letters) // 2 and middle_node:
                         desc = Description(letter, str_pos_node, middle_node)
-                        desc.proposal_level = desc.BUILT
+                        desc.proposal_level = built_level
                         letter.descriptions.insert(0, desc)
                         middle_node.activation = max_act
 
@@ -1232,7 +1232,7 @@ class EngineRunner:
             if concept_activation_importance(node, before, after) >= threshold:
                 ctx.trace.record_event(
                     TraceEvent(
-                        event_type=CONCEPT_ACTIVATION,
+                        event_type=ctx.meta.vocabulary.event_type_concept_activation,
                         codelet_count=ctx.codelet_count,
                         temperature=ctx.temperature.value,
                         description=f"the concept of {node.short_name} became active",
@@ -1275,7 +1275,9 @@ class EngineRunner:
     def bottom_up_posting_rules(self) -> list[PostingRuleSpec]:
         """The bottom-up rules themselves, in posting order."""
         return [
-            rule for rule in self.meta.posting_rules if rule.direction == "bottom_up"
+            rule
+            for rule in self.meta.posting_rules
+            if rule.direction == self.meta.vocabulary.posting_direction_bottom_up
         ]
 
     def posting_rule_for(self, codelet_type: str) -> PostingRuleSpec | None:
@@ -1351,7 +1353,8 @@ class EngineRunner:
 
         # Scheme iterates a list of thematic codelet types (``coderack.ss:629``): every
         # rule directed ``thematic``, in file order.  The shipped file has one.
-        thematic_rules = [r for r in self.meta.posting_rules if r.direction == "thematic"]
+        thematic = self.meta.vocabulary.posting_direction_thematic
+        thematic_rules = [r for r in self.meta.posting_rules if r.direction == thematic]
         if not thematic_rules:
             return
         eligible = False
@@ -1451,7 +1454,7 @@ class EngineRunner:
         """
         ctx = self.ctx
         if ctx is None:
-            return self.meta.get_urgency("low")
+            return self.meta.get_urgency(self.meta.get_param("default_urgency_level"))
         return evaluate_urgency(rule, PostingContext(ctx))
 
     def _post_top_down_codelets(self, batch: list[Codelet] | None = None) -> None:
@@ -1471,6 +1474,7 @@ class EngineRunner:
             deferred = False
 
         top_down_nodes = self.meta.get_param("top_down_slipnodes")
+        top_down = self.meta.vocabulary.posting_direction_top_down
 
         for node_name in top_down_nodes:
             node = ctx.slipnet.nodes.get(node_name)
@@ -1483,7 +1487,7 @@ class EngineRunner:
 
             # Determine which codelets to post for this node
             for rule in self.meta.posting_rules:
-                if rule.direction != "top_down":
+                if rule.direction != top_down:
                     continue
                 if rule.triggering_slipnodes and node_name not in rule.triggering_slipnodes:
                     continue

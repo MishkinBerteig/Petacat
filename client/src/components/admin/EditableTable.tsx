@@ -14,8 +14,14 @@ export interface ColumnDef {
    * JSON back, so a column like `valid_relations` or `template_data` is editable in
    * the same table as the scalar ones.
    */
-  type: 'text' | 'number' | 'readonly' | 'json';
+  type: 'text' | 'number' | 'readonly' | 'json' | 'select' | 'bool';
   width?: string;
+  /**
+   * A `select` column is a pick from this list (the engine's role list for the table, for the
+   * Admin enum editor), read-only to the editor's own list: the empty choice is "none" and
+   * stores `null`. A `bool` column is a pick between true and false.
+   */
+  options?: string[];
   /**
    * A `number` column whose value may be absent. An empty box submits `null` for a
    * nullable column and `0` for the rest, so a column that carries a real zero and a
@@ -59,6 +65,8 @@ function displayValue(col: ColumnDef, value: any): string {
  * genuinely takes. A JSON column reports its own parse error.
  */
 function parseValue(col: ColumnDef, raw: string): any {
+  if (col.type === 'select') return raw === '' ? null : raw;
+  if (col.type === 'bool') return raw === 'true';
   if (col.type === 'number') {
     return raw.trim() === '' ? (col.nullable ? null : 0) : Number(raw);
   }
@@ -157,11 +165,13 @@ export function EditableTable<T extends Record<string, any>>({
     setEditValue(displayValue(col, value));
   };
 
-  const saveEdit = useCallback(async () => {
+  const saveEdit = useCallback(async (picked?: string) => {
     if (!editingCell || !onUpdate) return;
     const col = columns.find(c => c.key === editingCell.key);
+    // A pick commits the value it was given: the state it just set has not been rendered yet.
+    const raw = typeof picked === 'string' ? picked : editValue;
     try {
-      const parsed = col ? parseValue(col, editValue) : editValue;
+      const parsed = col ? parseValue(col, raw) : raw;
       await onUpdate(editingCell.id, { [editingCell.key]: parsed } as Partial<T>);
       setFlash({ id: editingCell.id, type: 'success', message: 'Saved' });
       onRefresh?.();
@@ -178,7 +188,7 @@ export function EditableTable<T extends Record<string, any>>({
   const cancelEdit = () => setEditingCell(null);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') saveEdit();
+    if (e.key === 'Enter') void saveEdit();
     if (e.key === 'Escape') cancelEdit();
   };
 
@@ -275,6 +285,27 @@ export function EditableTable<T extends Record<string, any>>({
                     editingCell !== null && editingCell.id === id && editingCell.key === col.key;
                   const canEdit = col.type !== 'readonly' && onUpdate;
 
+                  if (isEditing && (col.type === 'select' || col.type === 'bool')) {
+                    const choices = col.type === 'bool' ? ['true', 'false'] : ['', ...(col.options ?? [])];
+                    return (
+                      <td key={col.key} style={{ padding: cellPad }}>
+                        <select
+                          autoFocus
+                          aria-label={col.label}
+                          value={editValue}
+                          onChange={e => { setEditValue(e.target.value); void saveEdit(e.target.value); }}
+                          onBlur={() => setEditingCell(null)}
+                          onKeyDown={e => { if (e.key === 'Escape') cancelEdit(); }}
+                          style={{ width: '100%', fontSize: 11, padding: '1px 4px' }}
+                        >
+                          {choices.map(c => (
+                            <option key={c} value={c}>{c === '' ? '(none)' : c}</option>
+                          ))}
+                        </select>
+                      </td>
+                    );
+                  }
+
                   if (isEditing) {
                     return (
                       <td key={col.key} style={{ padding: cellPad }}>
@@ -282,7 +313,7 @@ export function EditableTable<T extends Record<string, any>>({
                           ref={inputRef}
                           value={editValue}
                           onChange={e => setEditValue(e.target.value)}
-                          onBlur={saveEdit}
+                          onBlur={() => void saveEdit()}
                           onKeyDown={handleKeyDown}
                           type={col.type === 'number' ? 'number' : 'text'}
                           style={{ width: '100%', fontSize: 11, padding: '1px 4px' }}
@@ -335,7 +366,19 @@ export function EditableTable<T extends Record<string, any>>({
                 <td key={col.key} style={{ padding: cellPad }}>
                   {/* A readonly column is assigned by the server — an id from its own
                       sequence — so the new row leaves it blank. */}
-                  {col.type !== 'readonly' && (
+                  {(col.type === 'select' || col.type === 'bool') && (
+                    <select
+                      value={newRow[col.key] ?? ''}
+                      onChange={e => setNewRow(r => r ? { ...r, [col.key]: e.target.value } : r)}
+                      aria-label={col.label}
+                      style={{ width: '100%', fontSize: 11, padding: '1px 4px' }}
+                    >
+                      {(col.type === 'bool' ? ['false', 'true'] : ['', ...(col.options ?? [])]).map(c => (
+                        <option key={c} value={c}>{c === '' ? '(none)' : c}</option>
+                      ))}
+                    </select>
+                  )}
+                  {col.type !== 'readonly' && col.type !== 'select' && col.type !== 'bool' && (
                     <input
                       value={newRow[col.key] ?? ''}
                       onChange={e => setNewRow(r => r ? { ...r, [col.key]: e.target.value } : r)}

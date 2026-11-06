@@ -185,6 +185,12 @@ export interface RunInfo {
    */
   config_hash?: string | null;
   memory_hash?: string | null;
+  /**
+   * The run's bound vocabulary (role -> name) and each link type's behaviour, sent with
+   * a run when it is created or loaded (`store/vocabulary.ts`). Absent on a listing.
+   */
+  vocabulary?: Record<string, string> | null;
+  link_behaviours?: Record<string, string | null> | null;
 }
 
 /**
@@ -464,20 +470,20 @@ export interface TraceEvent {
  */
 export type PictureRole =
   | 'event'
-  | 'top'
-  | 'bottom'
-  | 'vertical'
-  | 'snag'
   | 'theme_cm'
   | 'vertical_slippage'
   | 'vertical_slippage_dim'
   | 'coattail_slippage'
   | 'coattail_slippage_dim'
-  | 'faded';
+  | 'faded'
+  // The top, bottom and vertical roles are the run's names for the three bridge types
+  // (`bridge_type.top` ...) and the snag role its name for the snag event type
+  // (`event_type.snag`): any string, compared through the run's vocabulary (`roleColor`).
+  | (string & {});
 
 /** A letter, group or (with `left === -1`) a whole string, in a picture's highlights. */
 export interface PictureObjectRef {
-  /** The string's role: `initial`, `modified`, `target` or `answer`. */
+  /** The string's kind: the name the run's vocabulary binds to `string_kind.initial`, `.modified`, `.target` or `.answer`. */
   string: string;
   left: number;
   right: number;
@@ -754,6 +760,9 @@ export interface RecordedRun {
   /** How much record the Run left. Zero and zero is a Fast Run, by design. */
   capture_count: number;
   action_count: number;
+  /** The run's bound vocabulary and link behaviours (`store/vocabulary.ts`). */
+  vocabulary?: Record<string, string> | null;
+  link_behaviours?: Record<string, string | null> | null;
 }
 
 export interface CaptureSummary {

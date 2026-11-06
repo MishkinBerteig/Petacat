@@ -28,14 +28,12 @@ import os
 import pytest
 
 from server.engine.metadata import MetadataProvider
-from server.engine.rules import (
+from server.engine.rules import Rule, RuleChange, RuleClause
+from tests.support.standard_names import (
     CLAUSE_EXTRINSIC,
     CLAUSE_INTRINSIC,
     CLAUSE_VERBATIM,
     RULE_TOP,
-    Rule,
-    RuleChange,
-    RuleClause,
 )
 from server.engine.slipnet import Slipnet
 

@@ -222,7 +222,7 @@
   ],
   "comparison_templates": {
     "problem": "\"{initial} -> {modified}, {target} -> ?\"",
-    "change": "the change from {initial} to {modified}",
+    "problem_change": "the change from {initial} to {modified}",
     "full_answer": "{answer} to the problem {problem}",
     "both_answers": "the answer {answer1} and the answer {answer2}",
     "answer_ordinal": "the {order} {answer}",

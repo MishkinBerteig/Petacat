@@ -11,14 +11,8 @@ import pytest
 
 from server.engine.metadata import MetadataProvider
 from server.engine.runner import EngineRunner
-from server.engine.trace import (
-    BOND_BUILT,
-    BOND_BROKEN,
-    SNAG,
-    ANSWER_FOUND,
-    TraceEvent,
-    TemporalTrace,
-)
+from server.engine.trace import TraceEvent, TemporalTrace
+from tests.support.standard_names import BOND_BUILT, BOND_BROKEN, SNAG, ANSWER_FOUND
 
 # Every test here executes arithmetic the numeric substrate owns, so each one runs
 # once per backend in the matrix. See tests/conftest.py.

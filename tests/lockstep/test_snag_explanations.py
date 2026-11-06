@@ -27,7 +27,7 @@ import os
 import pytest
 
 from server.engine.runner import EngineRunner
-from server.engine.trace import SNAG
+from tests.support.standard_names import SNAG
 from tests.lockstep.run_trace import replay_trace
 
 pytestmark = pytest.mark.lockstep

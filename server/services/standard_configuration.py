@@ -39,6 +39,7 @@ BULK_SEED_FILES = (
     "slipnet_layout.json",
     "codelet_types.json",
     "engine_params.json",
+    "engine_param_refs.json",
     "urgency_levels.json",
     "formula_coefficients.json",
     "theme_dimensions.json",
@@ -67,6 +68,11 @@ ENUM_MODELS: dict[str, str] = {
     "codelet_phases": "CodeletPhaseDef",
     "posting_directions": "PostingDirectionDef",
     "param_value_types": "ParamValueTypeDef",
+    "string_kinds": "StringKindDef",
+    "rule_scopes": "RuleScopeDef",
+    "failure_kinds": "FailureKindDef",
+    "clamp_types": "ClampTypeDef",
+    "progress_focuses": "ProgressFocusDef",
 }
 
 #: The help topics ship in one file, which the `en` suffix names.

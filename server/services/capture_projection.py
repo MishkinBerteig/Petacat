@@ -44,9 +44,14 @@ from __future__ import annotations
 
 from typing import Any
 
-#: The four Workspace strings, by the role that names them — the same roles
-#: ``state_graph`` references strings by.
-_STRING_ROLES = ("initial", "modified", "target", "answer")
+from server.engine.themes import dominant_index, theme_types_for_mode
+
+
+def _string_kinds(meta: Any) -> tuple[str, ...]:
+    """The four Workspace strings, by the string-kind names the run's vocabulary gives them (the
+    names ``state_graph`` references strings and keys the problem by)."""
+    v = meta.vocabulary
+    return (v.string_kind_initial, v.string_kind_modified, v.string_kind_target, v.string_kind_answer)
 
 
 class CaptureFormatError(ValueError):
@@ -171,7 +176,7 @@ def _project_bond(g: _Graph, meta: Any, fields: dict) -> dict:
         "category": _short_name(meta, g.node(fields.get("bond_category"))),
         "direction": _short_name(meta, g.node(fields.get("direction")), None),
         "strength": round(fields.get("strength", 0.0)),
-        "built": fields.get("proposal_level") == "built",
+        "built": fields.get("proposal_level") == meta.vocabulary.proposal_level_built,
     }
 
 
@@ -182,7 +187,7 @@ def _project_group(g: _Graph, meta: Any, fields: dict) -> dict:
         "category": _short_name(meta, g.node(fields.get("group_category"))),
         "direction": _short_name(meta, g.node(fields.get("direction")), None),
         "strength": round(fields.get("strength", 0.0)),
-        "built": fields.get("proposal_level") == "built",
+        "built": fields.get("proposal_level") == meta.vocabulary.proposal_level_built,
         "depth": _nesting_level(g, fields),
         # ``Group.length`` is ``len(self.objects)`` — a property, so it is not a
         # captured field, but the list it counts is.
@@ -219,15 +224,16 @@ def _project_bridge(g: _Graph, meta: Any, fields: dict) -> dict:
         "obj2_pos": left2,
         "obj2_right_pos": right2,
         "strength": round(fields.get("strength", 0.0)),
-        "built": fields.get("proposal_level") == "built",
+        "built": fields.get("proposal_level") == meta.vocabulary.proposal_level_built,
         "concept_mappings": mappings,
     }
 
 
-def _project_rule(g: _Graph, fields: dict) -> dict:
+def _project_rule(g: _Graph, meta: Any, fields: dict) -> dict:
     theme_pattern = g.items(fields.get("theme_pattern"))
+    v = meta.vocabulary
     return {
-        "type": fields.get("rule_type", "top"),
+        "type": fields.get("rule_type", v.rule_type_top),
         "quality": round(fields.get("quality", 0.0)),
         "uniformity": round(fields.get("uniformity", 0.0)),
         "abstractness": round(fields.get("abstractness", 0.0)),
@@ -235,13 +241,13 @@ def _project_rule(g: _Graph, fields: dict) -> dict:
         "clause_count": len(g.items(fields.get("clauses"))),
         # ``Rule.is_verbatim_rule`` is "any clause is of the verbatim type".
         "verbatim": any(
-            (g.record(c) or {}).get("clause_type") == "verbatim"
+            (g.record(c) or {}).get("clause_type") == v.clause_type_verbatim
             for c in g.items(fields.get("clauses"))
         ),
         # Transcription is cached on the Rule as it is built, so the English the run
         # actually produced is in the record rather than being re-derived here.
         "english": fields.get("english_transcription") or "",
-        "built": fields.get("proposal_level") == "built",
+        "built": fields.get("proposal_level") == v.proposal_level_built,
         # The head of a rule's theme pattern is its bridge type; the display wants the
         # dimensions only, matching ``_serialize_rule``'s ``theme_pattern[1:]``.
         "theme_pattern": [_plain(item) for item in theme_pattern[1:]],
@@ -265,6 +271,8 @@ def project_workspace(state: dict, meta: Any) -> dict:
     g = _Graph(state)
     ws = state["workspace"]
     strings = ws["strings"]
+    v = meta.vocabulary
+    string_kinds = _string_kinds(meta)
 
     # Keyed by string *text*, as the live serializer keys them: the display looks
     # bonds up by the text it is drawing.  Two strings with the same text collapse
@@ -273,18 +281,18 @@ def project_workspace(state: dict, meta: Any) -> dict:
         out = []
         for ref in strings[role][key]:
             fields = g.record(ref)
-            if fields is not None and fields.get("proposal_level") == "built":
+            if fields is not None and fields.get("proposal_level") == v.proposal_level_built:
                 out.append(project(fields))
         return out
 
     bonds = {
         strings[role]["text"]: built_only(role, "bonds", lambda f: _project_bond(g, meta, f))
-        for role in _STRING_ROLES
+        for role in string_kinds
         if role in strings
     }
     groups = {
         strings[role]["text"]: built_only(role, "groups", lambda f: _project_group(g, meta, f))
-        for role in _STRING_ROLES
+        for role in string_kinds
         if role in strings
     }
 
@@ -292,7 +300,7 @@ def project_workspace(state: dict, meta: Any) -> dict:
         out = []
         for ref in ws[key]:
             fields = g.record(ref)
-            if fields is not None and fields.get("proposal_level") == "built":
+            if fields is not None and fields.get("proposal_level") == v.proposal_level_built:
                 out.append(_project_bridge(g, meta, fields))
         return out
 
@@ -303,15 +311,15 @@ def project_workspace(state: dict, meta: Any) -> dict:
         for ref in ws[key]:
             fields = g.record(ref)
             if fields is not None:
-                out.append(_project_rule(g, fields))
+                out.append(_project_rule(g, meta, fields))
         return out
 
     problem = state["problem"]
     return {
-        "initial": problem["initial"],
-        "modified": problem["modified"],
-        "target": problem["target"],
-        "answer": problem["answer"],
+        "initial": problem[v.string_kind_initial],
+        "modified": problem[v.string_kind_modified],
+        "target": problem[v.string_kind_target],
+        "answer": problem[v.string_kind_answer],
         "num_top_bridges": len(ws["top_bridges"]),
         "num_bottom_bridges": len(ws["bottom_bridges"]),
         "num_vertical_bridges": len(ws["vertical_bridges"]),
@@ -403,9 +411,8 @@ def project_coderack(state: dict, meta: Any = None) -> dict:
 def project_themespace(state: dict, meta: Any) -> dict:
     """Theme clusters in ``serialize_themespace_state``'s shape.
 
-    Dominance is recomputed here with the engine's own rule — rank by *absolute*
-    activation, the leader must itself be positive and must beat the runner-up by more
-    than the margin — because it is not a captured field.  Recomputing it rather than
+    Dominance is recomputed here with the engine's own rule (``themes.dominant_index``, the
+    one the live clusters use) because it is not a captured field.  Recomputing it rather than
     letting the client decide keeps the recorded view and the live view saying the same
     thing about which themes were locked in.
     """
@@ -445,7 +452,8 @@ def project_themespace(state: dict, meta: Any) -> dict:
             }
             for relation in relations
         ]
-        dominant = _dominant_theme(themes, margin)
+        index = dominant_index([t["activation"] for t in themes], margin)
+        dominant = None if index is None else themes[index]
         if dominant is not None:
             dominant["dominant"] = True
         clusters.append({
@@ -464,29 +472,11 @@ def project_themespace(state: dict, meta: Any) -> dict:
         **theme_display_labels(meta),
         # ``Themespace.possible_theme_types`` is a function of justify mode, which the
         # capture records under ``runner``.
-        "possible_theme_types": (
-            ["top_bridge", "vertical_bridge", "bottom_bridge"]
-            if justify_mode
-            else ["top_bridge", "vertical_bridge"]
-        ),
+        "possible_theme_types": theme_types_for_mode(meta.vocabulary, justify_mode),
         "active_theme_types": active,
         "thematic_pressure": bool(active),
         "dominant_theme_margin": margin,
     }
-
-
-def _dominant_theme(themes: list[dict], margin: float) -> dict | None:
-    """``ThemeCluster.get_dominant_theme``, applied to projected themes."""
-    if not themes:
-        return None
-    ranked = sorted(themes, key=lambda t: abs(t["activation"]), reverse=True)
-    top = ranked[0]
-    if top["activation"] <= 0:
-        return None
-    runner_up = abs(ranked[1]["activation"]) if len(ranked) > 1 else 0.0
-    if abs(top["activation"]) - runner_up > margin:
-        return top
-    return None
 
 
 def project_trace(state: dict) -> list[dict]:
@@ -575,7 +565,12 @@ def project_capture(state: dict, meta: Any) -> dict:
             f"{sorted(SUPPORTED_FORMAT_VERSIONS)}"
         )
     return {
-        "problem": state["problem"],
+        "problem": {
+            "initial": state["problem"][meta.vocabulary.string_kind_initial],
+            "modified": state["problem"][meta.vocabulary.string_kind_modified],
+            "target": state["problem"][meta.vocabulary.string_kind_target],
+            "answer": state["problem"][meta.vocabulary.string_kind_answer],
+        },
         "codelet_count": state["runner"]["codelet_count"],
         "temperature": state["temperature"]["value"],
         "temperature_detail": state["temperature"],

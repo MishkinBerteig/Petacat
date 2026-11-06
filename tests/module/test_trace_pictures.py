@@ -17,7 +17,7 @@ import pytest
 from server.engine.memory import EpisodicMemory
 from server.engine.metadata import MetadataProvider
 from server.engine.runner import STATUS_RUNNING, EngineRunner
-from server.engine.trace import (
+from tests.support.standard_names import (
     ANSWER_FOUND,
     CONCEPT_ACTIVATION,
     GROUP_BUILT,

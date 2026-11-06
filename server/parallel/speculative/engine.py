@@ -101,7 +101,7 @@ from server.engine.codelet_dsl.interpreter import (
 )
 from server.engine.codelet_dsl.builtins import get_builtins
 from server.engine.ids import IdAllocator
-from server.engine.run_binding import use_run
+from server.engine.run_binding import use_run, vocab
 from server.engine.runner import EngineContext
 from server.engine.slipnet import SlipnetNode
 from server.engine.workspace_structures import WorkspaceStructure
@@ -139,7 +139,7 @@ class SpeculationAbort(BaseException):
         self.reason = reason
 
 
-R_CONFLICT = "conflict"
+R_CONFLICT = "write_conflict"
 R_STEP = "step-relative"
 R_EXCEPTION = "exception"
 R_ABANDONED = "abandoned"
@@ -449,11 +449,12 @@ def _snapshot_private(codelet: Any) -> list[tuple[Any, dict, list]]:
     shallow copy of each list/dict/set attribute.
     """
     saved = []
+    built = vocab().proposal_level_built
     for value in codelet.arguments.values():
         # Only a *proposed or evaluated structure* is private to its codelet.  Other
         # argument objects (a ``WorkspaceString``, a built structure) are shared, and
         # restoring a shared object's lists would undo other steps' commits.
-        if not isinstance(value, WorkspaceStructure) or value.proposal_level == "built":
+        if not isinstance(value, WorkspaceStructure) or value.proposal_level == built:
             continue
         d = value.__dict__
         containers = [
@@ -782,7 +783,7 @@ class SpeculativeEngine:
         tele = self.telemetry
         c = self._ctele
         for key in ("speculated", "committed_speculated", "committed_read_only",
-                    "aborted_conflict", "aborted_step", "aborted_exception",
+                    "aborted_write_conflict", "aborted_step", "aborted_exception",
                     "aborted_chaos", "reexecuted", "abandoned"):
             tele[key] = sum(w.get(key, 0) for w in self._wtele) + c.get(key, 0)
         tele["abandoned_read_only"] = c.get("abandoned_read_only", 0)
@@ -1462,7 +1463,7 @@ def _new_telemetry(workers: int) -> dict[str, Any]:
         "speculated": 0,
         "committed_speculated": 0,
         "committed_read_only": 0,
-        "aborted_conflict": 0,
+        "aborted_write_conflict": 0,
         "aborted_step": 0,
         "aborted_exception": 0,
         "aborted_chaos": 0,

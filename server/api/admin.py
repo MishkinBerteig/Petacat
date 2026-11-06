@@ -10,7 +10,7 @@ from types import SimpleNamespace
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import func, inspect as sa_inspect, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,36 +19,25 @@ from server.services.problem_text import check_problem
 from server.engine.rational import canonical_rational
 from server.models.journal import GLOBAL_CONFIGURATION_ID
 from server.services import journal
-from server.services.config_registry import LAYER_REGISTRY, REGISTRY
+from server.services.change_resolve.spec import ENUM_COLUMN_REFERENCES, REFERENCES
+from server.services.change_resolve.vocabulary import delete_problem, role_problem, roles_by_table, VOCABULARY_TABLES
+from server.services.config_registry import ENUM_REGISTRY, LAYER_REGISTRY, REGISTRY
 from server.services.configuration_writer import ChangeError, ChangeService
 from server.models.metadata import (
-    BridgeOrientationDef,
-    BridgeTypeDef,
-    ClauseTypeDef,
-    CodeletFamilyDef,
     CodeletPatternDef,
     CodeletTypeRole,
-    CodeletPhaseDef,
     CodeletTypeDef,
     CommentaryTemplate,
     DemoProblem,
     EngineParam,
-    EventTypeDef,
     FormulaCoefficient,
     HelpTopic,
-    LinkTypeDef,
-    ParamValueTypeDef,
-    PostingDirectionDef,
     PostingRule,
-    ProposalLevelDef,
-    RuleTypeDef,
-    RunStatusDef,
     SlipnetLayoutPos,
     SlipnetLinkDef,
     SlipnetNodeDef,
     SlipnetNodeRole,
     ThemeDimensionDef,
-    ThemeTypeDef,
     ThemeRelation,
     UrgencyLevel,
 )
@@ -64,9 +53,11 @@ router = APIRouter(prefix="/api/admin", tags=["admin"])
 # (``source = admin``, ``channel = admin_editor``) and calling ``ChangeService.apply``: the
 # one change API, so the input checks, the cascades and the journal entry (one per request,
 # the editor's ops as its proposed ops) are the same as for every other writer.  The enum
-# tables are the engine's vocabulary, not addressable by the change API, and keep a direct
-# call to the journal layer.  ``help_topics`` is content, not configuration, and keeps its
-# own writes.
+# tables are the engine's vocabulary, not addressable by the change API's generic ops: their
+# creates, updates and deletes keep a direct call to the journal layer (after the vocabulary
+# rules of ``change_resolve/vocabulary.py``), and their renames are the change API's
+# ``rename_enum_value``.  ``help_topics`` is content, not configuration, and keeps its own
+# writes.
 #
 # Every route takes ``?configuration=<id>`` (default 1, the global configuration).  The
 # lists read the global configuration only.  A row addressed by its surrogate ``id`` (links,
@@ -109,6 +100,10 @@ def _refusal(exc: ChangeError, ops: list[dict]) -> HTTPException:
     if exc.code == "unknown_reference" and len(ops) == 1 and ops[0]["op"] in ("update", "delete"):
         for problem in exc.problems:
             if problem.get("table") == ops[0]["table"] and problem.get("field") == "key":
+                status = 404
+    if exc.code == "unknown_reference" and len(ops) == 1 and ops[0]["op"] == "rename_enum_value":
+        for problem in exc.problems:
+            if problem.get("table") == ops[0]["table"] and problem.get("field") == "old":
                 status = 404
     return HTTPException(status, exc.message)
 
@@ -312,12 +307,17 @@ class ParamUpdateRequest(BaseModel):
     #: How the value is read back — ``int``, ``float``, ``bool``, ``json``, ``string`` or ``rational`` (``n/m``).
     #: Sent when the type is being changed alongside the value.
     value_type: str | None = None
+    #: What the value's names refer to (``node_list``, ``trigger_node_list``, ``node_map``,
+    #: ``codelet_type_list``, ``urgency_level``); omitted, the parameter keeps its own.
+    refers_to: str | None = None
 
 
 class ParamResponse(BaseModel):
     name: str
     value: str
     value_type: str
+    #: What the value's names refer to, or null (``engine_params.refers_to``).
+    refers_to: str | None = None
 
 
 class UrgencyLevelUpdateRequest(BaseModel):
@@ -646,7 +646,8 @@ async def list_params(session: AsyncSession = Depends(get_session)):
     )
     rows = result.scalars().all()
     return [
-        ParamResponse(name=r.name, value=r.value, value_type=r.value_type or "string")
+        ParamResponse(name=r.name, value=r.value, value_type=r.value_type or "string",
+                      refers_to=r.refers_to)
         for r in rows
     ]
 
@@ -661,9 +662,11 @@ async def create_param(
     if req.value_type == "rational":
         value = _checked_number(value, "rational", kinds=("rational",))
     param = await _insert(
-        session, EngineParam, dict(name=req.name, value=value, value_type=req.value_type)
+        session, EngineParam,
+        dict(name=req.name, value=value, value_type=req.value_type, refers_to=req.refers_to),
     )
-    return ParamResponse(name=param.name, value=param.value, value_type=param.value_type or "string")
+    return ParamResponse(name=param.name, value=param.value, value_type=param.value_type or "string",
+                         refers_to=param.refers_to)
 
 
 @router.put("/params/{name}", response_model=ParamResponse)
@@ -680,11 +683,14 @@ async def update_param(
         changes["value"] = _checked_number(req.value, "rational", kinds=("rational",))
     if req.value_type is not None:
         changes["value_type"] = req.value_type
+    if "refers_to" in req.model_fields_set:
+        changes["refers_to"] = req.refers_to
     param = await _update(session, EngineParam, key, changes)
     return ParamResponse(
         name=param.name,
         value=param.value,
         value_type=param.value_type or "string",
+        refers_to=param.refers_to,
     )
 
 
@@ -1419,6 +1425,7 @@ async def export_metadata(session: AsyncSession = Depends(get_session)):
                 "name": r.name,
                 "value": r.value,
                 "value_type": r.value_type or "string",
+                "refers_to": r.refers_to,
             }
             for r in params_result.scalars().all()
         ],
@@ -1638,25 +1645,19 @@ async def import_metadata(
 # Enum tables — generic CRUD
 # ------------------------------------------------------------------
 
-# Map of table name -> ORM model class
-_ENUM_TABLES: dict[str, type] = {
-    "run_statuses": RunStatusDef,
-    "event_types": EventTypeDef,
-    "bridge_types": BridgeTypeDef,
-    "bridge_orientations": BridgeOrientationDef,
-    "clause_types": ClauseTypeDef,
-    "rule_types": RuleTypeDef,
-    "theme_types": ThemeTypeDef,
-    "proposal_levels": ProposalLevelDef,
-    "link_types": LinkTypeDef,
-    "codelet_families": CodeletFamilyDef,
-    "codelet_phases": CodeletPhaseDef,
-    "posting_directions": PostingDirectionDef,
-    "param_value_types": ParamValueTypeDef,
-}
+# Map of table name -> ORM model class: every enum lookup table of the registry.
+_ENUM_TABLES: dict[str, type] = {name: spec.model for name, spec in ENUM_REGISTRY.items()}
+
+#: The four columns every enum table has; a table may add more (``role``, ``behaviour``,
+#: ``serialised``, a clamp type's factors, a progress focus's event types).
+_ENUM_BASE_COLUMNS = ("name", "display_label", "sort_order", "description")
 
 
 class EnumValueRequest(BaseModel):
+    """A new row: the four columns every enum table has, and the table's own (``role`` ...)."""
+
+    model_config = ConfigDict(extra="allow")
+
     name: str
     display_label: str
     sort_order: int = 0
@@ -1664,16 +1665,18 @@ class EnumValueRequest(BaseModel):
 
 
 class EnumValueUpdateRequest(BaseModel):
+    """The columns of a row that change (its name is its key and does not): the three every
+    enum table has, and the table's own."""
+
+    model_config = ConfigDict(extra="allow")
+
     display_label: str
     sort_order: int = 0
     description: str = ""
 
 
-class EnumValueResponse(BaseModel):
-    name: str
-    display_label: str
-    sort_order: int
-    description: str
+class EnumRenameRequest(BaseModel):
+    new_name: str
 
 
 def _get_enum_model(table: str) -> type:
@@ -1683,74 +1686,180 @@ def _get_enum_model(table: str) -> type:
     return model
 
 
+def _enum_extra_columns(table: str) -> list[dict[str, Any]]:
+    """The columns of an enum table beyond the four it always has, for the editor."""
+    spec = LAYER_REGISTRY[table]
+    vocabulary = VOCABULARY_TABLES.get(table)
+    out = []
+    for name in spec.columns:
+        if name in _ENUM_BASE_COLUMNS:
+            continue
+        column = spec.table.c[name]
+        kind = column.type.__class__.__name__.lower()
+        entry: dict[str, Any] = {
+            "name": name,
+            "type": {"boolean": "bool", "float": "float", "integer": "int", "json": "json"}.get(kind, "text"),
+            "nullable": bool(column.nullable),
+            "pick": None,
+            "references": None,
+        }
+        if vocabulary is not None and name == vocabulary.column:
+            entry["pick"] = list(vocabulary.roles)
+        ref = REFERENCES.get((table, name)) or ENUM_COLUMN_REFERENCES.get((table, name))
+        if ref is not None:
+            entry["references"] = ref[0]
+        out.append(entry)
+    return out
+
+
+def _enum_row(table: str, row: Any) -> dict[str, Any]:
+    """Every column of a stored row, for the editor (a text column reads ``""`` for NULL only
+    where it always did: the description)."""
+    out = {name: getattr(row, name) for name in LAYER_REGISTRY[table].columns}
+    out["description"] = out.get("description") or ""
+    return out
+
+
+def _enum_values(table: str, base: dict[str, Any], extra: dict[str, Any] | None) -> dict[str, Any]:
+    """The base columns and the table's own, checked: a column the table does not have is a
+    422, as is a value of the wrong kind."""
+    columns = {c["name"]: c for c in _enum_extra_columns(table)}
+    values = dict(base)
+    for name, value in (extra or {}).items():
+        column = columns.get(name)
+        if column is None:
+            raise HTTPException(422, f"{table} has no column {name!r}")
+        ok = (
+            value is None and column["nullable"]
+            or column["type"] == "bool" and isinstance(value, bool)
+            or column["type"] == "float" and isinstance(value, (int, float)) and not isinstance(value, bool)
+            or column["type"] == "int" and isinstance(value, int) and not isinstance(value, bool)
+            or column["type"] == "json" and isinstance(value, list)
+            or column["type"] == "text" and isinstance(value, str)
+        )
+        if not ok:
+            raise HTTPException(422, f"{table}.{name} {value!r} is not a valid {column['type']}")
+        values[name] = value
+    return values
+
+
+async def _enum_names(session: AsyncSession, table: str) -> set[str]:
+    model = _ENUM_TABLES.get(table)
+    if model is not None:
+        return set((await session.execute(select(model.name))).scalars())
+    return set((await session.execute(select(UrgencyLevel.name))).scalars())
+
+
+async def _check_enum_write(
+    session: AsyncSession, table: str, values: dict[str, Any], *, exclude: str | None
+) -> None:
+    """The vocabulary rules for a row about to be written: its ``role`` (or ``behaviour``) is a
+    name of the table's vocabulary and held by no other row, and the names it holds in the
+    columns that reference another table exist there."""
+    model = _ENUM_TABLES[table]
+    others = [
+        {c: getattr(r, c) for c in LAYER_REGISTRY[table].columns}
+        for r in (await session.execute(select(model))).scalars()
+        if r.name != exclude
+    ]
+    problem = role_problem(table, values, others, key=[values.get("name")])
+    if problem is not None:
+        raise HTTPException(problem.status, f"{problem.kind}: {problem.message}")
+    for (t, column), (target, many) in {**REFERENCES, **ENUM_COLUMN_REFERENCES}.items():
+        if t != table or column not in values or values[column] in (None, ""):
+            continue
+        known = await _enum_names(session, target)
+        for item in values[column] if many else [values[column]]:
+            if item not in known:
+                raise HTTPException(
+                    422, f"unknown_reference: {table}.{column} names {item!r}, which {target} does not have")
+
+
 @router.get("/enums")
 async def list_enum_tables():
-    """List all enum table names."""
-    return {"tables": sorted(_ENUM_TABLES.keys())}
+    """List all enum table names, with what an editor needs about each.
+
+    ``roles`` gives, for each table whose rows the engine names, the column that holds the
+    binding (``role``; ``behaviour`` for ``link_types``) and the names that column may hold
+    (the engine's vocabulary for the table, ``server/engine/roles.py``); ``columns`` gives the
+    columns of each table beyond the four every enum table has.
+    """
+    return {
+        "tables": sorted(_ENUM_TABLES.keys()),
+        "roles": roles_by_table(),
+        "columns": {t: _enum_extra_columns(t) for t in sorted(_ENUM_TABLES)},
+    }
 
 
-@router.get("/enums/{table}", response_model=list[EnumValueResponse])
+@router.get("/enums/{table}")
 async def list_enum_values(
     table: str,
     session: AsyncSession = Depends(get_session),
 ):
-    """List all values in an enum table."""
+    """List all values in an enum table: every column of each row."""
     model = _get_enum_model(table)
-    result = await session.execute(select(model).order_by(model.sort_order))
-    return [
-        EnumValueResponse(
-            name=r.name,
-            display_label=r.display_label,
-            sort_order=r.sort_order,
-            description=r.description or "",
-        )
-        for r in result.scalars().all()
-    ]
+    result = await session.execute(select(model).order_by(*LAYER_REGISTRY[table].order_by()))
+    return [_enum_row(table, r) for r in result.scalars().all()]
 
 
-@router.post("/enums/{table}", response_model=EnumValueResponse, status_code=201)
+@router.post("/enums/{table}", status_code=201)
 async def create_enum_value(
     table: str,
     req: EnumValueRequest,
     session: AsyncSession = Depends(get_session),
 ):
-    """Add a value to an enum table."""
+    """Add a value to an enum table (an unbound row is inert until a column refers to it)."""
     model = _get_enum_model(table)
-    row = await _insert(session, model, dict(
+    _require_global(session, table)
+    values = _enum_values(table, dict(
         name=req.name,
         display_label=req.display_label,
         sort_order=req.sort_order,
         description=req.description,
-    ))
-    return EnumValueResponse(
-        name=row.name,
-        display_label=row.display_label,
-        sort_order=row.sort_order,
-        description=row.description or "",
-    )
+    ), req.model_extra)
+    await _check_enum_write(session, table, values, exclude=None)
+    row = await _insert(session, model, values)
+    return {**{c: getattr(row, c) for c in LAYER_REGISTRY[table].columns}, "description": row.description or ""}
 
 
-@router.put("/enums/{table}/{name}", response_model=EnumValueResponse)
+@router.put("/enums/{table}/{name}")
 async def update_enum_value(
     table: str,
     name: str,
     req: EnumValueUpdateRequest,
     session: AsyncSession = Depends(get_session),
 ):
-    """Update display_label, description, or sort_order of an enum value."""
+    """Update the columns of an enum value but its name (``POST .../rename`` renames it)."""
     model = _get_enum_model(table)
     key = await _existing(session, model, name, f"Value '{name}' not found in {table}")
-    row = await _update(session, model, key, dict(
+    changes = _enum_values(table, dict(
         display_label=req.display_label,
         sort_order=req.sort_order,
         description=req.description,
-    ))
-    return EnumValueResponse(
-        name=row.name,
-        display_label=row.display_label,
-        sort_order=row.sort_order,
-        description=row.description or "",
-    )
+    ), req.model_extra)
+    await _check_enum_write(session, table, {**changes, "name": name}, exclude=name)
+    row = await _update(session, model, key, changes)
+    return {**{c: getattr(row, c) for c in LAYER_REGISTRY[table].columns}, "description": row.description or ""}
+
+
+@router.post("/enums/{table}/{name}/rename")
+async def rename_enum_value(
+    table: str,
+    name: str,
+    req: EnumRenameRequest,
+    session: AsyncSession = Depends(get_session),
+):
+    """Rename an enum value: the change API's ``rename_enum_value``.
+
+    Every column that references the row is rewritten with it, and the report lists the code,
+    parameters and templates that still spell the old name (``dangling``).  The row keeps its
+    role.  A session's Episodic Memory is not rewritten (see ``API.md``, the change API).
+    """
+    _get_enum_model(table)
+    await _existing(session, _ENUM_TABLES[table], name, f"Value '{name}' not found in {table}")
+    report = await _apply(
+        session, [{"op": "rename_enum_value", "table": table, "old": name, "new": req.new_name}])
+    return {"renamed": req.new_name, "table": table, "report": report}
 
 
 @router.delete("/enums/{table}/{name}")
@@ -1759,9 +1868,30 @@ async def delete_enum_value(
     name: str,
     session: AsyncSession = Depends(get_session),
 ):
-    """Delete an enum value (with FK-violation guard)."""
+    """Delete an enum value.
+
+    Refused with ``422 role_bound`` while the row holds a ``role`` (or, for ``link_types``, a
+    ``behaviour``): unbind it first by setting the column to null.  Refused with 409 while
+    another row refers to it.
+    """
     model = _get_enum_model(table)
     key = await _existing(session, model, name, f"Value '{name}' not found in {table}")
+    stored = await session.get(model, name)
+    if stored is not None:
+        bound = delete_problem(table, {"name": name, **{
+            c: getattr(stored, c) for c in LAYER_REGISTRY[table].columns}})
+        if bound is not None:
+            raise HTTPException(bound.status, f"{bound.kind}: {bound.message}")
+    # Columns that name an enum row without a foreign key (the database cannot refuse them).
+    for (t, column), (target, many) in {**REFERENCES, **ENUM_COLUMN_REFERENCES}.items():
+        if target != table or t not in _ENUM_TABLES:
+            continue
+        for other in (await session.execute(select(_ENUM_TABLES[t]))).scalars():
+            value = getattr(other, column)
+            if name in (value if many else [value]) if value is not None else False:
+                raise HTTPException(
+                    409,
+                    f"Cannot delete '{name}' from {table} — {t} row '{other.name}' refers to it in {column}")
     try:
         await _delete(session, model, key)
     except HTTPException:

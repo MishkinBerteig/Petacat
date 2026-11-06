@@ -4,14 +4,13 @@ import os
 
 from server.engine.rng import RNG
 from server.engine.metadata import MetadataProvider
-from server.engine.rules import (
+from server.engine.rules import Rule, RuleClause
+from tests.support.standard_names import (
     CLAUSE_EXTRINSIC,
     CLAUSE_INTRINSIC,
     CLAUSE_VERBATIM,
     RULE_BOTTOM,
     RULE_TOP,
-    Rule,
-    RuleClause,
 )
 
 _META = MetadataProvider.from_standard_configuration(

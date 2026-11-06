@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol, runtime_checkable
 
 from server.engine.answer_comparison import _fill
+from server.engine.run_binding import vocab
 
 
 def _reporting(
@@ -259,7 +260,8 @@ def emit_snag(
     capitalised (``capitalize-string``); "again" and "another" are chosen by whether
     this is not the run's first snag event.
     """
-    section = _reporting(templates, "snag", commentary)
+    snag = vocab().event_type_snag
+    section = _reporting(templates, snag, commentary)
     later = snag_count > 1
     eliza = _fill(
         section.get("eliza", ""),
@@ -272,7 +274,7 @@ def emit_snag(
         explanation=explanation,
     )
     commentary.add_comment(
-        eliza, technical, codelet_count=codelet_count, event_type="snag"
+        eliza, technical, codelet_count=codelet_count, event_type=snag
     )
 
 

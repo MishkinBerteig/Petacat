@@ -16,6 +16,7 @@ from fractions import Fraction
 from typing import Any
 
 from server.engine.rational import parse_rational
+from server.engine.roles import Vocabulary, VocabularyBinding, vocabulary_bindings
 
 
 class ConfigurationRequired(RuntimeError):
@@ -137,6 +138,43 @@ class ThemeRelationSpec:
     node_name: str | None
     abstractness: int | None
     description: str
+    #: The engine's name for the relation (``theme_relation.opposite``), or None.
+    role: str | None = None
+
+
+@dataclass(frozen=True)
+class LinkTypeSpec:
+    """A link type and what the engine does with a link of that type (``behaviour``:
+    ``category``, ``instance``, ``property``, ``lateral``, ``slip``, or None for none)."""
+
+    name: str
+    behaviour: str | None = None
+
+
+@dataclass(frozen=True)
+class ClampTypeSpec:
+    """A clamp type: what its clamp holds the rest of the Coderack against, the factor its
+    clamps give the jootsing probability, and what counts as progress for it."""
+
+    name: str
+    role: str | None
+    #: The name of an urgency level, or None (no background).
+    codelet_background_level: str | None
+    jootsing_factor: float | None
+    #: The factor applies only while the clamp is still the newest event of the Trace.
+    jootsing_only_when_latest: bool
+    #: The name of a progress focus.
+    progress_focus: str | None
+    #: The names of the codelet patterns (``meta.codelet_patterns``) a clamp of this type clamps.
+    codelet_patterns: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class ProgressFocusSpec:
+    """A progress focus: the event types (names) that count as progress."""
+
+    name: str
+    event_types: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -183,8 +221,39 @@ class MetadataProvider:
     codelet_roles: tuple[CodeletRoleSpec, ...] = ()
     #: Theme relations, ordered by ``ordinal``.
     theme_relations: tuple[ThemeRelationSpec, ...] = ()
-    # Enum values loaded from DB lookup tables (table_name -> set of valid names)
-    enum_values: dict[str, set[str]] = field(default_factory=dict)
+    #: The rows of the enum tables bound to a role of the vocabulary
+    #: (``server/engine/roles.py``), ordered by role name.  Hashed with the rest.
+    vocabulary_bindings: tuple[VocabularyBinding, ...] = ()
+    #: The link types and their behaviours, in table order.
+    link_types: tuple[LinkTypeSpec, ...] = ()
+    #: The clamp types, in table order.
+    clamp_types: tuple[ClampTypeSpec, ...] = ()
+    #: The progress focuses, in table order.
+    progress_focuses: tuple[ProgressFocusSpec, ...] = ()
+    #: The codelet families whose codelets run alone under the free-running executor.
+    serialised_families: tuple[str, ...] = ()
+    #: Parameter name -> what its value's names refer to (``engine_params.refers_to``:
+    #: ``node_list``, ``trigger_node_list``, ``node_map``, ``codelet_type_list`` or
+    #: ``urgency_level``); a parameter whose value names nothing is absent.
+    param_refers_to: dict[str, str] = field(default_factory=dict)
+
+    @property
+    def vocabulary(self) -> Vocabulary:
+        """The resolved vocabulary of this configuration (built once, on first use).
+
+        ``vocabulary.bridge_type_top`` is the name of the row bound to ``bridge_type.top``
+        or an ``AbsentName``.  A run reads it through its binding
+        (``run_binding.constants().vocab`` on a hot path).
+        """
+        cached = self.__dict__.get("_vocabulary")
+        if cached is None:
+            cached = Vocabulary({b.role: b.name for b in self.vocabulary_bindings})
+            self.__dict__["_vocabulary"] = cached
+        return cached
+
+    def params_referring_to(self, *kinds: str) -> tuple[str, ...]:
+        """The names of the parameters whose ``refers_to`` is one of *kinds*, in the table's order."""
+        return tuple(n for n in self.params if self.param_refers_to.get(n) in kinds)
 
     def get_param(self, name: str) -> Any:
         """The engine parameter *name*; ``None`` when the configuration lacks it.
@@ -262,6 +331,9 @@ class MetadataProvider:
 
         # Engine params
         params = _load("engine_params.json")
+
+        refs = _load("engine_param_refs.json")
+        param_refers_to = {n: refs[n] for n in params if n in refs}
 
         # Urgency levels
         urgency_levels = _load("urgency_levels.json")
@@ -377,17 +449,43 @@ class MetadataProvider:
                 node_name=r.get("node_name"),
                 abstractness=r.get("abstractness"),
                 description=r.get("description", ""),
+                role=r.get("role"),
             )
             for r in sorted(_load("theme_relations.json"), key=lambda r: r["ordinal"])
         )
 
-        # Enum values
-        enum_values: dict[str, set[str]] = {}
+        # The enum tables: the rows the engine names (their ``role`` column) and the tables
+        # that carry more than a name.
+        enum_rows: dict[str, list[dict[str, Any]]] = {}
         enums_file = os.path.join(seed_dir, "enums.json")
         if os.path.exists(enums_file):
-            enums_data = _load("enums.json")
-            for table_name, rows in enums_data.items():
-                enum_values[table_name] = {r["name"] for r in rows}
+            enum_rows = {t: sorted(rows, key=lambda r: (r["sort_order"], r["name"].encode())) for t, rows in _load("enums.json").items()}
+        enum_rows["theme_relations"] = [
+            {"name": r.name, "role": r.role} for r in theme_relations
+        ]
+        link_types = tuple(
+            LinkTypeSpec(name=r["name"], behaviour=r.get("behaviour"))
+            for r in enum_rows.get("link_types", [])
+        )
+        clamp_types = tuple(
+            ClampTypeSpec(
+                name=r["name"],
+                role=r.get("role"),
+                codelet_background_level=r.get("codelet_background_level"),
+                jootsing_factor=r.get("jootsing_factor"),
+                jootsing_only_when_latest=bool(r.get("jootsing_only_when_latest", False)),
+                progress_focus=r.get("progress_focus"),
+                codelet_patterns=tuple(r.get("codelet_patterns") or ()),
+            )
+            for r in enum_rows.get("clamp_types", [])
+        )
+        progress_focuses = tuple(
+            ProgressFocusSpec(name=r["name"], event_types=tuple(r["event_types"]))
+            for r in enum_rows.get("progress_focuses", [])
+        )
+        serialised_families = tuple(
+            r["name"] for r in enum_rows.get("codelet_families", []) if r.get("serialised")
+        )
 
         return cls(
             slipnet_node_specs=node_specs,
@@ -405,5 +503,10 @@ class MetadataProvider:
             node_roles=node_roles,
             codelet_roles=codelet_roles,
             theme_relations=theme_relations,
-            enum_values=enum_values,
+            vocabulary_bindings=vocabulary_bindings(enum_rows),
+            link_types=link_types,
+            clamp_types=clamp_types,
+            progress_focuses=progress_focuses,
+            serialised_families=serialised_families,
+            param_refers_to=param_refers_to,
         )

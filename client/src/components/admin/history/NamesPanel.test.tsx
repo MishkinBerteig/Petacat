@@ -30,6 +30,14 @@ describe('memoryNames', () => {
     ])
     expect(memoryNames(null)).toEqual([])
   })
+
+  it('also collects the clause types the stored rule signatures name', () => {
+    const names = memoryNames({
+      answers: [{ themes: {}, clause_types: ['intrinsic', 'verbatim'] }],
+      snags: [{ theme_pattern: {}, clause_types: ['intrinsic', 'extrinsic'] }, { clause_types: null }],
+    })
+    expect(names).toEqual(['extrinsic', 'intrinsic', 'verbatim'])
+  })
 })
 
 describe('NamesPanel', () => {

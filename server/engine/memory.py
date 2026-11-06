@@ -45,8 +45,13 @@ class AnswerDescription:
     # (``memory.ss:190-196``) compares, so without them the duplicate-answer guard
     # cannot be written.  ``server/engine/rules.py:rule_signature`` produces them in a
     # form that survives being persisted and read back.
-    top_rule_signature: list | None = None
-    bottom_rule_signature: list | None = None
+    #: Every answer the engine makes carries both signatures (ruling 35: the probe
+    #: ``agents-workspace/metacat-cleanup/round2/S4-vocabulary/finish/probe_none_signature.py``
+    #: runs every case of the golden baselines and finds no run path that makes a ``None`` one),
+    #: so they are required, here and in the ``answer_descriptions`` columns, and
+    #: :func:`answers_equal` has no "never recorded" case.
+    top_rule_signature: list = field(kw_only=True)
+    bottom_rule_signature: list = field(kw_only=True)
 
     #: ``average-theme-abstractness`` (``answers.ss:885-892``), computed when the
     #: description is built because it needs the Slipnet's conceptual depths, which a
@@ -151,14 +156,47 @@ class SnagDescription:
         """Scheme: ``equal?`` on a snag description (``memory.ss:336-340``).
 
         A ``None`` signature means the clause list was never recorded rather than that
-        the rule was empty, and two unrecorded rules are not thereby the same rule —
-        the same reservation :meth:`EpisodicMemory._answers_equal` makes.
+        the rule was empty, and two unrecorded rules are not thereby the same rule.  (An
+        answer has no such case: its signatures are always present, see :func:`answers_equal`.)
         """
         if tuple(self.problem) != tuple(problem):
             return False
         if self.rule_signature is None or signature is None:
             return False
         return self.rule_signature == signature
+
+
+def clause_types_of(*signatures: list | None) -> list[str]:
+    """The clause-type names that rule signatures hold, sorted and distinct.
+
+    A rule signature (``rules.rule_signature``) is a list of clause signatures, each starting with
+    its clause type's name.  Episodic Memory stores these, so a clause type is one of the names a
+    memory holds (a rename of the row leaves the stored name as it was).  The memory views list
+    them so the "names that no longer resolve" panel can check them against the configuration.
+    """
+    names: set[str] = set()
+    for signature in signatures:
+        for clause in signature or ():
+            if clause and isinstance(clause[0], str):
+                names.add(clause[0])
+    return sorted(names)
+
+
+def answers_equal(a: AnswerDescription, b: AnswerDescription) -> bool:
+    """Scheme: ``answers-equal?`` (``memory.ss:182-196``): the one comparison of two answers.
+
+    The four strings and *both* rules' clause lists (``rule-clause-lists-equal?``), each
+    compared structurally.  Both signatures are always present: every answer the engine makes
+    has its two rules (ruling 35), so there is no "never recorded" case to treat apart.
+    ``EpisodicMemory.distance``, ``EpisodicMemory.answer_present`` (which compares the same
+    fields for a rule pair not yet turned into a description) and the Training Mode
+    Session memory's ``answer_present`` all agree through this function.
+    """
+    return (
+        tuple(a.problem) == tuple(b.problem)
+        and a.top_rule_signature == b.top_rule_signature
+        and a.bottom_rule_signature == b.bottom_rule_signature
+    )
 
 
 class EpisodicMemory:
@@ -256,15 +294,12 @@ class EpisodicMemory:
 
         top_sig = rule_signature(top_rule)
         bottom_sig = rule_signature(bottom_rule)
-        for past in self.answers:
-            if tuple(past.problem) != tuple(problem):
-                continue
-            if past.top_rule_signature != top_sig:
-                continue
-            if past.bottom_rule_signature != bottom_sig:
-                continue
-            return True
-        return False
+        return any(
+            tuple(past.problem) == tuple(problem)
+            and past.top_rule_signature == top_sig
+            and past.bottom_rule_signature == bottom_sig
+            for past in self.answers
+        )
 
     def find_remindings(
         self,
@@ -409,21 +444,8 @@ class EpisodicMemory:
 
     @staticmethod
     def _answers_equal(a: AnswerDescription, b: AnswerDescription) -> bool:
-        """Scheme: ``answers-equal?`` (``memory.ss:182-196``).
-
-        The four strings and *both* rules' clause lists.  A ``None`` signature means the
-        clause list was never recorded rather than that the rule was empty, and two
-        unrecorded rules are not thereby known to be the same rule — so an answer whose
-        top rule was not captured is never declared identical to another.
-        """
-        if tuple(a.problem) != tuple(b.problem):
-            return False
-        if a.top_rule_signature is None or b.top_rule_signature is None:
-            return False
-        return (
-            a.top_rule_signature == b.top_rule_signature
-            and a.bottom_rule_signature == b.bottom_rule_signature
-        )
+        """Scheme: ``answers-equal?`` (``memory.ss:182-196``); see :func:`answers_equal`."""
+        return answers_equal(a, b)
 
     def get_equivalent_snag(
         self, answer: AnswerDescription
@@ -510,7 +532,7 @@ class EpisodicMemory:
             "a_abstractness": a.top_rule_abstractness,
             "b_abstractness": b.top_rule_abstractness,
             "preferred": {
-                "answer": verdict.get("answer"),
+                "answer": verdict.get("preferred_answer"),
                 "reason": verdict.get("criterion", ""),
             },
         }

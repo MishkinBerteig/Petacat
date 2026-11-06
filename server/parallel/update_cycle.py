@@ -755,19 +755,21 @@ class UpdateCycle:
         for rule in runner.bottom_up_posting_rules():
             tasks.append(("bu", rule, None, rule.codelet_type))
         top_down_nodes = meta.get_param("top_down_slipnodes")
+        top_down = meta.vocabulary.posting_direction_top_down
         for node_name in top_down_nodes:
             node = ctx.slipnet.nodes.get(node_name)
             if node is None or not node.above_threshold():
                 continue
             for rule in meta.posting_rules:
-                if rule.direction != "top_down":
+                if rule.direction != top_down:
                     continue
                 if rule.triggering_slipnodes and node_name not in rule.triggering_slipnodes:
                     continue
                 tasks.append(("td", rule, node, f"{rule.codelet_type}({node_name})"))
-        thematic_rule = runner.posting_rule_for("thematic-bridge-scout")
-        if thematic_rule is not None:
-            tasks.append(("th", thematic_rule, None, thematic_rule.codelet_type))
+        thematic = meta.vocabulary.posting_direction_thematic
+        for thematic_rule in meta.posting_rules:
+            if thematic_rule.direction == thematic:
+                tasks.append(("th", thematic_rule, None, thematic_rule.codelet_type))
 
         def decide(task: tuple) -> tuple[int, int] | None:
             kind, rule, node, key = task

@@ -3,13 +3,13 @@
 import os
 import pytest
 
-from server.engine.bridges import (
+from server.engine.bridges import Bridge
+from tests.support.standard_names import (
     BRIDGE_BOTTOM,
     BRIDGE_TOP,
     BRIDGE_VERTICAL,
     ORIENTATION_HORIZONTAL,
     ORIENTATION_VERTICAL,
-    Bridge,
 )
 from server.engine.metadata import MetadataProvider
 from server.engine.slipnet import Slipnet

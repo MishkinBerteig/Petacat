@@ -23,12 +23,15 @@ codelet-type names at all.
 
 from __future__ import annotations
 
+import sys
 from dataclasses import dataclass
 from operator import itemgetter
 from typing import Any, Iterable, Mapping
 
 NODE = "node"
 CODELET_TYPE = "codelet_type"
+#: A role bound to a *row of an enum table*: its value is the row's name (a string).
+ENUM_ROW = "enum_row"
 ONE = "one"
 ORDERED = "ordered"
 
@@ -38,8 +41,10 @@ class RoleSpec:
     """One name of the vocabulary."""
 
     name: str
-    target_kind: str  # NODE or CODELET_TYPE
+    target_kind: str  # NODE, CODELET_TYPE or ENUM_ROW
     cardinality: str  # ONE or ORDERED
+    #: For an ``ENUM_ROW`` role, the table whose row the role is bound to.
+    table: str | None = None
 
     @property
     def attr(self) -> str:
@@ -279,3 +284,171 @@ def resolve_roles(
         else:
             bound[role] = entries[0][1]
     return Roles(bound), {n: frozenset(r) for n, r in held.items()}
+
+
+# ---------------------------------------------------------------------------
+# The vocabulary: roles bound to the rows of the enum tables (NAME-DESIGN 4.2)
+# ---------------------------------------------------------------------------
+#
+# The engine owns the *concepts* (a bridge joins the top strings, a clamp holds the rack
+# against a background ...); the configuration owns the *names* it calls them.  An enum
+# table row carries a ``role`` (``behaviour`` for ``link_types``); the engine reads the row
+# bound to each role once per run and compares against that name, never against a literal.
+# ``tests/architecture/test_vocabulary_literals.py`` fails when a bound name is written as a
+# literal in ``server/engine/`` or ``server/parallel/``.
+
+#: Each enum table the engine names rows of, with the column that holds the role and the roles
+#: (role names are ``<singular>.<suffix>``).
+_VOCABULARY_TABLES: tuple[tuple[str, str, str, tuple[str, ...]], ...] = (
+    ("event_types", "role", "event_type", (
+        "bond_built", "bond_broken", "group_built", "group_broken", "bridge_built",
+        "bridge_broken", "rule_built", "rule_broken", "description_built", "answer_found",
+        "snag", "clamp_start", "clamp_end", "concept_mapping_built", "concept_activation",
+    )),
+    ("bridge_types", "role", "bridge_type", ("top", "bottom", "vertical")),
+    ("bridge_orientations", "role", "bridge_orientation", ("horizontal", "vertical")),
+    ("clause_types", "role", "clause_type", ("intrinsic", "extrinsic", "verbatim")),
+    ("rule_types", "role", "rule_type", ("top", "bottom")),
+    ("theme_types", "role", "theme_type", ("top_bridge", "bottom_bridge", "vertical_bridge")),
+    ("proposal_levels", "role", "proposal_level", ("proposed", "evaluated", "built")),
+    ("posting_directions", "role", "posting_direction", ("bottom_up", "top_down", "thematic")),
+    ("theme_relations", "role", "theme_relation", (
+        "identity", "opposite", "successor", "predecessor", "diff",
+    )),
+    ("string_kinds", "role", "string_kind", ("initial", "modified", "target", "answer")),
+    ("rule_scopes", "role", "rule_scope", ("self", "subobjects")),
+    ("failure_kinds", "role", "failure_kind", ("swap", "conflict", "change")),
+    ("clamp_types", "role", "clamp_type", ("rule_codelet", "snag_response", "justify", "manual")),
+)
+
+VOCABULARY: tuple[RoleSpec, ...] = tuple(
+    RoleSpec(f"{prefix}.{suffix}", ENUM_ROW, ONE, table)
+    for table, _column, prefix, suffixes in _VOCABULARY_TABLES
+    for suffix in suffixes
+)
+VOCABULARY_BY_NAME: Mapping[str, RoleSpec] = {s.name: s for s in VOCABULARY}
+
+#: The column of each enum table that holds its role.
+ROLE_COLUMN: Mapping[str, str] = {table: column for table, column, _p, _s in _VOCABULARY_TABLES}
+
+#: What the engine does with a link of a type (``link_types.behaviour``); the configuration
+#: says which type has which.  A behaviour is the engine's name, as a role is.
+LINK_BEHAVIOURS: tuple[str, ...] = ("category", "instance", "property", "lateral", "slip")
+
+
+class AbsentName(str):
+    """The name counterpart of :class:`Absent`: the value of a vocabulary role nothing holds.
+
+    A falsy ``str`` equal only to itself, so ``x == vocabulary.rule_type_top`` is false for
+    every ``x`` while the role is unbound, and nothing is mistaken for a match.  One per role
+    (:func:`absent_name`).
+    """
+
+    __slots__ = ()
+
+    def __new__(cls, role: str) -> "AbsentName":
+        return super().__new__(cls, f"<absent:{role}>")
+
+    def __bool__(self) -> bool:
+        return False
+
+    def __eq__(self, other: object) -> bool:
+        return self is other
+
+    def __ne__(self, other: object) -> bool:
+        return self is not other
+
+    def __hash__(self) -> int:
+        return id(self)
+
+    def __reduce__(self) -> tuple:
+        return (absent_name, (str.__str__(self)[len("<absent:"):-1],))
+
+    def __copy__(self) -> "AbsentName":
+        return self
+
+    def __deepcopy__(self, memo: dict) -> "AbsentName":
+        return self
+
+
+_ABSENT_NAMES: dict[str, AbsentName] = {}
+
+
+def absent_name(role: str) -> AbsentName:
+    """The one :class:`AbsentName` of *role*."""
+    token = _ABSENT_NAMES.get(role)
+    if token is None:
+        token = _ABSENT_NAMES[role] = AbsentName(role)
+    return token
+
+
+_VOCAB_LAYOUT = tuple((sp.name, sp.attr) for sp in VOCABULARY)
+
+
+class Vocabulary:
+    """The resolved vocabulary of one run: one attribute per role of ``VOCABULARY``, frozen.
+
+    ``vocabulary.bridge_type_top`` (the role name with dots turned into underscores) is the
+    interned *name* of the row bound to ``bridge_type.top``, or that role's
+    :class:`AbsentName`.  Built with ``Vocabulary(bound)``, ``bound`` mapping a role name to
+    a row name.  Structures store the object they were given, so a comparison is a pointer
+    compare in the ordinary case.
+    """
+
+    __slots__ = tuple(s.attr for s in VOCABULARY)
+
+    def __init__(self, bound: Mapping[str, str] | None = None) -> None:
+        get = (bound or {}).get
+        for name, attr in _VOCAB_LAYOUT:
+            value = get(name)
+            _set(self, attr, sys.intern(value) if value is not None else absent_name(name))
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        raise AttributeError("Vocabulary is frozen")
+
+    def __delattr__(self, name: str) -> None:
+        raise AttributeError("Vocabulary is frozen")
+
+    def get(self, role: str) -> str:
+        """The name bound to *role* (``bridge_type.top``), or its :class:`AbsentName`."""
+        return getattr(self, VOCABULARY_BY_NAME[role].attr)
+
+    def items(self) -> Iterable[tuple[str, str]]:
+        return ((s.name, getattr(self, s.attr)) for s in VOCABULARY)
+
+    def bound(self) -> dict[str, str]:
+        """``{role: name}`` of the roles that are bound."""
+        return {r: n for r, n in self.items() if type(n) is str}
+
+    def __reduce__(self) -> tuple:
+        return (Vocabulary, (self.bound(),))
+
+    def __repr__(self) -> str:
+        return "Vocabulary(" + ", ".join(f"{n}={v!r}" for n, v in self.items()) + ")"
+
+
+@dataclass(frozen=True)
+class VocabularyBinding:
+    """One row of an enum table bound to a role: part of the provider, so it is hashed."""
+
+    role: str
+    table: str
+    name: str
+
+
+def vocabulary_bindings(tables: Mapping[str, Iterable[Mapping[str, Any]]]) -> tuple[VocabularyBinding, ...]:
+    """The bindings the enum tables' ``role`` columns state, ordered by role name.
+
+    *tables* maps a table name to its rows (mappings).  A row whose role is empty, or is
+    not in the vocabulary for that table, binds nothing.  A role held by several rows binds
+    the first (the schema makes the column unique, so this is for tables built by hand).
+    """
+    found: dict[str, VocabularyBinding] = {}
+    for table, column, _prefix, _suffixes in _VOCABULARY_TABLES:
+        for row in tables.get(table, ()):
+            role = row.get(column)
+            spec = VOCABULARY_BY_NAME.get(role) if role else None
+            if spec is None or spec.table != table or role in found:
+                continue
+            found[role] = VocabularyBinding(role, table, row["name"])
+    return tuple(found[r] for r in sorted(found, key=lambda r: r.encode()))

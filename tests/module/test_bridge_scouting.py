@@ -16,12 +16,12 @@ import pytest
 
 from server.engine.bonds import Bond
 from server.engine.bridges import (
-    BRIDGE_TOP,
     Bridge,
     _incompatible_bridges,
     possible_bridge_cms,
     reverse_direction_orientation,
 )
+from tests.support.standard_names import BRIDGE_TOP
 from server.engine.codelet_dsl.builtins import build_structure, get_builtins
 from server.engine.codelet_dsl.interpreter import CodeletInterpreter, CodeletRegistry
 from server.engine.concept_mappings import ConceptMapping
@@ -29,6 +29,7 @@ from server.engine.groups import Group
 from server.engine.metadata import MetadataProvider
 from server.engine.rng import RNG
 from server.engine.runner import EngineRunner
+from tests.support import standard_names
 
 # Every test here reaches the numeric seam through ``init_mcat``'s first
 # ``update-workspace-values``, so each runs once per backend. See tests/conftest.py.
@@ -286,7 +287,7 @@ def _spanning_group(ctx, string, category: str, direction: str) -> Group:
             right.letter_category,
             node[f"plato-{direction}"],
         )
-        bond.proposal_level = bond.BUILT
+        bond.proposal_level = standard_names.BUILT
         string.add_bond(bond)
         bonds.append(bond)
     group = Group(
@@ -297,7 +298,7 @@ def _spanning_group(ctx, string, category: str, direction: str) -> Group:
         objects=list(letters),
         bonds=bonds,
     )
-    group.proposal_level = group.BUILT
+    group.proposal_level = standard_names.BUILT
     string.add_group(group)
     return group
 
@@ -541,7 +542,7 @@ def test_a_spanning_bridge_is_not_incompatible_with_c_to_cc_in_abc_abcc(meta):
         objects=list(ctx.workspace.modified_string.letters[2:]),
         bonds=[],
     )
-    cc.proposal_level = cc.BUILT
+    cc.proposal_level = standard_names.BUILT
     ctx.workspace.modified_string.add_group(cc)
     abcc = Group(
         string=ctx.workspace.modified_string,
@@ -551,7 +552,7 @@ def test_a_spanning_bridge_is_not_incompatible_with_c_to_cc_in_abc_abcc(meta):
         objects=list(ctx.workspace.modified_string.letters),
         bonds=[],
     )
-    abcc.proposal_level = abcc.BUILT
+    abcc.proposal_level = standard_names.BUILT
     ctx.workspace.modified_string.add_group(abcc)
 
     spanning = Bridge(abc, abcc, BRIDGE_TOP, _length_cms(ctx, "three", "three"))
@@ -644,7 +645,7 @@ def test_a_crosswise_bridge_finds_the_directed_bond_it_contradicts(meta):
                 left, right, node["plato-successor"], node["plato-letter-category"],
                 left.letter_category, right.letter_category, node["plato-right"],
             )
-            bond.proposal_level = bond.BUILT
+            bond.proposal_level = standard_names.BUILT
             string.add_bond(bond)
             bonds[(string.string_type, left.left_string_pos)] = bond
 
@@ -681,7 +682,7 @@ def test_the_bridge_builder_fights_that_bond_at_three_to_two(meta):
                 left, right, node["plato-successor"], node["plato-letter-category"],
                 left.letter_category, right.letter_category, node["plato-right"],
             )
-            bond.proposal_level = bond.BUILT
+            bond.proposal_level = standard_names.BUILT
             string.add_bond(bond)
             if string is ctx.workspace.target_string:
                 target_bonds.append(bond)
@@ -694,7 +695,7 @@ def test_the_bridge_builder_fights_that_bond_at_three_to_two(meta):
         objects=list(ctx.workspace.target_string.letters),
         bonds=list(target_bonds),
     )
-    enclosing.proposal_level = enclosing.BUILT
+    enclosing.proposal_level = standard_names.BUILT
     ctx.workspace.target_string.add_group(enclosing)
     for bond in target_bonds:
         bond.enclosing_group = enclosing
@@ -728,8 +729,9 @@ def test_building_a_rule_posts_the_answer_finder_at_urgency_91(meta):
     gated by ``(100-T)/100`` at urgency ``100-T``; waiting for it made every
     answer attempt later, rarer and less urgent than the reference's.
     """
-    from server.engine.rules import RULE_TOP, Rule, RuleClause
-    from server.engine.rules import CLAUSE_VERBATIM
+    from server.engine.rules import Rule, RuleClause
+    from tests.support.standard_names import RULE_TOP
+    from tests.support.standard_names import CLAUSE_VERBATIM
 
     engine = _engine(meta, "abc", "abd", "xyz")
     ctx = engine.ctx
@@ -751,8 +753,9 @@ def test_building_a_rule_posts_the_answer_finder_at_urgency_91(meta):
 
 def test_a_justify_mode_rule_build_posts_the_answer_justifier_instead(meta):
     """rules.ss:489-490 — the codelet type follows the mode."""
-    from server.engine.rules import RULE_TOP, Rule, RuleClause
-    from server.engine.rules import CLAUSE_VERBATIM
+    from server.engine.rules import Rule, RuleClause
+    from tests.support.standard_names import RULE_TOP
+    from tests.support.standard_names import CLAUSE_VERBATIM
 
     runner = EngineRunner(meta)
     runner.init_mcat("abc", "abd", "xyz", answer="xyd", seed=42)

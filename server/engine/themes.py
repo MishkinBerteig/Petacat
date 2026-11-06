@@ -9,6 +9,7 @@ Scheme source: themes.ss
 from __future__ import annotations
 
 import math
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
 from server.engine.numeric.backend import select_backend
@@ -34,14 +35,6 @@ def _clip_negative(value: float, ceiling: float) -> float:
     return max(-ceiling, min(0.0, value))
 
 
-# Theme type string constants (values live in DB theme_types table)
-THEME_TOP_BRIDGE = "top_bridge"
-THEME_BOTTOM_BRIDGE = "bottom_bridge"
-THEME_VERTICAL_BRIDGE = "vertical_bridge"
-
-# All theme types for iteration
-ALL_THEME_TYPES = [THEME_TOP_BRIDGE, THEME_BOTTOM_BRIDGE, THEME_VERTICAL_BRIDGE]
-
 # ---------------------------------------------------------------------------
 # Theme relations
 #
@@ -53,32 +46,54 @@ ALL_THEME_TYPES = [THEME_TOP_BRIDGE, THEME_BOTTOM_BRIDGE, THEME_VERTICAL_BRIDGE]
 # of a relation must go through ``relation_name_for_label``.
 # ---------------------------------------------------------------------------
 
-RELATION_IDENTITY = "identity"
-RELATION_OPPOSITE = "opposite"
-RELATION_DIFFERENT = "diff"
-
 #: See ``slipnet._UNRESOLVED`` — "not yet decided" is not "decided against".
 _UNRESOLVED = object()
 
-# Bridge-type spellings accepted by the lookup helpers below.  A hyphen is read as an
-# underscore (``Rule.bridge_theme_type`` and older data spell ``top-bridge``), so the table
-# holds each name once.  Anything else passes through unchanged.
-_BRIDGE_TYPE_TO_THEME_TYPE: dict[str, str] = {
-    "top": THEME_TOP_BRIDGE,
-    "top_bridge": THEME_TOP_BRIDGE,
-    "bottom": THEME_BOTTOM_BRIDGE,
-    "bottom_bridge": THEME_BOTTOM_BRIDGE,
-    "vertical": THEME_VERTICAL_BRIDGE,
-    "vertical_bridge": THEME_VERTICAL_BRIDGE,
-}
+def _theme_type_table(v: Any) -> dict[str, str]:
+    """Bridge-type spellings accepted by :meth:`Themespace.theme_type_for_bridge_type`, mapped to
+    the Themespace theme type.  A hyphen is read as an underscore (``Rule.bridge_theme_type`` and
+    older data spell ``top-bridge``), so the table holds each name once.  Built from the
+    vocabulary ``v`` (``bridge_type.*`` and ``theme_type.*``)."""
+    return {
+        v.bridge_type_top: v.theme_type_top_bridge,
+        v.theme_type_top_bridge: v.theme_type_top_bridge,
+        v.bridge_type_bottom: v.theme_type_bottom_bridge,
+        v.theme_type_bottom_bridge: v.theme_type_bottom_bridge,
+        v.bridge_type_vertical: v.theme_type_vertical_bridge,
+        v.theme_type_vertical_bridge: v.theme_type_vertical_bridge,
+    }
 
 
-def theme_type_for_bridge_type(bridge_type: str) -> str:
-    """The Themespace theme type of a bridge-type spelling (``top``, ``top-bridge``,
-    ``top_bridge``); an unknown spelling is returned as given."""
-    if not isinstance(bridge_type, str):
-        return bridge_type
-    return _BRIDGE_TYPE_TO_THEME_TYPE.get(bridge_type.replace("-", "_"), bridge_type)
+def theme_types_for_mode(v: Any, justify_mode: bool) -> list[str]:
+    """The theme types meaningful in a mode, from the vocabulary ``v``: all three in justification
+    mode (top, bottom, vertical, the Scheme's iteration order), else top and vertical.
+
+    Scheme: ``get-possible-theme-types`` (``themes.ss:132-135``).  The one definition: the
+    Themespace reads it, and so does the review projection of a recorded capture.
+    """
+    if justify_mode:
+        return [v.theme_type_top_bridge, v.theme_type_bottom_bridge, v.theme_type_vertical_bridge]
+    return [v.theme_type_top_bridge, v.theme_type_vertical_bridge]
+
+
+def dominant_index(activations: Sequence[float], margin: float) -> int | None:
+    """The index of the dominant theme among themes with these activations, or ``None``.
+
+    Scheme: ``update-dominant-theme`` (``themes.ss:503-518``).  All themes are ranked by
+    *absolute* activation; the leader must itself be positively activated, and must beat the
+    runner-up by strictly more than the margin.  The one definition: a live cluster reads it
+    (:meth:`ThemeCluster.get_dominant_theme`), and so does the review projection of a capture.
+    """
+    if not activations:
+        return None
+    ranked = sorted(range(len(activations)), key=lambda i: abs(activations[i]), reverse=True)
+    top = activations[ranked[0]]
+    if top <= 0:
+        return None
+    runner_up = abs(activations[ranked[1]]) if len(ranked) > 1 else 0.0
+    if abs(top) - runner_up > margin:
+        return ranked[0]
+    return None
 
 
 def relation_name_for_label(label_node: Any) -> str:
@@ -89,7 +104,11 @@ def relation_name_for_label(label_node: Any) -> str:
     label that is no relation -- maps to ``diff``, matching the Scheme's ``#f`` relation.
     """
     relation = getattr(label_node, "relation", None)
-    return relation if relation is not None else RELATION_DIFFERENT
+    if relation is not None:
+        return relation
+    from server.engine.run_binding import vocab
+
+    return vocab().theme_relation_diff
 
 
 class Theme:
@@ -249,16 +268,8 @@ class ThemeCluster:
         cluster blocks dominance, which is the point of negatively clamping a
         theme-pattern during a snag response (§4.5.2).
         """
-        if not self.themes:
-            return None
-        ranked = sorted(self.themes, key=lambda t: abs(t.activation), reverse=True)
-        top = ranked[0]
-        if top.activation <= 0:
-            return None
-        runner_up = abs(ranked[1].activation) if len(ranked) > 1 else 0.0
-        if abs(top.activation) - runner_up > margin:
-            return top
-        return None
+        index = dominant_index([t.activation for t in self.themes], margin)
+        return None if index is None else self.themes[index]
 
     def get_theme(self, relation: str | None) -> Theme | None:
         for t in self.themes:
@@ -383,9 +394,17 @@ class Themespace:
         #: ``EngineContext.self_watching_enabled`` keeps it current.
         self.self_watching_enabled: bool = True
 
+        #: The theme types of the run's vocabulary, in the Scheme's iteration order (top, bottom,
+        #: vertical).  Read this instead of spelling a theme type: it follows the configuration.
+        v = meta.vocabulary
+        self.theme_types: tuple[str, ...] = tuple(theme_types_for_mode(v, True))
+        #: The theme types that exist without a fourth (answer) string (top and vertical).
+        self.discovery_theme_types: tuple[str, ...] = tuple(theme_types_for_mode(v, False))
+        self._theme_type_of: dict[str, str] = _theme_type_table(v)
+
         # Build clusters from theme dimension specs
         for dim_spec in meta.theme_dimensions:
-            for theme_type in ALL_THEME_TYPES:
+            for theme_type in self.theme_types:
                 cluster = ThemeCluster(
                     theme_type=theme_type,
                     dimension=dim_spec.slipnet_node,
@@ -396,10 +415,7 @@ class Themespace:
         # Which theme types are meaningful for the current mode.  Bottom themes
         # only exist when a fourth (answer) string exists.
         # Scheme: ``get-possible-theme-types`` (themes.ss:132-135).
-        self.possible_theme_types: list[str] = [
-            THEME_TOP_BRIDGE,
-            THEME_VERTICAL_BRIDGE,
-        ]
+        self.possible_theme_types: list[str] = list(self.discovery_theme_types)
 
         # Which theme types are *currently exerting thematic pressure*.  Empty
         # by default: "Most of the time, therefore, themes behave as passive
@@ -414,14 +430,20 @@ class Themespace:
         self._numeric_layout: Any = None
         self._numeric_params: Any = None
 
+    def types_for_mode(self, justify_mode: bool) -> list[str]:
+        """The theme types meaningful in a mode: all three in justification mode, else top and
+        vertical.  ``possible_theme_types`` is always this for the run's current mode."""
+        return list(self.theme_types if justify_mode else self.discovery_theme_types)
+
+    def theme_type_for_bridge_type(self, bridge_type: str) -> str:
+        """The theme type of a bridge-type spelling (the bridge-type name, the theme-type name,
+        either with a hyphen for an underscore); an unknown spelling is returned as given."""
+        if not isinstance(bridge_type, str):
+            return bridge_type
+        return self._theme_type_of.get(bridge_type.replace("-", "_"), bridge_type)
+
     def set_justify_mode(self, enabled: bool) -> None:
-        if enabled:
-            self.possible_theme_types = list(ALL_THEME_TYPES)
-        else:
-            self.possible_theme_types = [
-                THEME_TOP_BRIDGE,
-                THEME_VERTICAL_BRIDGE,
-            ]
+        self.possible_theme_types = self.types_for_mode(enabled)
         # Pressure can only be exerted by a type the mode allows.
         self.active_theme_types = [
             tt for tt in self.active_theme_types if tt in self.possible_theme_types
@@ -576,7 +598,7 @@ class Themespace:
         Returns ``[bridge_type, (dimension, relation), ...]`` matching the
         Scheme list format used by rules, justification, and jootsing.
         """
-        tt = theme_type_for_bridge_type(bridge_type)
+        tt = self.theme_type_for_bridge_type(bridge_type)
         margin = self.meta.get_param("dominant_theme_margin")
         entries: list[tuple[str, str | None]] = []
         for cluster in self.clusters:
@@ -623,7 +645,7 @@ class Themespace:
         # ``*display-mode?*`` (``workspace-graphics.ss:80-88, 674``), before it asks the Themespace,
         # so with Self-watching off nothing below is put back.
         self._saved_state = None
-        for tt in ALL_THEME_TYPES:
+        for tt in self.theme_types:
             self.delete_theme_type(tt)
             for cluster in self.get_clusters(tt):
                 cluster.frozen = False
@@ -701,11 +723,11 @@ class Themespace:
         the order in which pressure happened to be switched on, so that the
         thematic scout's weighted choice does not depend on clamp history.
         """
-        return [tt for tt in ALL_THEME_TYPES if tt in self.active_theme_types]
+        return [tt for tt in self.theme_types if tt in self.active_theme_types]
 
     def get_clusters(self, theme_type: str) -> list[ThemeCluster]:
         """Every cluster of *theme_type*.  Scheme: ``get-clusters`` (themes.ss:190-194)."""
-        tt = theme_type_for_bridge_type(theme_type)
+        tt = self.theme_type_for_bridge_type(theme_type)
         return [c for c in self.clusters if c.theme_type == tt]
 
     def has_thematic_pressure(self, types: list[str] | None = None) -> bool:
@@ -802,7 +824,7 @@ class Themespace:
         the bottom patterns separately, and the expiry of the first switched pressure
         off globally.
         """
-        tt = theme_type_for_bridge_type(theme_type)
+        tt = self.theme_type_for_bridge_type(theme_type)
         for cluster in self.clusters:
             if cluster.theme_type != tt:
                 continue
@@ -856,16 +878,14 @@ class Themespace:
 
 def bridge_type_for_theme_type(theme_type: str) -> str:
     """``top_bridge`` -> ``top``.  Scheme: ``theme-type->bridge-type`` (themes.ss:735-740)."""
+    from server.engine.run_binding import vocab
+
+    v = vocab()
     return {
-        THEME_TOP_BRIDGE: "top",
-        THEME_BOTTOM_BRIDGE: "bottom",
-        THEME_VERTICAL_BRIDGE: "vertical",
+        v.theme_type_top_bridge: v.bridge_type_top,
+        v.theme_type_bottom_bridge: v.bridge_type_bottom,
+        v.theme_type_vertical_bridge: v.bridge_type_vertical,
     }[theme_type]
-
-
-def bridge_orientation(bridge_type: str) -> str:
-    """``top``/``bottom`` are horizontal, ``vertical`` is vertical."""
-    return "horizontal" if bridge_type in ("top", "bottom") else "vertical"
 
 
 def pick_theme_type(themespace: Themespace, workspace: Any, rng: Any) -> str | None:
@@ -959,7 +979,9 @@ def propose_description_based_on_theme(
     # (``utilities.ss:443-448``).
     descriptor = rng.weighted_pick(candidates, [c.activation for c in candidates])
     description = Description(obj, dimension, descriptor)
-    description.proposal_level = description.PROPOSED
+    from server.engine.run_binding import vocab
+
+    description.proposal_level = vocab().proposal_level_proposed
     descriptor.activate_from_workspace()
     return description
 

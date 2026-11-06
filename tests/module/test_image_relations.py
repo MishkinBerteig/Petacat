@@ -24,6 +24,7 @@ import pytest
 from server.engine.metadata import MetadataProvider
 from server.engine.rules import _generate_image_letters
 from server.engine.runner import EngineRunner
+from tests.support import standard_names
 
 pytestmark = pytest.mark.numeric_matrix
 
@@ -60,10 +61,10 @@ def _same_group(ctx, string, letters):
         for i in range(len(letters) - 1)
     ]
     for b in bonds:
-        b.proposal_level = b.BUILT
+        b.proposal_level = standard_names.BUILT
         string.add_bond(b)
     group = Group(string, samegrp, facet, None, letters, bonds)
-    group.proposal_level = group.BUILT
+    group.proposal_level = standard_names.BUILT
     string.groups.append(group)
     for letter in letters:
         letter.enclosing_group = group

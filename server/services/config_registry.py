@@ -10,8 +10,9 @@ Built by introspecting the models in ``server/models/metadata.py`` (the configur
   declaration here stops the application importing this module, so a table is never
   silently unaddressable.
 
-``REGISTRY`` is the tables the change API addresses (the 13 enum tables, which are the
-engine's vocabulary, are not among them).  ``ENUM_REGISTRY`` is those 13 and ``LAYER_REGISTRY``
+``REGISTRY`` is the tables the change API addresses by generic ops (the 18 enum tables, which
+are the engine's vocabulary, are not among them; the change API's ``rename_enum_value`` is the
+one op that reads and writes them).  ``ENUM_REGISTRY`` is those 18 and ``LAYER_REGISTRY``
 is both: the journal layer (``server/services/journal.py``) writes all of them, because the
 Metacat Standard Configuration's first load and the Admin enum editor do.
 
@@ -79,7 +80,8 @@ _CODE_COLUMNS: dict[str, frozenset[str]] = {
     ),
 }
 
-#: The columns every enum lookup table has; its key is ``name`` and its order ``sort_order``.
+#: The columns every enum lookup table has (it may add more); its key is ``name`` and its
+#: order ``sort_order``.
 _ENUM_COLUMNS = frozenset({"name", "display_label", "sort_order", "description"})
 
 
@@ -184,7 +186,10 @@ def configuration_table_names() -> frozenset[str]:
 
 
 def _is_enum_table(model: type) -> bool:
-    return {c.name for c in model.__table__.columns} == _ENUM_COLUMNS
+    """An enum lookup table has the four enum columns (and may add more: ``role``,
+    ``behaviour``, ``serialised``, a clamp type's factors ...)."""
+    columns = {c.name for c in model.__table__.columns}
+    return _ENUM_COLUMNS <= columns and [c.name for c in model.__table__.primary_key.columns] == ["name"]
 
 
 def _json_columns(model: type) -> frozenset[str]:
@@ -199,7 +204,7 @@ def _build() -> tuple[dict[str, TableSpec], dict[str, TableSpec]]:
     for name, model in sorted(configuration_models().items()):
         if _is_enum_table(model):
             enums[name] = TableSpec(
-                name, model, ("name",), ("sort_order",), frozenset(), frozenset()
+                name, model, ("name",), ("sort_order",), frozenset(), _json_columns(model)
             )
             continue
         if name not in _NATURAL_KEYS:
@@ -226,8 +231,8 @@ _registry, _enums = _build()
 #: The tables the change API addresses, by database table name.
 REGISTRY: Mapping[str, TableSpec] = MappingProxyType(_registry)
 
-#: The 13 enum lookup tables (the engine's vocabulary): written by the layer, not addressed
-#: by the change API.
+#: The 18 enum lookup tables (the engine's vocabulary): written by the layer, not addressed
+#: by the change API's generic ops (``rename_enum_value`` renames a row of one).
 ENUM_REGISTRY: Mapping[str, TableSpec] = MappingProxyType(_enums)
 
 #: Every table the journal layer writes: ``REGISTRY`` and ``ENUM_REGISTRY``.

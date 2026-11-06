@@ -8,15 +8,21 @@ import { clampThemes } from '@/api/client';
 import { useSelfWatchingDisabled } from '@/components/SelfWatchingWarning';
 import { useCatalogueNumber } from '@/hooks/useParameterCatalogue';
 import { useRunStore, type ThemeEditState } from '@/store/runStore';
+import { useVocabulary, type RoleName } from '@/store/vocabulary';
 import type { ClusterState, ThemespaceState, ThemeState } from '@/types';
 
 /** Map a theme type key to a column heading. */
-function columnLabel(themeType: string): string {
-  const t = themeType.toLowerCase().replace(/[-\s]/g, '_');
-  if (t.includes('top')) return 'TOP BRIDGE';
-  if (t.includes('vertical')) return 'VERTICAL BRIDGE';
-  if (t.includes('bottom')) return 'BOTTOM BRIDGE';
+function columnLabel(v: RoleName, themeType: string): string {
+  const t = normaliseType(themeType);
+  if (t === normaliseType(v('theme_type.top_bridge'))) return 'TOP BRIDGE';
+  if (t === normaliseType(v('theme_type.vertical_bridge'))) return 'VERTICAL BRIDGE';
+  if (t === normaliseType(v('theme_type.bottom_bridge'))) return 'BOTTOM BRIDGE';
   return themeType;
+}
+
+/** A theme type compared case- and separator-blind, as the grid always has. */
+function normaliseType(themeType: string): string {
+  return themeType.toLowerCase().replace(/[-\s]/g, '_');
 }
 
 /** Group clusters by their theme_type. */
@@ -323,6 +329,7 @@ export function ThemespaceGrid({
   /** Undo the last clamp, as the Options menu's "Undo last clamp" does. */
   onRelease?: () => void;
 }) {
+  const v = useVocabulary();
   if (!themespace) {
     return (
       <div className="text-muted text-sm" style={{ padding: 16, textAlign: 'center' }}>
@@ -335,11 +342,15 @@ export function ThemespaceGrid({
   const possible = themespace.possible_theme_types ?? active_theme_types;
   const grouped = groupByType(clusters);
 
-  const columnOrder = ['top_bridge', 'vertical_bridge', 'bottom_bridge'];
+  const columnOrder = [
+    v('theme_type.top_bridge'),
+    v('theme_type.vertical_bridge'),
+    v('theme_type.bottom_bridge'),
+  ];
   const activeColumns = columnOrder.filter(
     t =>
       grouped[t]?.length ||
-      possible.some(at => at.toLowerCase().replace(/[-\s]/g, '_') === t),
+      possible.some(at => normaliseType(at) === normaliseType(t)),
   );
   const displayKeys = activeColumns.length > 0 ? activeColumns : Object.keys(grouped);
 
@@ -412,7 +423,7 @@ export function ThemespaceGrid({
     >
       {displayKeys.map(key => {
         const isActive = active_theme_types.some(
-          at => at.toLowerCase().replace(/[-\s]/g, '_') === key,
+          at => normaliseType(at) === normaliseType(key),
         );
         return (
           <div
@@ -439,7 +450,7 @@ export function ThemespaceGrid({
                 paddingBottom: 4,
               }}
             >
-              {columnLabel(key)}
+              {columnLabel(v, key)}
               {isActive && (
                 <span style={{ fontSize: 8, marginLeft: 4, color: '#4caf50' }}>ACTIVE</span>
               )}
@@ -451,7 +462,7 @@ export function ThemespaceGrid({
                 cluster={cluster}
                 labels={themespace.dimension_labels?.[cluster.dimension]}
                 relationLabels={themespace.relation_labels}
-                abbreviate={key === 'vertical_bridge'}
+                abbreviate={key === v('theme_type.vertical_bridge')}
                 clickSelect={editing !== undefined}
                 onClamp={
                   onClamp ? (theme, a) => onClamp(theme, cluster, a) : undefined

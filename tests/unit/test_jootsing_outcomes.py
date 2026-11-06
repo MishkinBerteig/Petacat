@@ -11,21 +11,21 @@ from server.engine.jootsing import (
     get_clamp_jootsing_probability,
     get_most_recent_event_set,
 )
-from server.engine.rules import CLAUSE_INTRINSIC, Rule, RuleClause
+from server.engine.rules import Rule, RuleClause
+from tests.support.standard_configuration import standard_meta
+from tests.support.standard_names import CLAUSE_INTRINSIC
+from server.engine.run_binding import vocab
 from server.engine.temperature import Temperature
-from server.engine.trace import (
-    BOND_BUILT,
-    ClampEvent,
-    SnagEvent,
-    TemporalTrace,
-    TraceEvent,
-)
+from server.engine.trace import ClampEvent, SnagEvent, TemporalTrace, TraceEvent
+from tests.support.standard_names import BOND_BUILT
 
 
 class _FakeMeta:
-    """The parameters ``jootsing.py`` reads, and nothing else."""
+    """The parameters ``jootsing.py`` reads, and the Standard Configuration's clamp types and
+    codelet patterns (a clamp names the patterns it clamps)."""
 
-    codelet_patterns: dict = {}
+    clamp_types = standard_meta().clamp_types
+    codelet_patterns = standard_meta().codelet_patterns
 
     def get_param(self, name, default=None):
         return {
@@ -109,7 +109,7 @@ def test_two_justify_clamps_over_the_same_rule_pair_are_the_same_clamp():
     for count, rules in ((100, [first, second]), (200, [second, first]), (300, [first, second])):
         trace.record_event(_justify_clamp(rules, count))
 
-    assert len(get_most_recent_event_set(trace, "clamp")) == 3
+    assert len(get_most_recent_event_set(trace, vocab().event_type_clamp_start)) == 3
 
 
 def test_justify_clamps_over_different_rules_are_different_clamps():
@@ -118,7 +118,7 @@ def test_justify_clamps_over_different_rules_are_different_clamps():
     trace.record_event(_justify_clamp([first, second], 100))
     trace.record_event(_justify_clamp([first, third], 200))
 
-    assert len(get_most_recent_event_set(trace, "clamp")) == 1
+    assert len(get_most_recent_event_set(trace, vocab().event_type_clamp_start)) == 1
 
 
 # --- JO-3: the justify clamp-type factor ------------------------------------

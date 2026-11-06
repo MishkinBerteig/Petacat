@@ -9,13 +9,15 @@ import pytest
 
 from server.engine import codelet_dsl as _dsl  # noqa: F401
 from server.engine.bonds import Bond
-from server.engine.bridges import BRIDGE_TOP, _propose_bridge_side_effects
+from server.engine.bridges import _propose_bridge_side_effects
+from tests.support.standard_names import BRIDGE_TOP
 from server.engine.codelet_dsl import builtins as B
 from server.engine.codelet_dsl.interpreter import CodeletInterpreter, CodeletRegistry
 from server.engine.groups import Group
 from server.engine.metadata import MetadataProvider
 from server.engine.runner import EngineRunner
 from server.engine.workspace import Workspace
+from tests.support import standard_names
 
 pytestmark = pytest.mark.numeric_matrix
 
@@ -42,7 +44,7 @@ def ctx_mrrjjj(runner):
     letters = target.letters
     for members in (letters[1:3], letters[3:6]):
         group = Group(target, samegrp, lcat, None, list(members), [])
-        group.proposal_level = Group.BUILT
+        group.proposal_level = standard_names.BUILT
         target.add_group(group)
     return ctx
 

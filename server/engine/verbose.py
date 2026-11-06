@@ -44,6 +44,7 @@ import threading
 from collections import deque
 from typing import TYPE_CHECKING, Any
 
+from server.engine.run_binding import vocab as run_vocab
 from server.engine.slipnet import holds_role, lowercase_name
 
 if TYPE_CHECKING:
@@ -209,9 +210,6 @@ def full_object_name(obj: Any) -> str:
     return _full_object_name(obj)
 
 
-_LEVEL_WORDS = {"proposed": "proposed", "evaluated": "evaluated"}
-
-
 def level_suffix(structure: Any, level: str | None = None) -> str:
     """`` (new)``, `` (proposed)`` or `` (evaluated)``; nothing once built.
 
@@ -219,11 +217,12 @@ def level_suffix(structure: Any, level: str | None = None) -> str:
     a state Petacat's structures do not have: a call site that prints one in that
     moment says so with ``level="new"``.
     """
+    built = run_vocab().proposal_level_built
     if level is None:
-        level = getattr(structure, "proposal_level", "built")
-    if level == "built":
+        level = getattr(structure, "proposal_level", built)
+    if level == built:
         return ""
-    return f" ({_LEVEL_WORDS.get(level, level)})"
+    return f" ({level})"
 
 
 # ---------------------------------------------------------------------------
@@ -240,7 +239,7 @@ def concept_mapping_long_name(cm: Any) -> str:
     else:
         head = "SLIPPAGE"
     label = getattr(cm, "label", None)
-    if label is None or getattr(label, "relation", None) == "identity":
+    if label is None or getattr(label, "relation", None) == run_vocab().theme_relation_identity:
         arrow = "=>"
     else:
         arrow = f"=({_short(label)})=>"
@@ -318,7 +317,12 @@ def _bond_text(bond: Any, level: str | None) -> str:
 
 def _bridge_text(bridge: Any, level: str | None) -> str:
     """``print`` of a horizontal or vertical bridge (``bridges.ss:78``, ``455``)."""
-    orientation = "vertical" if getattr(bridge, "bridge_type", "") == "vertical" else "horizontal"
+    v = run_vocab()
+    orientation = (
+        v.bridge_orientation_vertical
+        if getattr(bridge, "bridge_type", "") == v.bridge_type_vertical
+        else v.bridge_orientation_horizontal
+    )
     head = "Spanning " if bridge.is_spanning_bridge else ""
     noun = f"{head}{orientation} bridge" if head else f"{orientation.capitalize()} bridge"
     text = (
@@ -367,7 +371,7 @@ def theme_ascii_name(theme: Any, slipnet: Any) -> str:
     nodes = getattr(slipnet, "nodes", {}) or {}
     dimension = nodes.get(theme.dimension)
     relation = None
-    if theme.relation and theme.relation not in ("diff", "different"):
+    if theme.relation and theme.relation not in (run_vocab().theme_relation_diff, "different"):
         relation = nodes.get(theme.relation) or _relation_node(slipnet, theme.relation)
     return f"{_short(dimension) if dimension is not None else theme.dimension}:" + (
         _node_name(relation) if relation is not None else "different"
@@ -398,14 +402,13 @@ def narrate_event_display(log: "VerboseLog", event: Any) -> None:
     (``trace.ss:427``); an answer prints its slippage log (``trace.ss:452``), and a rule
     event the rule, its clauses and its quality figures (``trace.ss:988``).
     """
-    from server.engine import trace as T
-
+    v = run_vocab()
     kind = getattr(event, "event_type", None)
-    if kind in (T.CLAMP_START, T.CLAMP_END):
+    if kind in (v.event_type_clamp_start, v.event_type_clamp_end):
         log.say("progress-achieved-by-clamp", exact(getattr(event, "progress_achieved", 0)))
-    elif kind == T.SNAG:
+    elif kind == v.event_type_snag:
         log.say("progress-achieved-by-snag", exact(getattr(event, "progress_achieved", 0)))
-    elif kind == T.ANSWER_FOUND:
+    elif kind == v.event_type_answer_found:
         # ``display`` of an answer (``trace.ss:427-454``): the unjustified slippages
         # first (only an unjustified answer has any), then ``(print slippage-log)``.
         if getattr(event, "unjustified_slippages", None):
@@ -413,7 +416,7 @@ def narrate_event_display(log: "VerboseLog", event: Any) -> None:
             log.print_object(list(event.unjustified_slippages))
         if getattr(event, "slippage_log", None) is not None:
             log.print_object(event.slippage_log)
-    elif kind == T.RULE_BUILT and getattr(event, "structures", None):
+    elif kind == v.event_type_rule_built and getattr(event, "structures", None):
         _narrate_rule_display(log, event)
 
 
@@ -459,7 +462,7 @@ def rule_clause_text(clause: Any) -> str:
         names = " ".join(_node_name(n) for n in clause.verbatim_letters or [])
         return f"VERBATIM ({names})\n"
     descriptions = clause.object_descriptions
-    if clause.clause_type == "intrinsic":
+    if clause.clause_type == run_vocab().clause_type_intrinsic:
         text = f"CHANGE {_format_object_description(descriptions[0])}\n"
         for change in clause.changes:
             target = change.relation if change.relation is not None else change.to_descriptor
@@ -519,16 +522,19 @@ class VerboseLog:
     def fresh(self, obj: Any) -> str:
         """The level Metacat would print *obj* at as it is about to be built again:
         ``new`` for an object never built, ``built`` for one that already was."""
-        return "built" if (type(obj).__name__, getattr(obj, "id", id(obj))) in self._built else "new"
+        if (type(obj).__name__, getattr(obj, "id", id(obj))) in self._built:
+            return run_vocab().proposal_level_built
+        return "new"
 
     def reveal(self, entry: Any) -> list[str]:
         """``reveal`` of a theme-pattern entry (``utilities.ss:936``): a slipnode shows as
         ``<short-name>`` in lower case."""
         nodes = getattr(self.slipnet, "nodes", {}) or {}
         out = []
+        diff = run_vocab().theme_relation_diff
         for key in ("dimension", "relation"):
             name = entry.get(key) if isinstance(entry, dict) else None
-            if key == "relation" and name in (None, "diff", "different"):
+            if key == "relation" and name in (None, diff, "different"):
                 out.append("#f")  # a difference theme has no relation
                 continue
             node = nodes.get(name) if isinstance(name, str) else name

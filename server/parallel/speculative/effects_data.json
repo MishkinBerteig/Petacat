@@ -288,7 +288,7 @@
    "kind": "READ",
    "reads": [],
    "writes": [],
-   "why": "slipnet.roles attribute: the resolved Roles record is frozen after build."
+   "why": "slipnet.roles attribute or meta.vocabulary attribute: both records are frozen after build."
   },
   "relation": {
    "kind": "READ",
@@ -800,7 +800,7 @@
    ],
    "uses_cc": true,
    "why": "Reads workspace.answer_string (set only by report_answer = barrier). `justify_mode` and `codelet_count` are namespace locals captured at exec start. Everything up to line 80 (the whole admissibility g",
-   "body_digest": "ea4e8cabaa2225ef2f0d66e006d029009cda515a13f105e8d647ce2511d9694e"
+   "body_digest": "2ebd1320b81abc9b3d4ee5a85f0a91484c263b87b308c3bbb8bc010fb7031f2b"
   },
   "important-object-bridge-scout": {
    "barrier": false,
@@ -820,7 +820,7 @@
    "uses_cc": true,
    "why": "Only prefix body with a hidden SHARED write before its first builtin write. Scans string2.objects and every object's relevant descriptions. ['verbose' appears in writes only when ctx.verbose is on.]",
    "profit_note": "WP10: speculating only this type changed a run's time by x0.986 (median of 3 cases, 4 workers, M5 Max): its hand-off and cross-thread costs exceed the work it hides",
-   "body_digest": "d806dcae97bd3d0d5a6e869f511fd09e1b330c3aa89ebf3a68b307e65330b7d3"
+   "body_digest": "5fc4966397ad36d5b86e78980e9c8c3f605d06e6b6af0156bd3b14b84ef5d7b4"
   },
   "bridge-evaluator": {
    "barrier": false,
@@ -962,7 +962,7 @@
    ],
    "uses_cc": true,
    "why": "build_rule_from_bridges/currently_works: image caches and id/description writes on shared objects",
-   "body_digest": "0f7efed0e405d7a64c8c5330d6078447e45e4d4d86845b5ffb53386ccd1d69ea"
+   "body_digest": "3ad9df54b91322c335cbafb2894e6c46816c69a3d4c656d0d2608bce619d6980"
   },
   "rule-evaluator": {
    "barrier": false,
@@ -1033,7 +1033,7 @@
    ],
    "uses_cc": false,
    "why": "BARRIER: can call record_snag (update cycle + coderack flush) and report_answer (update cycle, memory). Most executions fizzle at the first probability gate (4,238 executions, 187 answers) but cannot ",
-   "body_digest": "a11f9e4d0c83bc898a3aadbbe5ae49ed54d6f088e00fcbdf79b73a6855a09706"
+   "body_digest": "c73b005876f7f561a0d9edc4509e857ff90f0567615f38f108f06a72d6b20ba1"
   },
   "answer-justifier": {
    "barrier": true,
@@ -1085,7 +1085,7 @@
    ],
    "uses_cc": true,
    "why": "interleaves id-allocating writes with reads; 0.03% of codelets",
-   "body_digest": "afbc7cc50235b006a4a4ff92211ab68807518ddf811c506ae315e891aa98014c"
+   "body_digest": "d6220a6b1748e1c84fd4d09a640cbdb04f86317e078b029a82bcc3ed48bee10a"
   },
   "progress-watcher": {
    "barrier": true,

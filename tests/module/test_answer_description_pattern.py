@@ -19,12 +19,15 @@ import os
 import pytest
 
 from server.engine.answers import _distil_vertical_pattern, create_answer_description
-from server.engine.bridges import BRIDGE_VERTICAL, Bridge
+from server.engine.bridges import Bridge
+from tests.support.standard_names import BRIDGE_VERTICAL
 from server.engine.concept_mappings import ConceptMapping
 from server.engine.groups import Group
 from server.engine.metadata import MetadataProvider
 from server.engine.runner import EngineRunner
-from server.engine.trace import CONCEPT_MAPPING_BUILT, GROUP_BUILT, TraceEvent
+from server.engine.trace import TraceEvent
+from tests.support.standard_names import CONCEPT_MAPPING_BUILT, GROUP_BUILT
+from tests.support import standard_names
 
 # Every test here reaches the numeric seam through ``init_mcat``'s first
 # ``update-workspace-values``, so each runs once per backend. See tests/conftest.py.
@@ -67,7 +70,7 @@ def _spanning_group(ctx, string, bond_category, direction):
         objects=list(string.letters),
         bonds=[],
     )
-    group.proposal_level = Group.BUILT
+    group.proposal_level = standard_names.BUILT
     string.add_group(group)
     return group
 
@@ -92,7 +95,7 @@ def _vertical_bridge(ctx, object1, object2, mappings):
             for dimension, descriptor1, descriptor2 in mappings
         ],
     )
-    bridge.proposal_level = Bridge.BUILT
+    bridge.proposal_level = standard_names.BUILT
     ctx.workspace.add_bridge(bridge)
     object1.vertical_bridge = bridge
     object2.vertical_bridge = bridge
@@ -354,7 +357,7 @@ def test_an_event_on_a_horizontal_bridge_is_ignored(meta):
     """``relevant-for-answer-description?`` requires ``(eq? bridge-type 'vertical)``
     (``trace.ss:784``): the answer's *vertical* pattern is about how the two rows
     correspond, not about either row's own transformation."""
-    from server.engine.bridges import BRIDGE_TOP
+    from tests.support.standard_names import BRIDGE_TOP
 
     ctx = _engine(meta)
     nodes = ctx.slipnet.nodes
@@ -376,7 +379,7 @@ def test_an_event_on_a_horizontal_bridge_is_ignored(meta):
             )
         ],
     )
-    bridge.proposal_level = Bridge.BUILT
+    bridge.proposal_level = standard_names.BUILT
     ctx.workspace.add_bridge(bridge)
     _slippage_event(ctx, bridge, bridge.concept_mappings[0])
 
@@ -398,10 +401,23 @@ def test_the_description_is_indexed_by_the_distilled_pattern(meta):
     _group_event(ctx, initial)
     _group_event(ctx, target)
 
+    from server.engine.rules import Rule, RuleClause
+
+    # An answer always has its two rules (ruling 35): a verbatim rule of no letters stands in.
+    top_rule = Rule(
+        standard_names.RULE_TOP,
+        [RuleClause(clause_type=standard_names.CLAUSE_VERBATIM, verbatim_letters=[])],
+        workspace=ctx.workspace,
+    )
+    bottom_rule = Rule(
+        standard_names.RULE_BOTTOM,
+        [RuleClause(clause_type=standard_names.CLAUSE_VERBATIM, verbatim_letters=[])],
+        workspace=ctx.workspace,
+    )
     description = create_answer_description(
         ctx.workspace,
-        None,
-        None,
+        top_rule,
+        bottom_rule,
         quality=70.0,
         temperature=30.0,
         themes={"vertical_bridge": {DIRECTION: "opposite"}},

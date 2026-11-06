@@ -2,7 +2,7 @@
 
 > **Auto-generated.** Run `python scripts/generate_api_docs.py` to regenerate from the FastAPI application.
 
-184 HTTP routes, plus `WS /ws/runs/{run_id}` for live state push.
+185 HTTP routes, plus `WS /ws/runs/{run_id}` for live state push.
 
 Interactive documentation is served at `/docs` while the API is running.
 
@@ -136,6 +136,31 @@ Metacat Mode: reading back what a Normal or Audit run recorded, and the episodic
 | `DELETE` | `/api/review/runs/{run_id}/inspector` | Close Inspector |
 | `POST` | `/api/review/runs/{run_id}/inspector/advance` | Advance Inspector |
 
+## Configurations and the change API
+
+Metacat Mode and Training Mode: one batch, `POST /api/configurations/{id}/changes`, is how configuration is written (the Admin editors, the Database tab, restore, reset, import, the external route and the in-worker learner submit the same batch); `GET .../schema` lists the tables, the ops and the shape of a batch. **Vocabulary.** `rename_enum_value` renames a row of an enum table or a theme relation and rewrites every column that names it: `posting_rules.direction`, `codelet_type_defs.family` and `.phase`, `slipnet_link_defs.link_type`, `engine_params.value_type`, `formula_coefficients.value_type`, `clamp_types.progress_focus`, `progress_focuses.event_types` and `theme_dimension_defs.valid_relations`, and the keys of the commentary sections keyed by the table's names; the row keeps its `role` (`behaviour` for `link_types`) and its place. Bodies, predicates, formulas, parameters and templates that still spell the old name are listed as `dangling` and left alone, as `rename_node` lists code. An urgency level rename also rewrites `clamp_types.codelet_background_level`. Deleting an enum row that holds a `role` (a `behaviour`, for `link_types`) is refused, `422 role_bound`: unbind it first by setting the column to null. A `role` must be a name of the table's vocabulary and held by one row (else `422 unknown_reference` or `422 role_taken`); an unbound row is allowed and inert, except that it becomes a valid value of the columns that name its table. **Episodic Memory.** A Training Mode Session's Episodic Memory persists names (theme types in theme patterns, rule and clause types in signatures, relations in concept patterns). The change API has one rule for every name the memory holds, a node or a vocabulary row alike: it neither refuses nor rewrites. The rename, removal or merge is carried out on the configuration, and the session's memory keeps the names it stored. **Parameters that name things.** `engine_params.refers_to` declares what a parameter's value names: `node_list`, `trigger_node_list`, `node_map`, `codelet_type_list`, `urgency_level` or null. Removing, renaming or merging a node edits every parameter that refers to nodes; a codelet type edit edits the `codelet_type_list` parameters; an urgency level edit lists the `urgency_level` parameters as `dangling`. A rule-trigger edit (`add_trigger`, `remove_trigger`) also changes the parameter whose `refers_to` is `trigger_node_list` (`top_down_slipnodes` in the Metacat Standard Configuration): the node is added to it, or removed from it only when no rule still triggers the node. A configuration that declares no such parameter leaves every parameter alone.
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/api/configurations` | List Configurations |
+| `GET` | `/api/configurations/compare` | Get Compare |
+| `POST` | `/api/configurations/edits` | Post Edits |
+| `POST` | `/api/configurations/edits/preview` | Post Edits Preview |
+| `GET` | `/api/configurations/{configuration_id}` | Get Configuration |
+| `PATCH` | `/api/configurations/{configuration_id}` | Patch Configuration |
+| `POST` | `/api/configurations/{configuration_id}/apply-from` | Post Apply From |
+| `GET` | `/api/configurations/{configuration_id}/as-of` | Get As Of |
+| `POST` | `/api/configurations/{configuration_id}/changes` | Post Changes |
+| `GET` | `/api/configurations/{configuration_id}/diff` | Get Diff |
+| `GET` | `/api/configurations/{configuration_id}/export` | Get Export |
+| `POST` | `/api/configurations/{configuration_id}/reset-to-standard` | Post Reset |
+| `POST` | `/api/configurations/{configuration_id}/restore` | Post Restore |
+| `POST` | `/api/configurations/{configuration_id}/restore-selected` | Post Restore Selected |
+| `GET` | `/api/configurations/{configuration_id}/rows` | Get Rows |
+| `GET` | `/api/configurations/{configuration_id}/schema` | Get Schema |
+| `GET` | `/api/configurations/{configuration_id}/status` | Get Status |
+| `GET` | `/api/configurations/{configuration_id}/verify-journal` | Get Verify Journal |
+
 ## Configuration
 
 Metacat Mode: the editable copy of the seed data (the global configuration). A Training Mode Session copies it when created and never changes it.
@@ -164,6 +189,7 @@ Metacat Mode: the editable copy of the seed data (the global configuration). A T
 | `POST` | `/api/admin/enums/{table}` | Create Enum Value |
 | `PUT` | `/api/admin/enums/{table}/{name}` | Update Enum Value |
 | `DELETE` | `/api/admin/enums/{table}/{name}` | Delete Enum Value |
+| `POST` | `/api/admin/enums/{table}/{name}/rename` | Rename Enum Value |
 | `GET` | `/api/admin/export` | Export Metadata |
 | `GET` | `/api/admin/formula-coefficients` | List Formula Coefficients |
 | `POST` | `/api/admin/formula-coefficients` | Create Formula Coefficient |
@@ -229,24 +255,6 @@ What the process resolved at startup.
 
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/api/configurations` | List Configurations |
-| `GET` | `/api/configurations/compare` | Get Compare |
-| `POST` | `/api/configurations/edits` | Post Edits |
-| `POST` | `/api/configurations/edits/preview` | Post Edits Preview |
-| `GET` | `/api/configurations/{configuration_id}` | Get Configuration |
-| `PATCH` | `/api/configurations/{configuration_id}` | Patch Configuration |
-| `POST` | `/api/configurations/{configuration_id}/apply-from` | Post Apply From |
-| `GET` | `/api/configurations/{configuration_id}/as-of` | Get As Of |
-| `POST` | `/api/configurations/{configuration_id}/changes` | Post Changes |
-| `GET` | `/api/configurations/{configuration_id}/diff` | Get Diff |
-| `GET` | `/api/configurations/{configuration_id}/export` | Get Export |
-| `POST` | `/api/configurations/{configuration_id}/reset-to-standard` | Post Reset |
-| `POST` | `/api/configurations/{configuration_id}/restore` | Post Restore |
-| `POST` | `/api/configurations/{configuration_id}/restore-selected` | Post Restore Selected |
-| `GET` | `/api/configurations/{configuration_id}/rows` | Get Rows |
-| `GET` | `/api/configurations/{configuration_id}/schema` | Get Schema |
-| `GET` | `/api/configurations/{configuration_id}/status` | Get Status |
-| `GET` | `/api/configurations/{configuration_id}/verify-journal` | Get Verify Journal |
 | `GET` | `/api/journal` | Get Journal |
 | `POST` | `/api/journal/check-names` | Check Names |
 | `GET` | `/api/journal/where-did-name-go` | Where Did Name Go |

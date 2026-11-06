@@ -22,11 +22,8 @@ from server.engine.rng import RNG
 from server.engine.roles import absent
 from server.engine.runner import EngineRunner
 from server.engine.slipnet import Slipnet, opposite_node
-from server.engine.themes import (
-    RELATION_DIFFERENT,
-    relation_name_for_label,
-    theme_type_for_bridge_type,
-)
+from server.engine.themes import Themespace, relation_name_for_label
+from tests.support.standard_names import RELATION_DIFFERENT
 from tests.support import golden_baseline as gb
 from tests.support import reduced_configurations as rc
 
@@ -93,14 +90,17 @@ def test_get_related_node_by_relation_name_equals_by_node(slipnet) -> None:
 
 
 @pytest.mark.parametrize("spelling", ["top", "top-bridge", "top_bridge"])
-def test_every_top_spelling_is_the_top_bridge_theme_type(spelling) -> None:
-    assert theme_type_for_bridge_type(spelling) == "top_bridge"
+def test_every_top_spelling_is_the_top_bridge_theme_type(spelling, meta) -> None:
+    v = meta.vocabulary
+    assert Themespace(meta).theme_type_for_bridge_type(spelling) == v.theme_type_top_bridge
 
 
-def test_the_other_bridge_types_and_unknown_spellings() -> None:
-    assert theme_type_for_bridge_type("bottom-bridge") == "bottom_bridge"
-    assert theme_type_for_bridge_type("vertical") == "vertical_bridge"
-    assert theme_type_for_bridge_type("sideways") == "sideways"
+def test_the_other_bridge_types_and_unknown_spellings(meta) -> None:
+    v = meta.vocabulary
+    themespace = Themespace(meta)
+    assert themespace.theme_type_for_bridge_type("bottom-bridge") == v.theme_type_bottom_bridge
+    assert themespace.theme_type_for_bridge_type("vertical") == v.theme_type_vertical_bridge
+    assert themespace.theme_type_for_bridge_type("sideways") == "sideways"
 
 
 # --- the diff abstractness ---------------------------------------------------------------

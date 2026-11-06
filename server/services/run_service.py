@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from server.engine import hardware
 from server.engine.coderack import coderack_display
 from server.engine.ids import KIND_ANSWER, KIND_SNAG
-from server.engine.memory import AnswerDescription, EpisodicMemory, SnagDescription
+from server.engine.memory import AnswerDescription, EpisodicMemory, SnagDescription, clause_types_of
 from server.engine.metadata import MetadataProvider
 from server.services.configuration_store import ConfigurationStore
 from server.engine.runner import EngineContext, EngineRunner, STATUS_ANSWER_FOUND, STATUS_HALTED, STATUS_PAUSED, STATUS_RUNNING, StepResult
@@ -30,7 +30,6 @@ from server.engine.serialization import (
 from server.engine.start_check import require_run_start
 from server.engine.snag_explanation import fallback_explanation, snag_explanation_text
 from server.engine.verbose import VERBOSE_STEP_LIMIT, narrate_event_display
-from server.engine.trace import SNAG
 from server.models.run import (
     _utcnow,
     AnswerDescriptionRow,
@@ -1265,6 +1264,7 @@ class RunService:
                     "temperature": a.temperature,
                     "themes": a.themes,
                     "unjustified_slippages": a.unjustified_slippages,
+                    "clause_types": clause_types_of(a.top_rule_signature, a.bottom_rule_signature),
                     **_live_answer_fields(self.meta, a.problem, a.top_rule_description, a.answer_id),
                     "has_picture": a.picture is not None,
                 }
@@ -1285,6 +1285,7 @@ class RunService:
                     "codelet_count": s.codelet_count,
                     "temperature": s.temperature,
                     "theme_pattern": s.theme_pattern,
+                    "clause_types": clause_types_of(s.rule_signature, s.translated_rule_signature),
                     "description": s.description or "",
                     "translated_rule_description": s.translated_rule_description or "",
                     "explanation": _stored_snag_explanation(s, self.meta.commentary_templates),
@@ -1447,6 +1448,7 @@ class RunService:
                     "temperature": a.temperature,
                     "themes": a.themes,
                     "unjustified_slippages": a.unjustified_slippages,
+                    "clause_types": clause_types_of(a.top_rule_signature, a.bottom_rule_signature),
                     # §4.7.1 keeps four theme-patterns, not one, and §4.7.3's verdict
                     # reads the rules' abstractness and the coherence judgement.  Read
                     # straight off the description here rather than merged in from a
@@ -1473,6 +1475,7 @@ class RunService:
                     "codelet_count": s.codelet_count,
                     "temperature": s.temperature,
                     "theme_pattern": s.theme_pattern,
+                    "clause_types": clause_types_of(s.rule_signature, s.translated_rule_signature),
                     "description": s.description,
                     "translated_rule_description": s.translated_rule_description,
                     "explanation": snag_explanation_text(s, self.meta.commentary_templates),
@@ -1785,12 +1788,13 @@ class RunService:
         if answer is None:
             raise ValueError(f"Answer {answer_id} not found")
 
+        v = runner.ctx.meta.vocabulary
         patterns = [
             {"type": theme_type, "entries": pattern}
             for theme_type, pattern in (
-                ("vertical_bridge", answer.vertical_themes or answer.themes),
-                ("top_bridge", answer.top_themes),
-                ("bottom_bridge", answer.bottom_themes),
+                (v.theme_type_vertical_bridge, answer.vertical_themes or answer.themes),
+                (v.theme_type_top_bridge, answer.top_themes),
+                (v.theme_type_bottom_bridge, answer.bottom_themes),
             )
         ]
         shown = self._shown(run_id, ("answer", answer_id), patterns)
@@ -1818,7 +1822,9 @@ class RunService:
 
         pattern = snag.theme_pattern
         patterns = (
-            [{"type": "vertical_bridge", "entries": pattern}] if pattern else []
+            [{"type": runner.ctx.meta.vocabulary.theme_type_vertical_bridge, "entries": pattern}]
+            if pattern
+            else []
         )
         shown = self._shown(run_id, ("snag", snag_id), patterns)
         return {
@@ -1981,13 +1987,12 @@ class RunService:
         event = ClampEvent(
             codelet_count=ctx.codelet_count,
             temperature=ctx.temperature.value,
-            clamp_type="manual_clamp",
+            clamp_type=ctx.meta.vocabulary.clamp_type_manual,
             max_activation=float(ctx.meta.get_param("max_activation")),
             clamped_theme_patterns=patterns,
             clamped_concept_patterns=[],
             clamped_codelet_patterns=[],
             rules=[],
-            progress_focus="workspace",
         )
         ctx.trace.undo_last_clamp(
             ctx.themespace, ctx.slipnet, ctx.codelet_count, ctx.coderack
@@ -2195,21 +2200,26 @@ class RunService:
             urgency = int(ctx.meta.get_urgency(level))
             resolved.append((codelet_type, urgency))
             clamped.append({"codelet_type": codelet_type, "urgency": urgency})
-        if pattern in ("group", "bridge", "rule"):
+        # The patterns the configuration holds against a background of the named urgency
+        # (``manual_clamp_background_patterns`` and ``manual_clamp_background_level``).
+        if pattern in ctx.meta.get_param("manual_clamp_background_patterns"):
             resolved = ctx.coderack.against_background(
-                int(ctx.meta.get_urgency("very_low")), resolved
+                int(ctx.meta.get_urgency(ctx.meta.get_param("manual_clamp_background_level"))),
+                resolved,
             )
         event = ClampEvent(
             codelet_count=ctx.codelet_count,
             temperature=ctx.temperature.value,
-            clamp_type="manual_clamp",
+            clamp_type=ctx.meta.vocabulary.clamp_type_manual,
             clamped_theme_patterns=[],
             clamped_concept_patterns=[],
             clamped_codelet_patterns=[resolved],
             rules=[],
             # ``gui.ss:1237``: the progress a codelet clamp is judged by is the
             # structure it favours; the general patterns are judged by the Workspace.
-            progress_focus=pattern if pattern in ("rule", "group") else "workspace",
+            progress_focus=(
+                pattern if pattern in {focus.name for focus in ctx.meta.progress_focuses} else None
+            ),
         )
         ctx.trace.undo_last_clamp(
             ctx.themespace, ctx.slipnet, ctx.codelet_count, ctx.coderack
@@ -2236,10 +2246,10 @@ class RunService:
 
         ctx = runner.ctx
         entries = pattern_entries(ctx.meta, pattern)
-        last = ctx.trace.get_last_event("clamp_start")
+        last = ctx.trace.get_last_event(ctx.meta.vocabulary.event_type_clamp_start)
         if (
             ctx.trace.within_clamp_period
-            and getattr(last, "clamp_type", None) == "manual_clamp"
+            and getattr(last, "clamp_type", None) == ctx.meta.vocabulary.clamp_type_manual
             and getattr(last, "clamped_codelet_patterns", None)
         ):
             ctx.trace.undo_last_clamp(

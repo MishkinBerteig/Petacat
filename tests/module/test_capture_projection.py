@@ -58,6 +58,7 @@ from server.services.capture_projection import (
     project_trace,
     project_workspace,
 )
+from tests.support import standard_names
 
 # Every test here executes arithmetic the numeric substrate owns, so each one runs
 # once per backend in the matrix. See tests/conftest.py.
@@ -103,7 +104,8 @@ def _add_a_built_rule(ctx) -> None:
     capture, so the rule projection stays inside the equality check rather than
     beside it.
     """
-    from server.engine.rules import CLAUSE_VERBATIM, RULE_TOP, Rule, RuleClause
+    from server.engine.rules import Rule, RuleClause
+    from tests.support.standard_names import CLAUSE_VERBATIM, RULE_TOP
 
     letters = [
         ctx.slipnet.nodes[f"plato-{ch}"] for ch in ctx.workspace.modified_string.text
@@ -113,7 +115,7 @@ def _add_a_built_rule(ctx) -> None:
     rule.time_stamp = ctx.codelet_count
     rule.compute_quality(ctx.meta)
     rule.english_transcription = rule.transcribe_to_english(ctx.meta)
-    rule.proposal_level = rule.BUILT
+    rule.proposal_level = standard_names.BUILT
     ctx.workspace.add_rule(rule)
 
 
@@ -146,7 +148,8 @@ def test_a_translated_rule_justify_mode_adds_is_listed_live_and_recorded(meta):
     runner = _run_to(meta, RESTORABLE_POINT)
     _add_a_built_rule(runner.ctx)
     built = runner.ctx.workspace.top_rules[0]
-    from server.engine.rules import RULE_TOP, Rule
+    from server.engine.rules import Rule
+    from tests.support.standard_names import RULE_TOP
 
     translated = Rule(RULE_TOP, list(built.clauses))
     translated.set_verbatim_rule_information()

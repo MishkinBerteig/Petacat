@@ -23,7 +23,8 @@ import os
 
 import pytest
 
-from server.engine.bridges import BRIDGE_BOTTOM, BRIDGE_VERTICAL, Bridge
+from server.engine.bridges import Bridge
+from tests.support.standard_names import BRIDGE_BOTTOM, BRIDGE_VERTICAL
 from server.engine.codelet_dsl.builtins import get_builtins
 from server.engine.codelet_dsl.interpreter import CodeletInterpreter, CodeletRegistry
 from server.engine.concept_mappings import ConceptMapping
@@ -31,16 +32,12 @@ from server.engine.jootsing import JootserResult, joots_from_justify_clamps
 from server.engine.justify import attempt_justification
 from server.engine.metadata import MetadataProvider
 from server.engine.rng import RNG
-from server.engine.rules import (
-    CLAUSE_INTRINSIC,
-    RULE_BOTTOM,
-    RULE_TOP,
-    Rule,
-    RuleChange,
-    RuleClause,
-)
+from server.engine.rules import Rule, RuleChange, RuleClause
+from tests.support.standard_names import CLAUSE_INTRINSIC, RULE_BOTTOM, RULE_TOP
 from server.engine.runner import EngineRunner
-from server.engine.trace import ANSWER_FOUND, ClampEvent
+from server.engine.trace import ClampEvent
+from tests.support.standard_names import ANSWER_FOUND
+from tests.support import standard_names
 
 # Every fixture here runs ``init_mcat``, which reaches the numeric seam.
 pytestmark = pytest.mark.numeric_matrix
@@ -122,7 +119,7 @@ def _vertical_bridge(workspace, slipnet, concept_mappings) -> Bridge:
         bridge_type=BRIDGE_VERTICAL,
         concept_mappings=list(concept_mappings),
     )
-    bridge.proposal_level = bridge.BUILT
+    bridge.proposal_level = standard_names.BUILT
     workspace.add_bridge(bridge)
     return bridge
 
@@ -394,7 +391,7 @@ def _prepare_translation(engine):
     workspace, slipnet = engine.ctx.workspace, engine.ctx.slipnet
     top = _letter_rule(slipnet, RULE_TOP, "plato-rightmost", "plato-successor")
     top.quality = 80.0
-    top.proposal_level = top.BUILT
+    top.proposal_level = standard_names.BUILT
     workspace.add_rule(top)
     _vertical_bridge(
         workspace,
@@ -470,7 +467,7 @@ def test_a_translation_the_workspace_does_support_is_reported_as_justified(
             bridge_type=BRIDGE_BOTTOM,
             concept_mappings=[],
         )
-        bridge.proposal_level = bridge.BUILT
+        bridge.proposal_level = standard_names.BUILT
         workspace.add_bridge(bridge)
 
     result = attempt_justification(

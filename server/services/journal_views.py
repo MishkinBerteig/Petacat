@@ -514,11 +514,16 @@ async def verify_journal(
 # History views (C13): the filtered journal, one entry, a name's story
 # ──────────────────────────────────────────────────────────────────
 
-#: The tables whose rows are the names an Episodic Memory can hold, and what to call one.
+#: The tables whose rows are the names an Episodic Memory can hold, and what to call one: nodes,
+#: theme relations and codelet types, and the vocabulary rows that theme patterns (theme
+#: types) and rule signatures (rule and clause types) persist.
 NAME_TABLES: Mapping[str, str] = {
     "slipnet_node_defs": "node",
     "theme_relations": "theme relation",
     "codelet_type_defs": "codelet type",
+    "theme_types": "theme type",
+    "rule_types": "rule type",
+    "clause_types": "clause type",
 }
 
 NOT_YET_SAVED = "not yet saved"
@@ -729,13 +734,28 @@ def _name_events(entry: Mapping[str, Any], name: str) -> list[dict]:
             continue
         kind = NAME_TABLES[table]
         key_name = op["key"].get("name")
-        if op["op"] == "insert" and key_name == name:
+        # a vocabulary row renamed is carried out as an insert of the new row, a delete of the
+        # old one and a role handed over: it reads as one rename
+        made_by_rename = next((q for q in asked if q.get("op") == "rename_enum_value"
+                               and q.get("table") == table and q.get("new") == name), None)
+        if op["op"] == "insert" and key_name == name and made_by_rename is not None:
+            events.append({"event": "renamed_from", "kind": kind, "table": table,
+                           "from": made_by_rename.get("old")})
+        elif op["op"] == "update" and key_name == name and made_by_rename is not None and "name" not in op["set"]:
+            continue
+        elif op["op"] == "insert" and key_name == name:
             events.append({"event": "created", "kind": kind, "table": table})
         elif op["op"] == "delete" and key_name == name:
             into = None
+            renamed_to = None
             for q in asked:
                 if q.get("op") == "merge_nodes" and q.get("drop") == name:
                     into = q.get("keep")
+                if q.get("op") == "rename_enum_value" and q.get("table") == table and q.get("old") == name:
+                    renamed_to = q.get("new")
+            if renamed_to is not None:  # a vocabulary row renamed: its row is replaced by the new one
+                events.append({"event": "renamed", "kind": kind, "table": table, "to": renamed_to})
+                continue
             if into is None:  # a merge not asked as one: references moved from this name
                 for j, other in enumerate(resolved):
                     was = before[j] if j < len(before) else None

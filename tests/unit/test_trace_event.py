@@ -1,6 +1,7 @@
 """Tests for TemporalTrace."""
 
-from server.engine.trace import BOND_BUILT, TemporalTrace, TraceEvent
+from server.engine.trace import TemporalTrace, TraceEvent
+from tests.support.standard_names import BOND_BUILT
 
 
 def test_record_event():

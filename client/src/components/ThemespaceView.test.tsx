@@ -18,6 +18,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ThemespaceGrid } from './ThemespaceView';
 import { useParameterCatalogueStore } from '@/hooks/useParameterCatalogue';
+import { useVocabularyStore } from '@/store/vocabulary';
+import { renamed } from '@/test/standardVocabulary';
 import type { ClusterState, RunParameterSpec, ThemespaceState, ThemeState } from '@/types';
 
 /**
@@ -287,5 +289,27 @@ describe('ThemespaceGrid — theme-edit mode', () => {
     fireEvent.click(screen.getAllByTitle(/^(identity|opposite): /)[0]);
 
     expect(onClamp).not.toHaveBeenCalled();
+  });
+});
+
+describe('ThemespaceGrid — the run\'s own theme-type names', () => {
+  it('headings and columns follow the bound theme-type names', () => {
+    useVocabularyStore.getState().adopt(renamed({ 'theme_type.vertical_bridge': 'v9' }));
+    const cluster: ClusterState = { ...CLUSTER, theme_type: 'v9' };
+    const ts = { ...themespace([cluster]), possible_theme_types: ['v9'] } as ThemespaceState;
+    render(<ThemespaceGrid themespace={ts} />);
+    expect(screen.getByText('VERTICAL BRIDGE')).toBeTruthy();
+  });
+
+  it('shows the old name as itself once the row is renamed, not as a vertical column', () => {
+    useVocabularyStore.getState().adopt(renamed({ 'theme_type.vertical_bridge': 'v9' }));
+    render(<ThemespaceGrid themespace={themespace()} />);
+    expect(screen.queryByText('VERTICAL BRIDGE')).toBeNull();
+  });
+
+  it('does not crash when nothing is bound', () => {
+    useVocabularyStore.getState().clear();
+    render(<ThemespaceGrid themespace={themespace()} onClamp={vi.fn()} />);
+    expect(screen.getAllByRole('button', { name: 'Clamp +100' }).length).toBeGreaterThan(0);
   });
 });

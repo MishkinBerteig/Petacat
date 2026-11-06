@@ -16,13 +16,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.engine.posting import validate_posting_formulas
 from server.engine.rational import parse_rational
+from server.engine.roles import ROLE_COLUMN, vocabulary_bindings
 from server.engine.metadata import (
+    ClampTypeSpec,
     CodeletRoleSpec,
     CodeletSpec,
     DemoProblem,
+    LinkTypeSpec,
     MetadataProvider,
     NodeRoleSpec,
     PostingRuleSpec,
+    ProgressFocusSpec,
     SlipnetLinkSpec,
     SlipnodeSpec,
     ThemeDimensionSpec,
@@ -31,6 +35,7 @@ from server.engine.metadata import (
 from server.models.metadata import (
     BridgeOrientationDef,
     BridgeTypeDef,
+    ClampTypeDef,
     ClauseTypeDef,
     CodeletFamilyDef,
     CodeletPatternDef,
@@ -41,18 +46,22 @@ from server.models.metadata import (
     DemoProblem as DemoProblemRow,
     EngineParam,
     EventTypeDef,
+    FailureKindDef,
     FormulaCoefficient,
     LinkTypeDef,
     ParamValueTypeDef,
     PostingDirectionDef,
     PostingRule,
+    ProgressFocusDef,
     ProposalLevelDef,
+    RuleScopeDef,
     RuleTypeDef,
     RunStatusDef,
     SlipnetLayoutPos,
     SlipnetLinkDef,
     SlipnetNodeDef,
     SlipnetNodeRole,
+    StringKindDef,
     ThemeDimensionDef,
     ThemeRelation,
     ThemeTypeDef,
@@ -60,7 +69,7 @@ from server.models.metadata import (
 )
 
 
-#: The enum lookup tables the provider's ``enum_values`` mirrors, and the model of each.
+#: The enum lookup tables, and the model of each.
 ENUM_TABLE_MODELS: dict[str, Any] = {
     "run_statuses": RunStatusDef,
     "event_types": EventTypeDef,
@@ -75,6 +84,11 @@ ENUM_TABLE_MODELS: dict[str, Any] = {
     "codelet_phases": CodeletPhaseDef,
     "posting_directions": PostingDirectionDef,
     "param_value_types": ParamValueTypeDef,
+    "string_kinds": StringKindDef,
+    "rule_scopes": RuleScopeDef,
+    "failure_kinds": FailureKindDef,
+    "clamp_types": ClampTypeDef,
+    "progress_focuses": ProgressFocusDef,
 }
 
 #: Each provider field, and the configuration tables it is built from.  A change to a table
@@ -85,6 +99,7 @@ PROVIDER_FIELD_TABLES: dict[str, tuple[str, ...]] = {
     "codelet_specs": ("codelet_type_defs",),
     "posting_rules": ("posting_rules",),
     "params": ("engine_params",),
+    "param_refers_to": ("engine_params",),
     "urgency_levels": ("urgency_levels",),
     "formula_coefficients": ("formula_coefficients",),
     "commentary_templates": ("commentary_templates",),
@@ -95,7 +110,18 @@ PROVIDER_FIELD_TABLES: dict[str, tuple[str, ...]] = {
     "node_roles": ("slipnet_node_roles",),
     "codelet_roles": ("codelet_type_roles",),
     "theme_relations": ("theme_relations",),
-    "enum_values": tuple(ENUM_TABLE_MODELS),
+    "vocabulary_bindings": tuple(ROLE_COLUMN),
+    "link_types": ("link_types",),
+    "clamp_types": ("clamp_types",),
+    "progress_focuses": ("progress_focuses",),
+    "serialised_families": ("codelet_families",),
+}
+
+#: A provider field that reads only some of the columns of a table it is built from: an update
+#: that sets none of them leaves the field as it was (``engine_params`` feeds both the
+#: parameters and what their names refer to).  A field not listed here reads every column.
+PROVIDER_FIELD_COLUMNS: dict[str, dict[str, frozenset[str]]] = {
+    "param_refers_to": {"engine_params": frozenset({"name", "sort_order", "refers_to"})},
 }
 
 
@@ -203,6 +229,10 @@ def _field_params(tables: Mapping[str, Any]) -> dict[str, Any]:
     return {r["name"]: _parse_param(r["value"], r["value_type"]) for r in _rows(tables["engine_params"])}
 
 
+def _field_param_refers_to(tables: Mapping[str, Any]) -> dict[str, str]:
+    return {r["name"]: r["refers_to"] for r in _rows(tables["engine_params"]) if r.get("refers_to")}
+
+
 def _field_urgency_levels(tables: Mapping[str, Any]) -> dict[str, int]:
     return {r["name"]: r["value"] for r in _rows(tables["urgency_levels"])}
 
@@ -282,13 +312,46 @@ def _field_theme_relations(tables: Mapping[str, Any]) -> tuple[ThemeRelationSpec
             node_name=r.get("node_name"),
             abstractness=r.get("abstractness"),
             description=r.get("description") or "",
+            role=r.get("role"),
         )
         for r in _rows(tables["theme_relations"])
     )
 
 
-def _field_enum_values(tables: Mapping[str, Any]) -> dict[str, set[str]]:
-    return {name: {r["name"] for r in _rows(tables[name])} for name in ENUM_TABLE_MODELS}
+def _field_vocabulary_bindings(tables: Mapping[str, Any]) -> tuple:
+    return vocabulary_bindings({name: list(_rows(tables[name])) for name in ROLE_COLUMN})
+
+
+def _field_link_types(tables: Mapping[str, Any]) -> tuple[LinkTypeSpec, ...]:
+    return tuple(
+        LinkTypeSpec(name=r["name"], behaviour=r.get("behaviour")) for r in _rows(tables["link_types"])
+    )
+
+
+def _field_clamp_types(tables: Mapping[str, Any]) -> tuple[ClampTypeSpec, ...]:
+    return tuple(
+        ClampTypeSpec(
+            name=r["name"],
+            role=r.get("role"),
+            codelet_background_level=r.get("codelet_background_level"),
+            jootsing_factor=r.get("jootsing_factor"),
+            jootsing_only_when_latest=bool(r.get("jootsing_only_when_latest")),
+            progress_focus=r.get("progress_focus"),
+            codelet_patterns=tuple(r.get("codelet_patterns") or ()),
+        )
+        for r in _rows(tables["clamp_types"])
+    )
+
+
+def _field_progress_focuses(tables: Mapping[str, Any]) -> tuple[ProgressFocusSpec, ...]:
+    return tuple(
+        ProgressFocusSpec(name=r["name"], event_types=tuple(r["event_types"]))
+        for r in _rows(tables["progress_focuses"])
+    )
+
+
+def _field_serialised_families(tables: Mapping[str, Any]) -> tuple[str, ...]:
+    return tuple(r["name"] for r in _rows(tables["codelet_families"]) if r.get("serialised"))
 
 
 _FIELD_BUILDERS = {
@@ -297,6 +360,7 @@ _FIELD_BUILDERS = {
     "codelet_specs": _field_codelet_specs,
     "posting_rules": _field_posting_rules,
     "params": _field_params,
+    "param_refers_to": _field_param_refers_to,
     "urgency_levels": _field_urgency_levels,
     "formula_coefficients": _field_formula_coefficients,
     "commentary_templates": _field_commentary_templates,
@@ -307,7 +371,11 @@ _FIELD_BUILDERS = {
     "node_roles": _field_node_roles,
     "codelet_roles": _field_codelet_roles,
     "theme_relations": _field_theme_relations,
-    "enum_values": _field_enum_values,
+    "vocabulary_bindings": _field_vocabulary_bindings,
+    "link_types": _field_link_types,
+    "clamp_types": _field_clamp_types,
+    "progress_focuses": _field_progress_focuses,
+    "serialised_families": _field_serialised_families,
 }
 
 

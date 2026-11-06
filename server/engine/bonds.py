@@ -282,7 +282,9 @@ class Bond(WorkspaceStructure):
         """
         bridge = getattr(
             obj,
-            "horizontal_bridge" if bridge_orientation == "horizontal" else "vertical_bridge",
+            "horizontal_bridge"
+            if bridge_orientation == constants().vocab.bridge_orientation_horizontal
+            else "vertical_bridge",
             None,
         )
         if bridge is None:

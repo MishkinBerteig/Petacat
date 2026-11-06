@@ -10,25 +10,20 @@ import os
 
 import pytest
 
-from server.engine.bridges import (
-    BRIDGE_TOP,
-    BRIDGE_VERTICAL,
-    Bridge,
-    make_concept_mappings,
-)
+from server.engine.bridges import Bridge, make_concept_mappings
+from tests.support.standard_names import BRIDGE_TOP, BRIDGE_VERTICAL
 from server.engine.memory import AnswerDescription, EpisodicMemory, SnagDescription
 from server.engine.metadata import MetadataProvider
 from server.engine.runner import EngineRunner
-from server.engine.themes import (
+from server.engine.themes import Theme, ThemeCluster, relation_name_for_label
+from tests.support.standard_names import (
     RELATION_DIFFERENT,
     RELATION_IDENTITY,
     THEME_TOP_BRIDGE,
     THEME_VERTICAL_BRIDGE,
-    Theme,
-    ThemeCluster,
-    relation_name_for_label,
 )
 from tests.support.theme_fixtures import populate
+from tests.support import standard_names
 
 # Every test here executes arithmetic the numeric substrate owns, so each one runs
 # once per backend in the matrix. See tests/conftest.py.
@@ -302,13 +297,8 @@ class TestRules:
         Averaging only the *dimension* depth scored these two identically, since
         both changes are along Letter-Category.
         """
-        from server.engine.rules import (
-            CLAUSE_INTRINSIC,
-            RULE_TOP,
-            Rule,
-            RuleChange,
-            RuleClause,
-        )
+        from server.engine.rules import Rule, RuleChange, RuleClause
+        from tests.support.standard_names import CLAUSE_INTRINSIC, RULE_TOP
 
         runner = _run(meta, "abc", "abd", "ijk", steps=1)
         sl = runner.ctx.slipnet
@@ -344,7 +334,8 @@ class TestRules:
     def test_verbatim_rules_are_uniform_and_succinct_but_not_abstract(self, meta):
         """§3.3.5: "Verbatim rules ... are maximally uniform, minimally abstract,
         and maximally succinct."."""
-        from server.engine.rules import CLAUSE_VERBATIM, RULE_TOP, Rule, RuleClause
+        from server.engine.rules import Rule, RuleClause
+        from tests.support.standard_names import CLAUSE_VERBATIM, RULE_TOP
 
         runner = _run(meta, "abc", "abd", "ijk", steps=1)
         sl = runner.ctx.slipnet
@@ -365,7 +356,8 @@ class TestRules:
     def test_the_identity_rule_is_maximal_on_all_three_measures(self, meta):
         """§3.3.5: "The identity rule Don't change anything is maximally uniform,
         maximally abstract, and maximally succinct."."""
-        from server.engine.rules import RULE_TOP, Rule
+        from server.engine.rules import Rule
+        from tests.support.standard_names import RULE_TOP
 
         rule = Rule(RULE_TOP, [])
         rule.compute_quality(meta)
@@ -379,13 +371,8 @@ class TestRules:
     def test_rule_application_handles_a_successor_and_snags_on_z(self, meta):
         """Applying "change letter-category of rightmost letter to successor"."""
         from server.engine.codelet_dsl.builtins import apply_rule
-        from server.engine.rules import (
-            CLAUSE_INTRINSIC,
-            RULE_BOTTOM,
-            Rule,
-            RuleClause,
-            RuleChange,
-        )
+        from server.engine.rules import Rule, RuleClause, RuleChange
+        from tests.support.standard_names import CLAUSE_INTRINSIC, RULE_BOTTOM
 
         def rule_for(ctx):
             sl = ctx.slipnet
@@ -463,7 +450,8 @@ class TestTraceAndSelfWatching:
         Snags used to be plain TraceEvents with none of that, so the jootser's
         snag branch bailed out immediately and never fired.
         """
-        from server.engine.trace import SNAG, SnagEvent
+        from server.engine.trace import SnagEvent
+        from tests.support.standard_names import SNAG
 
         for seed in range(8):
             runner = _run(meta, "abc", "abd", "xyz", seed=seed, steps=3000)
@@ -553,7 +541,7 @@ class TestTraceAndSelfWatching:
         the runner runs.
         """
         from server.engine.runner import EngineRunner
-        from server.engine.trace import CONCEPT_ACTIVATION
+        from tests.support.standard_names import CONCEPT_ACTIVATION
 
         runner = _run(meta, "abc", "abd", "xyz", seed=0, steps=0)
         ctx = runner.ctx
@@ -634,6 +622,7 @@ def _answer(name, themes, *, rule="rule", abstractness=60.0, unjustified=None):
         unjustified_slippages=[],
         unjustified_themes=dict(unjustified or {}),
         top_rule_abstractness=abstractness,
+        top_rule_signature=[], bottom_rule_signature=[],
     )
 
 
@@ -741,6 +730,7 @@ class TestMemory:
             themes={"plato-string-position-category": "identity"},
             unjustified_slippages=[],
             unjustified_themes={"plato-bond-facet": "diff"},
+            bottom_rule_signature=[],
         )
         without_snag = AnswerDescription(
             problem=("eqe", "qeq", "abbba", "aaabaaa"),
@@ -754,6 +744,7 @@ class TestMemory:
             themes={"plato-string-position-category": "identity"},
             unjustified_slippages=[],
             unjustified_themes={"plato-bond-facet": "diff"},
+            bottom_rule_signature=[],
         )
         memory.store_snag(
             SnagDescription(
@@ -841,14 +832,8 @@ def test_a_rule_can_target_a_group_in_the_target_string(meta):
     then asserts what the architecture does with it.
     """
     from server.engine.codelet_dsl.builtins import apply_rule
-    from server.engine.rules import (
-        CLAUSE_INTRINSIC,
-        RULE_BOTTOM,
-        Rule,
-        RuleChange,
-        RuleClause,
-        SCOPE_SELF,
-    )
+    from server.engine.rules import Rule, RuleChange, RuleClause
+    from tests.support.standard_names import CLAUSE_INTRINSIC, RULE_BOTTOM, SCOPE_SELF
 
     for seed in range(8):
         runner = _run(meta, "abc", "abd", "iijjkk", seed=seed, steps=2500)
@@ -1151,7 +1136,7 @@ class TestStructuralCapabilities:
                     groups[i], groups[i + 1], category, length,
                     descriptors[i], descriptors[i + 1], right,
                 )
-                bond.proposal_level = Bond.EVALUATED
+                bond.proposal_level = standard_names.EVALUATED
                 build_structure(ctx, bond)
                 bonds.append(bond)
 
@@ -1173,7 +1158,7 @@ class TestStructuralCapabilities:
             assert ("Length", "three") in described
 
             # The nested image must still reproduce the untouched string.
-            nested.proposal_level = Group.BUILT
+            nested.proposal_level = standard_names.BUILT
             target.add_group(nested)
             image = _fresh_string_image(target, ctx.slipnet)
             assert "".join(n.short_name for n in image.generate()) == "mrrjjj"

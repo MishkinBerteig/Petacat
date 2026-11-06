@@ -108,7 +108,6 @@ def petacat_snags(trace: Path):
     """Replay ``trace``; return ``(snags, comments, outcome)`` in the shapes of
     ``parse_metacat`` (kind upper-cased as Metacat's symbols are)."""
     from server.engine.runner import EngineRunner
-    from server.engine.trace import SNAG
     from tests.lockstep.run_trace import replay_trace
 
     holder: dict = {}
@@ -125,10 +124,11 @@ def petacat_snags(trace: Path):
     finally:
         EngineRunner.init_mcat = original
     ctx = holder["runner"].ctx
+    snag_type = ctx.meta.vocabulary.event_type_snag
     snags = [(e.codelet_count, e.snag_type.upper(), e.explanation)
-             for e in ctx.trace.events if e.event_type == SNAG]
+             for e in ctx.trace.events if e.event_type == snag_type]
     comments = [(p.codelet_count, p.eliza_text, p.technical_text)
-                for p in ctx.commentary.get_paragraphs() if p.event_type == "snag"]
+                for p in ctx.commentary.get_paragraphs() if p.event_type == snag_type]
     return snags, comments, outcome
 
 

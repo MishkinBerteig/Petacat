@@ -5,6 +5,7 @@
 
 import { useMomentStore } from '@/store/momentStore';
 import { useRunStore } from '@/store/runStore';
+import { useVocabulary, v, type RoleName } from '@/store/vocabulary';
 import type {
   BondState,
   BridgeState,
@@ -59,19 +60,34 @@ const BOW_STEP = 11;
 
 const TOP_Y = TOP_CHROME + HEAD_BAND;
 
-const BRIDGE_COLORS = { top: '#4fc3f7', vertical: '#ab47bc', bottom: '#66bb6a' };
-type BridgeKind = keyof typeof BRIDGE_COLORS;
+const TOP_BRIDGE_COLOR = '#4fc3f7';
+const VERTICAL_BRIDGE_COLOR = '#ab47bc';
+const BOTTOM_BRIDGE_COLOR = '#66bb6a';
+
+/** A bridge's kind is the name the run's configuration binds to `bridge_type.*`. */
+type BridgeKind = string;
+
+/** The three bridge kinds in drawing order, each with its colour (names from the vocabulary). */
+function bridgeKinds(v: RoleName): { kind: BridgeKind; color: string }[] {
+  return [
+    { kind: v('bridge_type.top'), color: TOP_BRIDGE_COLOR },
+    { kind: v('bridge_type.vertical'), color: VERTICAL_BRIDGE_COLOR },
+    { kind: v('bridge_type.bottom'), color: BOTTOM_BRIDGE_COLOR },
+  ];
+}
 
 /**
  * What the colours of a redisplayed moment mean (`%workspace-event-structure-color%`,
  * `%top-bridge-color%`, `%vertical-bridge-color%`, `%snag-color%`, ... in Metacat).
+ *
+ * The server names the top, bottom and vertical roles with the run's own bridge-type names and
+ * the snag role with its snag event-type name, so those four are found through the run's
+ * vocabulary (`roleColor`), not by a literal word.
  */
-const ROLE_COLORS: Record<PictureRole, string> = {
+const SNAG_COLOR = '#ef5350';
+
+const FIXED_ROLE_COLORS: Record<string, string> = {
   event: '#ffd700',
-  top: BRIDGE_COLORS.top,
-  bottom: BRIDGE_COLORS.bottom,
-  vertical: BRIDGE_COLORS.vertical,
-  snag: '#ef5350',
   theme_cm: '#ffa726',
   vertical_slippage: '#ec407a',
   // `get-highlight-color` (answers.ss:1233): the dimmed form of a colour marks a slippage a
@@ -81,6 +97,15 @@ const ROLE_COLORS: Record<PictureRole, string> = {
   coattail_slippage_dim: '#26c6da80',
   faded: 'var(--text-secondary)',
 };
+
+/** The SVG colour a picture role is drawn in, the run's vocabulary naming the bridge and snag roles. */
+export function roleColor(role: PictureRole): string {
+  if (role === v('bridge_type.top')) return TOP_BRIDGE_COLOR;
+  if (role === v('bridge_type.bottom')) return BOTTOM_BRIDGE_COLOR;
+  if (role === v('bridge_type.vertical')) return VERTICAL_BRIDGE_COLOR;
+  if (role === v('event_type.snag')) return SNAG_COLOR;
+  return FIXED_ROLE_COLORS[role] ?? FIXED_ROLE_COLORS.faded;
+}
 
 /** The draw state of a redisplayed moment: what is highlighted, and whether the rest is faded. */
 interface Moment {
@@ -187,7 +212,7 @@ type RuleData = RuleState;
 
 /** A rule's colour: the role a redisplayed moment draws it in, else the live default. */
 function ruleColor(r: RuleData, fallback: string): string {
-  return r.role ? ROLE_COLORS[r.role as PictureRole] ?? fallback : fallback;
+  return r.role ? roleColor(r.role as PictureRole) ?? fallback : fallback;
 }
 
 /** "q=72 u=100 a=61 s=80" — quality plus the measures it is built from. */
@@ -322,7 +347,7 @@ function GroupBoxes({ s, moment }: { s: StringLayoutResult; moment?: Moment }) {
           (h) => h.string === s.label && h.left === g.left_pos && h.right === g.right_pos,
         )?.role;
         const stroke = role
-          ? ROLE_COLORS[role]
+          ? roleColor(role)
           : moment?.faded
             ? 'var(--text-secondary)'
             : 'var(--warning)';
@@ -382,6 +407,7 @@ function getStringLayout(
 interface NumberedBridge {
   bridge: BridgeData;
   kind: BridgeKind;
+  color: string;
   index: number;
   endpoints: string;
 }
@@ -434,7 +460,7 @@ function BridgeLines({
           : s2.y + (s2.y < s1.y ? LETTER_H + BRIDGE_Y_OFFSET : -BRIDGE_Y_OFFSET);
 
         const role = kind ? bridgeRole(moment, bridgeKeyOf(kind, br)) : undefined;
-        const drawColor = role ? ROLE_COLORS[role] : moment?.faded ? 'var(--text-secondary)' : color;
+        const drawColor = role ? roleColor(role) : moment?.faded ? 'var(--text-secondary)' : color;
         const opacity = role ? 1 : moment?.faded ? 0.4 : Math.max(0.35, br.strength / 100);
         const { full } = bridgeLabel(br);
         const number = firstNumber + i;
@@ -539,8 +565,7 @@ function BridgeKey({
         x1={SIDE_PAD} y1={y - 10} x2={width - SIDE_PAD} y2={y - 10}
         stroke="var(--border)" strokeWidth={1}
       />
-      {entries.map(({ bridge, kind, index, endpoints }, row) => {
-        const color = BRIDGE_COLORS[kind];
+      {entries.map(({ bridge, kind, color, index, endpoints }, row) => {
         const { short, full } = bridgeLabel(bridge);
         const ly = y + row * 12;
         return (
@@ -585,7 +610,7 @@ function BridgeKey({
                       return (
                         <tspan
                           key={n}
-                          fill={hit ? ROLE_COLORS[hit.role] : undefined}
+                          fill={hit ? roleColor(hit.role) : undefined}
                           fontWeight={hit ? 700 : 400}
                           data-highlight={hit ? hit.role : undefined}
                         >
@@ -628,6 +653,7 @@ export function WorkspaceDiagram({
   /** The "N" of "Event N:" for a redisplayed Trace event; absent for answers and snags. */
   eventNumber?: number | null;
 }) {
+  const v = useVocabulary();
   const moment: Moment | undefined = picture
     ? {
         faded: picture.faded,
@@ -674,15 +700,17 @@ export function WorkspaceDiagram({
   const bridgeKey: NumberedBridge[] = [];
   const objLabel = (s: string, from: number, to?: number) =>
     s.slice(from, (to ?? from) + 1) || '?';
-  for (const [kind, list] of [
-    ['top', topBridges],
-    ['vertical', vertBridges],
-    ['bottom', bottomBridges],
-  ] as [BridgeKind, BridgeData[]][]) {
+  const [topKind, vertKind, bottomKind] = bridgeKinds(v);
+  for (const [{ kind, color }, list] of [
+    [topKind, topBridges],
+    [vertKind, vertBridges],
+    [bottomKind, bottomBridges],
+  ] as [{ kind: BridgeKind; color: string }, BridgeData[]][]) {
     for (const b of list) {
       bridgeKey.push({
         bridge: b,
         kind,
+        color,
         index: bridgeKey.length + 1,
         endpoints: `${objLabel(b.obj1_string, b.obj1_pos, b.obj1_right_pos)}↔${objLabel(
           b.obj2_string, b.obj2_pos, b.obj2_right_pos,
@@ -708,13 +736,13 @@ export function WorkspaceDiagram({
   const SVG_W = Math.max(500, Math.max(topTotalW, botTotalW) + 2 * SIDE_PAD + 120);
 
   const topPair = layoutPair(
-    initial, 'initial', bondsFor(initial), groupsFor(initial),
-    modified, 'modified', bondsFor(modified), groupsFor(modified),
+    initial, v('string_kind.initial'), bondsFor(initial), groupsFor(initial),
+    modified, v('string_kind.modified'), bondsFor(modified), groupsFor(modified),
     TOP_Y, SVG_W,
   );
   const botPair = layoutPair(
-    target, 'target', bondsFor(target), groupsFor(target),
-    answer, 'answer', answer ? bondsFor(answer) : [], answer ? groupsFor(answer) : [],
+    target, v('string_kind.target'), bondsFor(target), groupsFor(target),
+    answer, v('string_kind.answer'), answer ? bondsFor(answer) : [], answer ? groupsFor(answer) : [],
     botRowY, SVG_W,
   );
 
@@ -788,7 +816,7 @@ export function WorkspaceDiagram({
         moment.highlights.objects.map((h, i) => {
           const layout = allStrings.find((l) => l.label === h.string);
           if (!layout) return null;
-          const color = ROLE_COLORS[h.role];
+          const color = roleColor(h.role);
           if (h.left < 0) {
             // A whole string is outlined at its label.
             return (
@@ -859,14 +887,14 @@ export function WorkspaceDiagram({
 
       {/* Bridges, numbered continuously so each badge has one legend row */}
       <BridgeLines
-        bridges={topBridges} layouts={allStrings} color={BRIDGE_COLORS.top}
-        kind="top" moment={moment}
+        bridges={topBridges} layouts={allStrings} color={topKind.color}
+        kind={topKind.kind} moment={moment}
         firstNumber={1} countOfKind={topBridges.length}
         gap={{ x: (topPair.arrowX1 + topPair.arrowX2) / 2, y: arrowY1 }}
       />
       <BridgeLines
-        bridges={vertBridges} layouts={allStrings} color={BRIDGE_COLORS.vertical}
-        kind="vertical" moment={moment}
+        bridges={vertBridges} layouts={allStrings} color={vertKind.color}
+        kind={vertKind.kind} moment={moment}
         firstNumber={1 + topBridges.length} countOfKind={vertBridges.length}
         band={{
           y1: topPair.left.y + LETTER_H + FOOT_BAND + 6,
@@ -874,8 +902,8 @@ export function WorkspaceDiagram({
         }}
       />
       <BridgeLines
-        bridges={bottomBridges} layouts={allStrings} color={BRIDGE_COLORS.bottom}
-        kind="bottom" moment={moment}
+        bridges={bottomBridges} layouts={allStrings} color={bottomKind.color}
+        kind={bottomKind.kind} moment={moment}
         firstNumber={1 + topBridges.length + vertBridges.length}
         countOfKind={bottomBridges.length}
         gap={{ x: (botPair.arrowX1 + botPair.arrowX2) / 2, y: arrowY2 }}
@@ -923,7 +951,7 @@ export function WorkspaceDiagram({
           textAnchor="middle"
           fontSize={22}
           fontWeight={700}
-          fill={ROLE_COLORS.snag}
+          fill={roleColor(v('event_type.snag'))}
           fontFamily="var(--font-mono)"
           data-testid="snag-question-marks"
         >
@@ -970,13 +998,13 @@ export function WorkspaceDiagram({
       {/* Which colour means what — the three bridge types are otherwise
           indistinguishable. Laid out in one row so it costs a single band. */}
       <g fontSize={8} fill="var(--text-secondary)">
-        {(['top', 'vertical', 'bottom'] as BridgeKind[]).map((kind, i) => {
+        {[topKind, vertKind, bottomKind].map(({ kind, color }, i) => {
           const x = SIDE_PAD + i * 62;
           return (
             <g key={kind}>
               <line
                 x1={x} y1={9} x2={x + 12} y2={9}
-                stroke={BRIDGE_COLORS[kind]} strokeWidth={1.5}
+                stroke={color} strokeWidth={1.5}
               />
               <text x={x + 16} y={12}>{kind}</text>
             </g>

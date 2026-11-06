@@ -16,6 +16,7 @@ import pytest
 
 from server.engine import trace as T
 from server.engine import trace_display as D
+from tests.support import standard_names
 
 
 # The display columns, roles and opposite of the Metacat Standard Configuration nodes this
@@ -80,7 +81,7 @@ def group_of(*descriptor_names: str, direction: str | None = None, nested: bool 
 
 def test_a_concept_activation_is_named_by_the_concepts_short_name():
     """``(format "(~a)" (tell slipnode 'get-short-name))`` (``trace.ss:708``)."""
-    event = T.TraceEvent(T.CONCEPT_ACTIVATION, 5, 50.0, slipnode=node("plato-identity", "Identity"))
+    event = T.TraceEvent(standard_names.CONCEPT_ACTIVATION, 5, 50.0, slipnode=node("plato-identity", "Identity"))
     assert D.print_name(event) == "(Identity)"
 
 
@@ -92,7 +93,7 @@ def test_a_group_is_named_by_its_letters_and_its_direction(direction, expected):
     """``>abc>`` / ``<cba<`` / ``[abc]`` by direction (``trace.ss:840-847``); the text is
     the descriptors on the bond facet hyphen-joined (``group-event-pexp-text-string``)."""
     group = group_of("a", "b", "c", direction=direction)
-    event = T.TraceEvent(T.GROUP_BUILT, 5, 50.0, group=group)
+    event = T.TraceEvent(standard_names.GROUP_BUILT, 5, 50.0, group=group)
     assert D.print_name(event) == expected
 
 
@@ -119,7 +120,7 @@ def test_a_slippage_is_named_by_its_bridge_type_and_mapping(bridge_type, prefix)
         is_identity=False,
     )
     event = T.TraceEvent(
-        T.CONCEPT_MAPPING_BUILT, 5, 50.0,
+        standard_names.CONCEPT_MAPPING_BUILT, 5, 50.0,
         concept_mapping=cm, bridge=SimpleNamespace(bridge_type=bridge_type),
     )
     assert D.print_name(event) == f"{prefix}:lmost=>rmost"
@@ -134,7 +135,7 @@ def test_the_letter_category_node_is_abbreviated_inside_a_mapping():
 @pytest.mark.parametrize("is_top, expected", [(True, "[Top Rule]"), (False, "[Bottom Rule]")])
 def test_a_rule_is_named_top_or_bottom(is_top, expected):
     """``(case rule-type (top "[Top Rule]") (bottom "[Bottom Rule]"))`` (``trace.ss:937``)."""
-    event = T.TraceEvent(T.RULE_BUILT, 5, 50.0, structures=[SimpleNamespace(is_top_rule=is_top)])
+    event = T.TraceEvent(standard_names.RULE_BUILT, 5, 50.0, structures=[SimpleNamespace(is_top_rule=is_top)])
     assert D.print_name(event) == expected
 
 
@@ -157,7 +158,7 @@ def test_the_headers_of_a_concept_activation_use_the_full_concept_name():
         ("plato-succgrp", "successor-group"),
         ("plato-leftmost", "leftmost"),
     ]:
-        event = T.TraceEvent(T.CONCEPT_ACTIVATION, 5, 50.0, slipnode=node(name))
+        event = T.TraceEvent(standard_names.CONCEPT_ACTIVATION, 5, 50.0, slipnode=node(name))
         assert D.header(event) == f"Activation of {full} concept"
 
 
@@ -165,11 +166,11 @@ def test_a_group_header_names_the_kind_of_group_and_a_flip_names_the_other_kind(
     """"Built successor-group", but "Flipped" names the *unflipped* group (``trace.ss:1291``):
     a predecessor group is what a successor group is flipped *from*."""
     built = T.TraceEvent(
-        T.GROUP_BUILT, 5, 50.0, group=group_of("a", "b", direction="right")
+        standard_names.GROUP_BUILT, 5, 50.0, group=group_of("a", "b", direction="right")
     )
     assert D.header(built) == "Built successor-group"
     flipped = T.TraceEvent(
-        T.GROUP_BUILT, 5, 50.0,
+        standard_names.GROUP_BUILT, 5, 50.0,
         group=SimpleNamespace(
             group_category=node("plato-predgrp"), objects=[], bond_facet=None, direction=None
         ),
@@ -183,7 +184,7 @@ def test_a_slippage_header_names_the_mapping():
         descriptor1=node("plato-a"), descriptor2=node("plato-b"), is_identity=False
     )
     event = T.TraceEvent(
-        T.CONCEPT_MAPPING_BUILT, 5, 50.0,
+        standard_names.CONCEPT_MAPPING_BUILT, 5, 50.0,
         concept_mapping=cm, bridge=SimpleNamespace(bridge_type="top"),
     )
     assert D.header(event) == "Made a=>b slippage"
@@ -192,8 +193,8 @@ def test_a_slippage_header_names_the_mapping():
 
 
 def test_a_rule_header_says_whether_the_rule_is_translated():
-    plain = T.TraceEvent(T.RULE_BUILT, 5, 50.0, structures=[SimpleNamespace(translated=False)])
-    translated = T.TraceEvent(T.RULE_BUILT, 5, 50.0, structures=[SimpleNamespace(translated=True)])
+    plain = T.TraceEvent(standard_names.RULE_BUILT, 5, 50.0, structures=[SimpleNamespace(translated=False)])
+    translated = T.TraceEvent(standard_names.RULE_BUILT, 5, 50.0, structures=[SimpleNamespace(translated=True)])
     assert D.header(plain) == "Built rule"
     assert D.header(translated) == "Built translated rule"
 

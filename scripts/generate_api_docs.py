@@ -54,6 +54,43 @@ GROUPS: list[tuple[str, str, str]] = [
         "editable note. It is not Training Mode and is untouched by Training Mode Sessions.",
     ),
     ("/api/review", "Review", "Metacat Mode: reading back what a Normal or Audit run recorded, and the episodic-run timeline: recorded runs with the Episodic Memory clears between them (Metacat Mode, not Training Mode)."),
+    (
+        "/api/configurations",
+        "Configurations and the change API",
+        "Metacat Mode and Training Mode: one batch, `POST /api/configurations/{id}/changes`, is how "
+        "configuration is written (the Admin editors, the Database tab, restore, reset, import, "
+        "the external route and the in-worker learner submit the same batch); `GET .../schema` "
+        "lists the tables, the ops and the shape of a batch. "
+        "**Vocabulary.** `rename_enum_value` renames a row of an enum table or a theme relation "
+        "and rewrites every column that names it: `posting_rules.direction`, "
+        "`codelet_type_defs.family` and `.phase`, `slipnet_link_defs.link_type`, "
+        "`engine_params.value_type`, `formula_coefficients.value_type`, "
+        "`clamp_types.progress_focus`, `progress_focuses.event_types` and "
+        "`theme_dimension_defs.valid_relations`, and the keys of the commentary sections keyed "
+        "by the table's names; the row keeps its `role` (`behaviour` for `link_types`) and its "
+        "place. Bodies, predicates, formulas, parameters and templates that still spell the old "
+        "name are listed as `dangling` and left alone, as `rename_node` lists code. An urgency "
+        "level rename also rewrites `clamp_types.codelet_background_level`. Deleting an enum row "
+        "that holds a `role` (a `behaviour`, for `link_types`) is refused, `422 role_bound`: "
+        "unbind it first by setting the column to null. A `role` must be a name of the table's "
+        "vocabulary and held by one row (else `422 unknown_reference` or `422 role_taken`); an "
+        "unbound row is allowed and inert, except that it becomes a valid value of the columns "
+        "that name its table. "
+        "**Episodic Memory.** A Training Mode Session's Episodic Memory persists names (theme "
+        "types in theme patterns, rule and clause types in signatures, relations in concept "
+        "patterns). The change API has one rule for every name the memory holds, a node or a "
+        "vocabulary row alike: it neither refuses nor rewrites. The rename, removal or merge is "
+        "carried out on the configuration, and the session's memory keeps the names it stored. "
+        "**Parameters that name things.** `engine_params.refers_to` declares what a parameter's "
+        "value names: `node_list`, `trigger_node_list`, `node_map`, `codelet_type_list`, "
+        "`urgency_level` or null. Removing, renaming or merging a node edits every parameter "
+        "that refers to nodes; a codelet type edit edits the `codelet_type_list` parameters; an "
+        "urgency level edit lists the `urgency_level` parameters as `dangling`. A rule-trigger "
+        "edit (`add_trigger`, `remove_trigger`) also changes the parameter whose `refers_to` is "
+        "`trigger_node_list` (`top_down_slipnodes` in the Metacat Standard Configuration): the "
+        "node is added to it, or removed from it only when no rule still triggers the node. A "
+        "configuration that declares no such parameter leaves every parameter alone.",
+    ),
     ("/api/admin", "Configuration", "Metacat Mode: the editable copy of the seed data (the global configuration). A Training Mode Session copies it when created and never changes it."),
     ("/api/docs", "Help", "In-app help topics, the glossary and search."),
     ("/api/system", "System", "What the process resolved at startup."),

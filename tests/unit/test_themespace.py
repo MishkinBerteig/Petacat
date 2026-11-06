@@ -14,13 +14,11 @@ covered elsewhere); determinism is by construction.
 
 import math
 
-from server.engine.themes import (
+from server.engine.themes import Theme, ThemeCluster, Themespace
+from tests.support.standard_names import (
     THEME_BOTTOM_BRIDGE,
     THEME_TOP_BRIDGE,
     THEME_VERTICAL_BRIDGE,
-    Theme,
-    ThemeCluster,
-    Themespace,
 )
 from tests.support.theme_fixtures import populate
 
@@ -38,6 +36,17 @@ class _FakeMeta:
 
     def __init__(self, dims, params=None, coeffs=None):
         self.theme_dimensions = dims
+        from server.engine.roles import Vocabulary
+
+        self.vocabulary = Vocabulary({
+            "theme_type.top_bridge": "top_bridge",
+            "theme_type.bottom_bridge": "bottom_bridge",
+            "theme_type.vertical_bridge": "vertical_bridge",
+            "bridge_type.top": "top",
+            "bridge_type.bottom": "bottom",
+            "bridge_type.vertical": "vertical",
+            "theme_relation.diff": "diff",
+        })
         self._params = params or {}
         self._coeffs = coeffs or {}
 
