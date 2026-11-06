@@ -83,11 +83,13 @@ def test_the_whole_pool_exists_before_any_worker_touches_the_rack(meta, monkeypa
     runner.init_mcat("eeqee", "qeeq", "xxixx", seed=42)
     alive_before = threading.active_count()
     alive_at_first_touch: list[int] = []
+    first_touch = threading.Lock()  # free-threaded, two workers can arrive at once
     choose = LockedCoderack.choose_and_remove
 
     def spy(self, temperature, rng, worker=None):
-        if not alive_at_first_touch:
-            alive_at_first_touch.append(threading.active_count() - alive_before)
+        with first_touch:
+            if not alive_at_first_touch:
+                alive_at_first_touch.append(threading.active_count() - alive_before)
         return choose(self, temperature, rng, worker)
 
     monkeypatch.setattr(LockedCoderack, "choose_and_remove", spy)
