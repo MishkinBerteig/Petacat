@@ -1,7 +1,7 @@
 """Shared plumbing for the "wrap and log" Metacat recorders.
 
-A wrap-and-log recorder runs the *unpatched* ``Metacat/build/source`` in the
-``metacat:1.2`` container, wraps one or more Metacat procedures from a driver script
+A wrap-and-log recorder runs the patched ``Metacat/build/source`` (without the recorder
+patch) in the ``metacat:1.2`` container, wraps one or more Metacat procedures from a driver script
 (``set!`` of a top-level definition reaches code loaded earlier, see README.md), and prints
 tab-separated lines that a comparer in ``scripts/`` checks against Petacat.  The recorders
 that use this module are ``record_rule_english.py``, ``record_events.py``,
@@ -67,7 +67,7 @@ def run_driver(driver: str, tag: str, timeout: int = 7200) -> str:
     The run directory is ``Metacat/build/recorder-work/<tag>-...`` (git-ignored) and is
     removed afterwards.  Exits the process if Docker or the Metacat tree is missing.
     """
-    record.source_state()
+    record.require_patched()
     record.WORK.mkdir(parents=True, exist_ok=True)
     rundir = record.WORK / f"{tag}-{os.getpid()}-{time.monotonic_ns()}"
     rundir.mkdir(parents=True)

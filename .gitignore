@@ -54,7 +54,11 @@ tests/lockstep/replays/
 # by tests/lockstep/metacat/record.py (see tests/lockstep/metacat/README.md).
 tests/lockstep/traces/*
 !tests/lockstep/traces/abc-abd-xyz/
-tests/lockstep/traces-heldout/
+# ... and of those only seeds 1-10 (seeds 11-30 of the same problem are regenerated like the rest)
+tests/lockstep/traces/abc-abd-xyz/1[1-9].metacat.jsonl.gz
+tests/lockstep/traces/abc-abd-xyz/[23][0-9].metacat.jsonl.gz
+# The extended golden baseline's traces: one folder per case (scripts/lockstep_corpus.py --extended)
+tests/lockstep/traces-extended/
 
 # Agents' working files (scripts, Metacat recordings, logs): kept on disk, never committed.
 agents-workspace/

@@ -830,7 +830,7 @@
  "episodes/abc-abd-glz/1.r3": {
   "agreement": 1.0,
   "reach": 5830,
-  "state_snapshots_differing": 215,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "episodes/abc-abd-glz/1.r4": {
@@ -872,7 +872,7 @@
  "episodes/abc-abd-glz/2.r2": {
   "agreement": 1.0,
   "reach": 5830,
-  "state_snapshots_differing": 215,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "episodes/abc-abd-glz/2.r3": {
@@ -914,7 +914,7 @@
  "episodes/abc-abd-glz/3.r1": {
   "agreement": 1.0,
   "reach": 2973,
-  "state_snapshots_differing": 24,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "episodes/abc-abd-glz/3.r2": {

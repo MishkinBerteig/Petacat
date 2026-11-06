@@ -2,7 +2,7 @@
 """Log Metacat 1.2's Temporal Trace events: their print-names and headers.
 
 Reproduces the data of ``tests/lockstep/event_names_metacat.tsv``.  After each run the
-recorder walks ``*trace*`` of the unpatched ``metacat:1.2`` container, asks every event for
+recorder walks ``*trace*`` of the ``metacat:1.2`` container, on the patched Metacat,, asks every event for
 its ``'print-name`` (``trace.ss``) and for the header its ``'display-workspace`` hands to
 ``draw-event-header`` (captured by replacing ``*workspace-window*``), and prints
 

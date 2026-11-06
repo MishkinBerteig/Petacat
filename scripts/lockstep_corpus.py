@@ -17,6 +17,15 @@ mode's ``off`` (``python``, ``numpy``, ``mlx``, ``mlx-cpu``), writing under
 ``<out-dir>/numeric-NAME``.  It is checked against the same ratchet, since the backend
 is meant to change nothing, and it never updates one.
 
+``--extended`` replays the extended golden baseline's cases
+(``tests/lockstep/golden/extended_cases.json``, 73 cases, 114 runs) from
+``tests/lockstep/traces-extended/<case id>/``, each laid out like the other corpora
+(``<slug>/<seed>...``, ``justify/...`` or ``episodes/...`` by the case's kind) and recorded
+from the patched Metacat with the case's own cap, answer, memory clears, interventions and
+Self-watching setting (``metacat/record.py``).  A case that names a numeric backend is
+replayed with that backend, whatever ``--numeric-backend`` says.  The ratchet is
+``ratchet-extended.json``, with keys ``<case id>|<slug>/<seed>``.
+
 ``--verbose`` replays with Verbose mode on (``<out-dir>/verbose``).  The narration only
 reads, so the results must equal the verbose-off ones; it is checked against the same
 ratchet and never updates one.
@@ -43,6 +52,8 @@ import compare_traces as ct  # noqa: E402
 
 REPO = ct.REPO_ROOT
 TRACES = REPO / "tests" / "lockstep" / "traces"
+TRACES_EXTENDED = REPO / "tests" / "lockstep" / "traces-extended"
+EXTENDED_CASES = REPO / "tests" / "lockstep" / "golden" / "extended_cases.json"
 RATCHET = REPO / "tests" / "lockstep" / "ratchet.json"
 DEFAULT_OUT = REPO / "tests" / "lockstep" / "replays"
 DEFAULT_CMD = ".venv/bin/python -m tests.lockstep.run_trace replay --metacat {metacat} --out {outdir}"
@@ -79,6 +90,30 @@ def find_traces(root: Path, problems: list[str] | None = None, seeds: list[str] 
             continue
         out.append((f"{sub}/{slug}" if sub else slug, seed, p))
     return sorted(out, key=lambda t: (t[0], _seed_key(t[1])))
+
+
+def extended_traces(root: Path, only: list[str] | None = None,
+                    seeds: list[str] | None = None) -> tuple[list[tuple[str, str, Path]], dict[str, str]]:
+    """The extended golden baseline's traces under ``root``, and each slug's own numeric backend.
+
+    The slug of a trace is ``<case id>|<layout slug>`` (``<case id>|episodes/<slug>``), so
+    the ratchet key is ``<case id>|<layout slug>/<seed>``.  A case with no trace is skipped
+    here; the ratchet check then reports its entries as missing."""
+    cases = json.loads(EXTENDED_CASES.read_text())["cases"]
+    items: list[tuple[str, str, Path]] = []
+    backends: dict[str, str] = {}
+    for case in cases:
+        if only and case["id"] not in only:
+            continue
+        kind = "episodes" if case["kind"] == "episode" else "justify" if case.get("answer") else "single"
+        if case["kind"] == "episode" and case.get("answer"):
+            kind = "episodes"  # episodes-justify is not used by any case
+        for slug, seed, path in find_traces(root / case["id"], None, seeds, kind):
+            key = f"{case['id']}|{slug}"
+            items.append((key, seed, path))
+            if case.get("backend") not in (None, "off"):
+                backends[key] = case["backend"]
+    return items, backends
 
 
 def petacat_path(out_dir: Path, slug: str, seed: str) -> Path:
@@ -180,6 +215,9 @@ def main(argv: list[str] | None = None) -> int:
                          "replay per episode, one memory carried across its runs; ratchet-episodes.json")
     ap.add_argument("--justify", action="store_true",
                     help="replay the justify-mode traces (traces/justify/<slug>/<seed>...); ratchet-justify.json")
+    ap.add_argument("--extended", action="store_true",
+                    help="replay the extended golden baseline's cases (traces-extended/<case id>/...); "
+                         "ratchet-extended.json")
     ap.add_argument("--ratchet", default=None)
     ap.add_argument("--update-ratchet", action="store_true")
     ap.add_argument("--check-ratchet", action="store_true")
@@ -195,19 +233,25 @@ def main(argv: list[str] | None = None) -> int:
 
         args.jobs = hardware.population_worker_count()
 
-    if args.episodes and args.justify:
-        ap.error("--episodes and --justify are separate corpora; run them one at a time")
+    if sum([args.episodes, args.justify, args.extended]) > 1:
+        ap.error("--episodes, --justify and --extended are separate corpora; run them one at a time")
     if args.verbose and args.update_ratchet:
         ap.error("the ratchet records the reference path (Verbose mode off); "
                  "use --check-ratchet with --verbose")
     if args.numeric_backend and args.update_ratchet:
         ap.error("the ratchet records the reference path (backend off); "
                  "use --check-ratchet with --numeric-backend")
-    kind = "episodes" if args.episodes else "justify" if args.justify else "single"
+    kind = "episodes" if args.episodes else "justify" if args.justify else "extended" if args.extended else "single"
     if args.ratchet is None:
         args.ratchet = str(RATCHET.with_name({"single": "ratchet.json", "episodes": "ratchet-episodes.json",
-                                              "justify": "ratchet-justify.json"}[kind]))
-    traces = find_traces(Path(args.traces), args.problem, args.seed, kind)
+                                              "justify": "ratchet-justify.json",
+                                              "extended": "ratchet-extended.json"}[kind]))
+    own_backend: dict[str, str] = {}
+    if kind == "extended":
+        root = Path(args.traces) if args.traces != str(TRACES) else TRACES_EXTENDED
+        traces, own_backend = extended_traces(root, args.problem, args.seed)
+    else:
+        traces = find_traces(Path(args.traces), args.problem, args.seed, kind)
     if not traces:
         print(f"no traces under {args.traces}", file=sys.stderr)
         return 2
@@ -221,7 +265,8 @@ def main(argv: list[str] | None = None) -> int:
     # A unit of work is one replay command: one trace, or (episodes) all runs of an episode.
     units: dict[tuple, list] = {}
     for item in traces:
-        key = (item[0], item[1].split(".")[0]) if kind == "episodes" else (item[0], item[1])
+        episodic = kind == "episodes" or (kind == "extended" and "|episodes/" in item[0])
+        key = (item[0], item[1].split(".")[0]) if episodic else (item[0], item[1])
         units.setdefault(key, []).append(item)
 
     def work(group):
@@ -229,7 +274,7 @@ def main(argv: list[str] | None = None) -> int:
         first = group[0]
         if not args.no_replay:
             ok, msg = replay(first[2], petacat_path(out_dir, first[0], first[1]), args.replay_cmd,
-                             args.numeric_backend, args.verbose)
+                             own_backend.get(first[0], args.numeric_backend), args.verbose)
             if not ok:
                 return [(it, None, f"replay failed: {msg}") for it in group]
         for item in group:

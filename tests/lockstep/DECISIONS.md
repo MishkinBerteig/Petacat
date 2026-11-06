@@ -11,12 +11,12 @@ spec differ, this file wins.
    `0002`), reconstructed with `Metacat/tools/reconstruct.py` into
    `Metacat/build/source` (git-ignored) and run in the `metacat:1.2` image built
    from `Metacat/build/source/docker`.  The recorder patch is applied to a *copy*
-   (`Metacat/build/recorder-source`), never to `build/source`.  Since 2026-10-28 the
-   bundle also has a second, optional patch group, the known-failure fixes
+   (`Metacat/build/recorder-source-kf`), never to `build/source`.  Since 2026-10-28 the
+   bundle also has a second patch group, the known-failure fixes
    (`Metacat/patches/fixes/`).  It changes no recorded run except the three crash
-   seeds, so traces recorded with and without it are interchangeable.  The recorder
-   notes which it used in the header's `revision` (`metacat/README.md`, "Which
-   Metacat").
+   seeds.  Since 2026-11-06 (ruling 70) the harness records and runs only the build
+   with that group, the patched Metacat, and refuses any other; every stored trace's
+   `revision` ends in `+known-failure-fixes` (`metacat/README.md`, "Which Metacat").
 2. **`~`.** Petacat changes.  Metacat redefines `round` to return exact integers
    (`utilities.ss:238-252`), so every `~` delta is a whole number drawn from
    `0 .. round(sqrt n)`.  `RNG.perturb` is fixed and `tests/unit/test_rng.py`
@@ -127,14 +127,14 @@ naming table in its `README.md`):
   known-failure traces are committed. The rest regenerate with `metacat/record.py`.
 * **Ratchet.** More unregistered errors count as a step back only when reach did not
   grow, because a trace that replays further meets decisions it never reached before.
-* **Metacat's known failures.** The verified reference reconstruction behind the
-  published studies is not changed, and plain `reconstruct.py --verify` still means it.
+* **Metacat's known failures.** The reconstruction behind the published studies is not
+  changed, and plain `reconstruct.py --verify` still means it; this harness does not run it.
   The three crashes are diagnosed.  Their fix is the bundle's second patch group
   (`Metacat/patches/fixes/0001-known-failures.patch`, checksummed in
   `Metacat/manifest.json`), applied with `reconstruct.py --apply-fixes` or `--fixes`.  It
   is applied to the local `Metacat/build/source`.  Every other recorded run (655 across
-  the development, held-out and justify corpora) gives a byte-identical trace with and
-  without it.  Petacat follows Metacat to each crash point and behaves as the fixed
+  the development, seeds 11-30 and justify corpora, checked before the unfixed build was
+  removed from the tools) gave a byte-identical trace with and without it.  Petacat follows Metacat to each crash point and behaves as the fixed
   Metacat past it.  The registry marks the three as reference crashes.
 * **Seam test pins.** `test_seam.py`'s four ordinary runs were measured before and after
   the seam was added and matched exactly. Since then they have been re-pinned with each
@@ -152,9 +152,10 @@ naming table in its `README.md`):
   corpus driver prints it as `snaps`, and the ratchet treats a rise in it like a rise
   in errors. Ratchet entries written before the count existed are not held to it.
 * **A tie replay cannot break is recorded, not registered.** One development trace
-  differs in a description's time stamp because two builders for the same description
-  were indistinguishable in everything the recorder logs (`DISCREPANCIES5.md` G-T3).
-  Registering it would hide the next one, so it stays visible in the count.
+  differed in a description's time stamp because two builders for the same description
+  were indistinguishable in everything the recorder logged (`DISCREPANCIES5.md` G-T3).
+  Registering it would hide the next one, so it stayed visible in the count. The recorder
+  now logs the stamp, the trace was re-recorded and its ratchet count is 0.
 * **The numeric backends are replayed too.** Faithful mode keeps the backend off, which
   left the arithmetic Petacat runs by default (MLX) outside the comparison, and the
   spreading fix of DISCREPANCIES5 B-1 had not reached it. `PETACAT_LOCKSTEP_NUMERIC_BACKEND`

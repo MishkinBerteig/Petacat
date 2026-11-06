@@ -13,29 +13,41 @@ are recorded in `DISCREPANCIES5.md`: the status lines on A-1…D-11 and section 
 
 | Part | Where | What it does |
 | --- | --- | --- |
-| Metacat recorder | `metacat/` (`record.py`, `recorder.patch`, `decision-trace.ss`) | Runs Metacat 1.2 (the `Metacat/` bundle's reconstruction plus a recorder patch applied to a *copy*) in the `metacat:1.2` Docker image and writes one gzipped JSON-lines trace per problem and seed. The recorder draws nothing and changes no run: its end results match the published support-v1a data, and two recordings of a run are byte-identical. See [`metacat/README.md`](metacat/README.md). |
+| Metacat recorder | `metacat/` (`record.py`, `recorder.patch`, `decision-trace.ss`) | Runs the patched Metacat 1.2 (the `Metacat/` bundle's reconstruction with the known-failure fixes, plus a recorder patch applied to a *copy*; no other build can be run) in the `metacat:1.2` Docker image and writes one gzipped JSON-lines trace per problem and seed. The recorder draws nothing and changes no run: its end results match the published support-v1a data, and two recordings of a run are byte-identical. See [`metacat/README.md`](metacat/README.md). |
 | Petacat tracer and replayer | `naming.py`, `context.py`, `tracing_rng.py`, `replay_rng.py`, `faithful.py`, `snapshot.py`, `run_trace.py` | `TracingRNG` records Petacat's own decisions in the same format. `ReplayRNG` pairs each Petacat decision with Metacat's record in the same unit, forces Metacat's result, and writes Petacat's trace with a `pair` field. Runs are in faithful mode: sequential engine, numeric backend `off`, fresh memory, `initial_clamp_fixed_time` on. `--numeric-backend NAME` (or `PETACAT_LOCKSTEP_NUMERIC_BACKEND`) runs it with a numeric backend instead, the GPU included. |
 | Engine seam | `server/engine/rng.py` (`TraceSeam`), `runner.py`, `coderack.py` | `init_mcat(rng=...)`, plus no-op hooks for the unit context, the update-cycle phases, `about`, and the composite codelet choice and eviction. An ordinary run draws exactly as it did without the seam (`test_seam.py`). |
 | Comparer | `scripts/compare_traces.py` | Computes every check class of spec §7.3 from the replay's pairing, compares snapshots per update cycle, applies the registry, and reports reach, agreement, and the number of update-cycle snapshots whose state differs (proposed structures aside, which the two programs hold differently by design). |
-| Corpus driver and ratchet | `scripts/lockstep_corpus.py`, `ratchet*.json` | Replays and compares a whole corpus in parallel, prints a table, and keeps per-trace reach, agreement, error count and differing state snapshots. A trace may not get worse. `--numeric-backend` replays with a backend on and checks against the same ratchet. |
+| Corpus driver and ratchet | `scripts/lockstep_corpus.py`, `ratchet*.json` | Replays and compares a whole corpus in parallel, prints a table, and keeps per-trace reach, agreement, error count and differing state snapshots. A trace may not get worse. `--numeric-backend` replays with a backend on and checks against the same ratchet; `--extended` replays the extended golden baseline's cases against `ratchet-extended.json`. |
 | Verbose narration | `metacat/record_verbose.py`, `scripts/compare_verbose.py`, `verbose_metacat.txt.gz`, `test_verbose.py` | Logs what Metacat prints with `%verbose%` on (the per-codelet banner and every `say`, `vprintf`, `vprint`), replays the same run in Petacat with Verbose mode on, and compares the two line for line. `--verbose` on the corpus driver replays with the mode on and checks the same ratchet. |
 | Golden baselines | `golden/engine_baseline*`, `golden/extended_*`, `../support/golden_baseline.py`, `../support/golden_extended.py`, `../../scripts/capture_golden_baseline.py`, `../../scripts/golden_coverage.py` | Byte-for-byte records of what the engine does (answers, per-codelet RNG draws, trace and state hashes, English): the 188 common-case runs, and the extended baseline of rare paths whose every case was checked against Metacat (below). They guard engine refactors, not fidelity; fidelity is what the traces above measure. |
+| Patched-only and coverage guards | `test_patched_only.py`, `test_ratchet_covers_golden.py` | The first fails if a recorder can run anything but the patched build, or if a stored trace's header does not end in `+known-failure-fixes` (`traces-known-failures/reference/` aside). The second fails if a run of either golden baseline has no ratchet entry. |
 | Registry | `known_divergences.toml` | Divergences that were triaged and kept. Today it holds only Metacat's own crashes (`Metacat/KNOWN-FAILURES.md`); every port divergence found so far was fixed. |
 
 ## Corpora
 
+Every corpus below was recorded from the **patched Metacat**: `Metacat/build/source` with the bundle's second
+patch group, the known-failure fixes. The recorder refuses any other build (`metacat/record.py`,
+`require_patched`), and a trace's `revision` header ends in `+known-failure-fixes`; `test_patched_only.py` checks
+every stored header. The one folder that is not patched is `traces-known-failures/reference/`, stored data that
+nothing runs and that documents the crashes the fixes remove.
+
 | Corpus | Location | Size | Committed? |
 | --- | --- | --- | --- |
-| Development: 19 demo problems × seeds 1–10 | `traces/<slug>/<seed>.metacat.jsonl.gz` | 190 traces, ~130 MB | Only `abc-abd-xyz` |
-| Held-out: the same problems × seeds 11–30 | `traces-heldout/` | 380 traces, ~320 MB | No |
+| Plain: 19 demo problems × seeds 1–30 (seeds 11–30 were once a separate "held-out" corpus; there is none now) | `traces/<slug>/<seed>.metacat.jsonl.gz` | 570 traces, ~450 MB | Only `abc-abd-xyz` seeds 1–10 |
 | Episodes: 8 runs per episode, memory carried | `traces/episodes/<slug>/<S>.r<k>.metacat.jsonl.gz` | 67 episodes over all 19 problems (536 runs, 6.5 M codelets, ~1.6 GB) | No |
 | Justify mode: the demo answers × seeds 1–5 | `traces/justify/<i-m-t-a>/<seed>…` | 85 traces | No |
-| Metacat's known failures, on the reference and with the bundle's known-failure fixes | `traces-known-failures/{reference,fixes}/` | 6 traces | Yes |
+| Extended golden baseline: every case of `golden/extended_cases.json`, recorded with the case's own cap, answer, memory clears, interventions and Self-watching setting | `traces-extended/<case id>/` (laid out like the corpora above) | 73 cases, 114 runs | No |
+| Metacat's known failures: with the bundle's known-failure fixes (the patched build), and as the unpatched reference reconstruction crashed | `traces-known-failures/{fixes,reference}/` | 6 traces | Yes |
+| Translation logs: the six runs behind `translation_log_metacat.tsv` | `traces-translation/<slug>/<seed>.metacat.jsonl.gz` | 6 traces | Yes |
 | Snag explanations: seven runs beyond the corpus that between them hit every shape of failure (CHANGE, SWAP, CONFLICT, group-category reversal), with Metacat's logged explanations and comment lines | `traces-snags/<slug>/<seed>.metacat.jsonl.gz`, `snag_explanations_metacat.tsv` | 7 traces, 1.5 MB | Yes |
 | Desync regressions: the shortest prefixes (caps of 260-480 codelets) of three runs beyond the corpus that used to desynchronise Petacat's replay (`a-b-xyz` 1, `abc-bcd-xyz` 1, `aaa-bbb-xyz` 3; `DISCREPANCIES5.md` G-Y2…G-Y4) | `traces-desync/<slug>/<seed>.metacat.jsonl.gz` | 3 traces, 0.3 MB | Yes |
 
-The uncommitted corpora regenerate in minutes with `metacat/record.py`. Recording all 190
-development traces takes about three minutes with `--jobs 12`.
+`traces-known-failures/reference/` was made once, in October 2026, by recording the three crash seeds on the
+reconstruction without the fixes, to show what the fixes remove (`metacat/README.md`, "Metacat's known failures").
+Nothing records on that build any more.
+
+The uncommitted corpora regenerate with `metacat/record.py`. Recording all 190 seeds 1–10 traces takes about
+three minutes with `--jobs 12`.
 
 ## Everyday use
 
@@ -59,9 +71,9 @@ python3 tests/lockstep/metacat/record.py --problem abc abd xyz --answer wyz --se
 .venv/bin/python scripts/compare_verbose.py abc-abd-xyz-wyz 1-3 --justify
 .venv/bin/python scripts/compare_verbose.py abc-abd-xyz 1 --episode
 
-# Whole corpus; --check-ratchet fails if any trace got worse
+# Whole plain corpus (seeds 1-30), then the other corpora; --check-ratchet fails if any trace got worse
 .venv/bin/python scripts/lockstep_corpus.py --jobs 12 --check-ratchet
-.venv/bin/python scripts/lockstep_corpus.py --traces tests/lockstep/traces-heldout --jobs 12
+.venv/bin/python scripts/lockstep_corpus.py --extended --jobs 8
 .venv/bin/python scripts/lockstep_corpus.py --episodes --jobs 8
 .venv/bin/python scripts/lockstep_corpus.py --justify --jobs 8
 
@@ -90,7 +102,7 @@ up there and nowhere else.
    points upstream, to a salience, an activation, or a structure that exists on one side
    only.
 3. Fix Petacat in its own idiom and cite the Scheme. Then replay the development corpus
-   and the held-out corpus, and update `ratchet.json` in the same commit.
+   and the rest of the plain corpus (seeds 1–30), and update `ratchet.json` in the same commit.
 
 The traps that produced most of the bugs:
 - Metacat redefines `round`, `floor`, `ceiling` and `truncate` to return exact integers
@@ -105,7 +117,7 @@ The traps that produced most of the bugs:
 | Corpus | First replay | After the pass |
 | --- | --- | --- |
 | Development: 19 problems × seeds 1–10 (190 runs) | reach 21 % of codelets; 29 traces replay to their end | **all 190 replay to their end with no error** |
-| Held-out: seeds 11–30 (380 runs) | 260 to their end (first run, mid-pass) | **all 380 replay to their end with no error** |
+| Seeds 11–30 (380 runs; then a separate "held-out" corpus) | 260 to their end (first run, mid-pass) | **all 380 replay to their end with no error** |
 | Justify mode (85 runs) | 21 to their end (first run, mid-pass) | **all 85 replay to their end with no error** |
 | Episodes, memory carried (536 runs, 6.5 M codelets) | 66 of 200 runs to their end (first run, mid-pass) | **all 536 replay to their end with no error** |
 | Metacat's three known crashes | — | Petacat follows Metacat to each crash point with no error |
@@ -120,16 +132,24 @@ leaving out proposed structures, which the two programs hold differently by desi
 
 | Corpus | Snapshots | Differing state snapshots |
 | --- | --- | --- |
-| Development (190 runs) | 29,085 | 24, all in `abc-abd-glz` 3 |
-| Held-out (380 runs) | 68,779 | 10, all in `zy-x-zy` 20 |
+| Development (190 runs) | 29,085 | none |
+| Seeds 11–30 (380 runs) | 68,779 | none |
 | Justify mode (85 runs) | 38,690 | none |
-| Episodes (536 runs) | 434,387 | 454, all in the three runs at `abc-abd-glz` seed 3 |
+| Episodes (536 runs) | 434,387 | none |
 
 The one harness gap these corpora had, two builders (or two evaluators) for the same description or rule that
 agree on everything the recorder logged, so replay could not tell which one Metacat ran, is closed: the recorder
 now logs the proposal's own time stamp for a description and a rule as it did for a bond, a group and a bridge
-(`DISCREPANCIES5.md` G-T3). The corpora above were recorded before that, so the differing snapshots in the table
-(and the ratchets that carry them) are the old figures; re-recorded, those traces replay with none. The re-run also
+(`DISCREPANCIES5.md` G-T3). The corpora were first recorded before that, and before the project ruled that
+only the patched Metacat is ever run. In round 2, stages T and T2, **every stored trace was recorded again** from the
+patched Metacat with the fixed recorder: the 190 + 380 plain traces, the 536 episode runs, the 85 justify traces and
+the 6 translation-log traces, 1,197 in all. Each new trace is the old one record for record, apart from the
+header's `revision` (the manifest hash now ends in `+known-failure-fixes`) and the new `picked_arg_stamp` field on
+description and rule decisions (about 1.7 M records gained it). That includes the traces that had 24, 215, 215 and 24
+differing snapshots (`abc-abd-glz` 3 alone and as `1.r3`, `2.r2`, `3.r1` of its episodes) and seeds 11–30's `zy-x-zy` 20
+(10): each replays with none, and their ratchet entries were lowered to 0. Every `state_snapshots_differing` in
+the ratchets is 0, so a difference in any trace is a defect.
+The re-run also
 found two faults that the decisions had hidden:
 - **The snapshot writer** left out the translated rule justify mode adds without
   building it. That came to 8,682 snapshots across 40 justify traces. The API's rule
@@ -138,8 +158,8 @@ found two faults that the decisions had hidden:
   arithmetic that `DISCREPANCIES5.md` B-1 fixed in the engine's own loops.
 
 **Through the GPU.** Replayed with `--numeric-backend mlx`, the MLX backend Petacat uses
-by default, every corpus gives exactly the backend-off results: all 190 development,
-380 held-out and 85 justify runs and 536 episode runs replay to their end with no
+by default, every corpus gives exactly the backend-off results: all 570 plain,
+85 justify and 536 episode runs replay to their end with no
 error, with the same differing snapshots as above. Faithful mode keeps the backend off
 for the reference path, so this is the check that what Petacat actually runs makes
 Metacat's decisions too.
@@ -207,10 +227,11 @@ backend's recomputation, and the final state with numbers normalised (a value th
 another is one value; that is the only way the raw `state` hash differs). A backend that is not installed or usable
 is reported as a skip, never a pass.
 
-**The two Metacat variants record the same.** `Metacat/build/source` is the known-failure-fixes variant. All 40
-original cases (65 traces) were recorded with `record.py --reference` and with `--known-failures-patch`: the traces
-are byte-identical apart from the header's `revision`. (`record_answers.py` runs only the build as it stands, so the
-five episodes' answer reports were not recorded on both; the runs they follow are identical.)
+**The cases are recorded from the patched Metacat only.** `Metacat/build/source` is the build with the known-failure
+fixes, and the recorder runs nothing else. In stage T2 the 40 original cases (65 traces) were first compared as recorded
+on the reconstruction without the fixes and with them (a one-off check, before the flag that chose between them was
+removed): the traces were byte-identical apart from the header's `revision`. (`record_answers.py` runs only the build
+as it stands, so the five episodes' answer reports were not recorded on both; the runs they follow are identical.)
 
 **Every case was checked against Metacat 1.2.** Each case was recorded with `metacat/record.py` and
 replayed with `scripts/lockstep_corpus.py` in faithful mode: it counts only if the replay reaches the end,
@@ -224,6 +245,17 @@ engine's own object-graph loops (`off`; three cases on the pure-Python backend, 
 runs the default configuration on NumPy. One caveat: the replay follows Metacat's trajectory, and the baseline
 runs Petacat's own random stream on the same inputs, so the check says that the situations Metacat reaches
 are handled as Metacat handles them, not that the baseline's own trajectory is Metacat's.
+
+**Every case is in a ratchet.** All 114 runs are in `ratchet-extended.json` (key `<case id>|<layout slug>/<seed>`, for
+example `episode/a-aa-b/s1x6-cap4000|episodes/a-aa-b/1.r1`), and all 188 runs of the original baseline are in
+`ratchet.json`, `ratchet-justify.json` and `ratchet-episodes.json`. `test_ratchet_covers_golden.py` fails for any run of
+either golden baseline that has no entry. The extended traces are recorded from the patched Metacat, one folder per
+case under `traces-extended/<case id>/`, with each case's own cap, answer, `clear_before`, interventions and
+Self-watching setting (a header that disagrees with its case is a defect: the recording script compared every header
+with its case). `scripts/lockstep_corpus.py --extended` replays them (a case that names a numeric backend, three of
+them `python`, is replayed with that backend whatever `--numeric-backend` says) and checks `ratchet-extended.json`. Every
+entry is full reach, agreement 1.0, 0 errors and 0 differing snapshots. The 8 episode answer reports stay checked
+by `scripts/compare_episode_answers.py`, which is not a ratchet.
 
 **What is in it** (73 cases, 114 runs, 8 episode answer reports; about 30 s in one process, the whole file
 recomputed in 6-12 s over a process pool): 42 discovery cases, 19 justify cases, 8 episodes; four with a

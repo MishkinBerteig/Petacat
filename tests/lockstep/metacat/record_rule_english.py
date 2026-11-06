@@ -3,7 +3,7 @@
 
 Reproduces the data of ``tests/seed_unit/rule_english_metacat.tsv``.  Metacat's
 ``transcribe-to-english`` (``rules.ss``) describes each rule the moment it is built; this
-recorder wraps it in the unpatched ``metacat:1.2`` container (``set!`` of the top-level
+recorder wraps it in the ``metacat:1.2`` container, on the patched Metacat, (``set!`` of the top-level
 procedure, see README.md), runs the problem for each seed with memory cleared, and prints
 
     RULE<TAB>seed<TAB>codelet-count<TAB>rule-type<TAB>clause-key<TAB>line1|||line2...

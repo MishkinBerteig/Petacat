@@ -14,7 +14,7 @@ The six runs are the smallest that between them have a coattail slippage (``a-b-
 22, and a justify-mode run), directly applied slippages, a snag with an applied slippage,
 and an answer whose supporting groups are nested.
 
-The comparison over the whole corpus (development, held-out and justify mode: 1,044 answers
+The comparison over the whole corpus (plain seeds 1-30 and justify mode: 1,044 answers
 and snags in 570 + 85 runs) was run with scripts in the task's scratchpad: the corpus is
 too large to commit.  The one thing it does not match is the *order* of the supporting
 groups of some answers (``DISCREPANCIES5.md`` G-Z1); none of the six runs here is one.

@@ -151,7 +151,7 @@ outside the matrix take it too and the run is entirely what it says it is.
   architecture   104 collected    104 run    104 passed      0 failed      0 skipped  complete
   integration    366 collected    366 run    366 passed      0 failed      0 skipped  complete
   parallel       304 collected    304 run    304 passed      0 failed      0 skipped  complete
-  lockstep       247 collected    247 run    247 passed      0 failed      0 skipped  complete
+  lockstep       258 collected    258 run    258 passed      0 failed      0 skipped  complete
   e2e            644 collected    644 run    644 passed      0 failed      0 skipped  complete
 
   run complete in 13.9 min against a 60 min ceiling
@@ -230,7 +230,7 @@ that allowance.
 | **architecture** | `tests/architecture/` | How the source tree is allowed to depend on itself | The repository's source, `seed_data/*.json`, child interpreters | 104 |
 | **integration** | `tests/integration/` | Agreement between the repository's artifacts, and the harness's own rules | Real `seed_data/*.json`, the ORM declarations, the generated client files, the documentation, a real pytest session | 366 |
 | **parallel** | `tests/parallel/` | The detachable multi-core plugin (`server/parallel/`): each executor against the serial run it claims to equal | Real engine objects and `seed_data/*.json`, worker processes and threads; each test pins the backend it compares on | 304 |
-| **lockstep** | `tests/lockstep/` | Petacat's decision traces against Metacat's: naming, helper conformance, tracing/replay RNGs, determinism guards, the comparer | Real engine in faithful mode (numeric backend off, or a named backend); recorded Metacat traces | 247 |
+| **lockstep** | `tests/lockstep/` | Petacat's decision traces against Metacat's: naming, helper conformance, tracing/replay RNGs, determinism guards, the comparer | Real engine in faithful mode (numeric backend off, or a named backend); recorded Metacat traces | 258 |
 | **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 644 |
 
 Those counts are cases, so they include the second pass the numeric matrix makes
@@ -258,7 +258,8 @@ subject is, and write the test where the answer lands:
   It runs the engine in faithful mode, which pins the numeric backend off, so it
   stays outside the backend matrix and the substrate-marker guard. One test names
   the exact CPU backend instead, and `scripts/lockstep_corpus.py --numeric-backend`
-  replays whole corpora with any backend, the GPU included.
+  replays whole corpora with any backend, the GPU included. Every Metacat trace and fixture it compares
+  with comes from the patched Metacat (`Metacat/build/source` with the known-failure fixes), the only build the recorders run.
 - **e2e** — the assertion travels over HTTP.
 
 A first pass should test **the lowest level of code just above the database
@@ -653,6 +654,8 @@ changing what it records.
 | `test_event_names.py` | 2 | Every Trace event in eight Metacat runs (all event types, all three group directions, flips, slippages on all three bridges, translated rules, the three answer headers) named and headed exactly as Metacat 1.2 logged them |
 | `test_helpers.py` | 11 | Helper conformance: `prob`, `~`, `weighted_pick` and `pick` give Metacat's results for the same draws |
 | `test_naming.py` | 9 | Canonical names for plain values and every kind of object, and the opening state against Metacat's |
+| `test_patched_only.py` | 7 | Only the patched Metacat is ever run (ruling 70): `record.py` has no flag that chooses a build; every recorder reaches Docker only through `run_container`, which refuses a tree that fails verification, the reference tree made with Metacat's own tool (never run) and a recorder copy not marked patched; and every stored trace header in every corpus ends in `+known-failure-fixes` (`traces-known-failures/reference/` is the one exempt folder, stored data nothing runs) |
+| `test_ratchet_covers_golden.py` | 4 | Every run of the original golden baseline (188) and of the extended one (114) has a lockstep ratchet entry (`ratchet.json`, `ratchet-justify.json`, `ratchet-episodes.json`, `ratchet-extended.json`), and every ratchet entry has agreement 1.0, no error and no differing state snapshot |
 | `test_replay.py` | 15 | Tracing rules, trace shape, self-replay, Guard 1, fatal and surplus paths, Guard 2 (slow); a committed Metacat trace replayed with the numeric backend on |
 | `test_seam.py` | 6 | The engine's trace seam changes nothing for an ordinary run; the faithful clamp-expiry switch |
 | `test_translation_log.py` | 2 | The slippage log, supporting vertical bridges, reference objects and supporting groups of every answer and snag in six Metacat runs (coattail slippages, a justify-mode answer, a snag with an applied slippage), equal to what Metacat 1.2 logged |

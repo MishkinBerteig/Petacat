@@ -22,7 +22,7 @@ number of its own and changes nothing Metacat computes.
 python3 tests/lockstep/metacat/record.py --problem abc abd xyz --seeds 1-10   # default out: tests/lockstep/traces
 python3 tests/lockstep/metacat/record.py --seeds 1,5,10600000-10600004 --cap 100000 --jobs 4 --no-snapshots
 python3 tests/lockstep/metacat/record.py --names                    # rewrite opening-names.<slug>.json
-python3 tests/lockstep/metacat/record.py --seeds 1-5 --baseline     # collector-style run without the recorder patch, on build/source as it is; prints answer + codelets
+python3 tests/lockstep/metacat/record.py --seeds 1-5 --baseline     # collector-style run without the recorder patch (still the patched Metacat); prints answer + codelets
 python3 tests/lockstep/metacat/record.py --seeds 1-3 --audit        # raw-draw audit (prints AUDIT lines; trace unchanged)
 ```
 
@@ -30,18 +30,19 @@ Output: `<out>/<slug>/<seed>.metacat.jsonl.gz`, slug = the three strings joined 
 start at 1.  The gzip header has mtime 0, so equal traces are equal bytes.  `--keep-plain`
 also keeps the `.jsonl`.
 
-**Which Metacat.** `Metacat/build/source` is either the reference reconstruction or the
-reference with the bundle's second patch group, the known-failure fixes
-(`Metacat/README.md`, "Optional: the known-failure fixes").  The recorder checks which
-with `Metacat/tools/reconstruct.py` and refuses a tree that is neither.  By default it
-records whichever `build/source` is.  `--reference` and `--known-failures-patch` choose one
-explicitly, adding or taking off the fixes on its copy, never on `build/source`.  The copy
-is `Metacat/build/recorder-source` for the reference and `Metacat/build/recorder-source-kf`
-with the fixes; each is rebuilt when `recorder.patch` or `Metacat/manifest.json` changes.
-The trace header's `revision` names the manifest's hash and, with the fixes, ends in
-`+known-failure-fixes`.  The two variants record byte-identical traces except on the three
-crash seeds.
-Both are git-ignored.  To change the patch: edit `recorder-source`, then regenerate with
+**Which Metacat.** This project runs the **patched Metacat** and nothing else: `Metacat/build/source` with the
+bundle's second patch group, the known-failure fixes (`Metacat/README.md`, "Optional: the known-failure fixes").
+Every container start goes through `record.run_container`, which calls `record.require_patched()` first; that
+verifies `build/source` with `Metacat/tools/reconstruct.py` and exits with an error, starting nothing, unless it is
+the patched build. `record.py`, `--baseline` and `--names` included, and every other recorder (`record_verbose.py`,
+`record_comments.py`, `record_translation.py`, and `record_events.py`, `record_snags.py`, `record_answers.py`,
+`record_frequencies.py`, `record_rule_english.py` through `wrap.py`) reach Docker only that way. There is no flag
+that picks a build or takes the fixes off. The recorder's copy of the tree, with `recorder.patch` applied, is
+`Metacat/build/recorder-source-kf`; it is rebuilt when `recorder.patch` or `Metacat/manifest.json` changes. The trace
+header's `revision` names the manifest's hash and always ends in `+known-failure-fixes`. `test_patched_only.py`
+holds all of this: the refusal of a tree that fails verification, of the reference tree made with Metacat's own
+tool (never run), and of a copy not marked patched, and the header of every stored trace.
+The copy is git-ignored.  To change the recorder patch: edit `recorder-source-kf`, then regenerate with
 `diff -u` against `build/source` using `a/` and `b/` path prefixes (applied with `patch -p1`).
 
 Each run is one `docker run --rm --platform linux/amd64 --network none` container
@@ -56,7 +57,7 @@ and prints `RESULT <answer|*CAP*|*NONE*|*ERROR*> <codelet count>` (the collector
 ```sh
 python3 tests/lockstep/metacat/record.py --problem abc abd xyz --seeds 1-5 --episode-runs 8   # 5 episodes of 8 runs
 python3 tests/lockstep/metacat/record.py --problem abc abd xyz --answer wyz --seeds 1-5       # justify mode
-python3 tests/lockstep/metacat/record.py --problem abc abd xyz --seeds 1-5 --episode-runs 8 --baseline   # unpatched check
+python3 tests/lockstep/metacat/record.py --problem abc abd xyz --seeds 1-5 --episode-runs 8 --baseline   # collector-style check, no recorder patch
 ```
 
 * `--episode-runs N`: one Metacat process runs N runs of the problem; `(tell *memory* 'clear)` only before run 1
@@ -72,7 +73,7 @@ python3 tests/lockstep/metacat/record.py --problem abc abd xyz --seeds 1-5 --epi
   carries `answer`.  Neither option changes the default layout, and recordings made without them are byte-identical
   to those made before the options existed.
 * `decision-trace.ss`: `*tr-header-extra*` (header fields spliced after `cap`), `*tr-failed?*`, `*tr-answers-before*`.
-* Validation: `--baseline` runs the unpatched collector-style loop and prints the same `RESULT answer/codelets`
+* Validation: `--baseline` runs the collector-style loop, without the recorder patch, and prints the same `RESULT answer/codelets`
   sequence; the recorder must match it, run for run.
 
 ## A person's actions: clears, clamps and Self-watching mode
@@ -215,9 +216,9 @@ byte-identical traces.
 
 * Recorder changes nothing: `abc abd xyz` seeds 10600000-10600004 (the seeds in the published
   `support-v1a` data, `main/chunks/construction/run4`) give `*NONE*` 3718, `dyz` 2630, `xyd` 1575,
-  `xyz` 1878, `xyd` 3619 codelets, all equal to the published values, from both the unpatched
-  collector-style driver and the recorder.  Seeds 1-5 (not in the study) give `xyz` 1331, `xyd` 3514, `yyz` 2427,
-  `xyz` 361, `xyz` 2624 from both.  Another 20 seeds over five other problems also matched the unpatched driver, and the
+  `xyz` 1878, `xyd` 3619 codelets, all equal to the published values, from both the collector-style
+  driver (no recorder patch) and the recorder.  Seeds 1-5 (not in the study) give `xyz` 1331, `xyd` 3514, `yyz` 2427,
+  `xyz` 361, `xyz` 2624 from both.  Another 20 seeds over five other problems also matched the collector-style driver, and the
   three `KNOWN-FAILURES.md` seeds reached the same codelet counts (2835, 2088) with reason `error`.
 * Repeatability: seeds 1 and 2 recorded twice (different `--jobs`) are byte-identical gzip files.
 * Measured size and time (Rosetta, one container per run, includes about 1 s start-up): 361-3514 codelets take 1.2-10 s;
@@ -226,26 +227,28 @@ byte-identical traces.
   to a run that reaches the 100,000-codelet cap: about 1 GB raw, 30 MB gzipped, a few minutes.
 
 
-## The three reference crashes
+## The three crash seeds
 
 `Metacat/KNOWN-FAILURES.md` lists three seeds on which Metacat itself crashes:
 `abc cba mrrjjj` seeds 20713988 and 20716342, and `abc aabbcc kkjjii` seed 20226148.
-The reference reconstruction behind the published studies is not changed.  The bundle's
-second patch group, `Metacat/patches/fixes/0001-known-failures.patch`, fixes the two
-causes, and Metacat's `CODE-FIXES.md` (§1.3 once applied) and `KNOWN-FAILURES.md`
-describe it.
+The reconstruction behind the published studies, without the fixes, is not changed and is not run by this
+harness. The bundle's second patch group, `Metacat/patches/fixes/0001-known-failures.patch`, fixes the two
+causes, and Metacat's `CODE-FIXES.md` (§1.3 once applied) and `KNOWN-FAILURES.md` describe it. The patched
+build is the Metacat of this project.
 
-Both variants are recorded and committed:
+`traces-known-failures/fixes/` is recorded from the patched build:
 
 ```sh
-python3 tests/lockstep/metacat/record.py --reference --problem abc cba mrrjjj \
-    --seeds 20713988,20716342 --out tests/lockstep/traces-known-failures/reference
-python3 tests/lockstep/metacat/record.py --known-failures-patch --problem abc cba mrrjjj \
+python3 tests/lockstep/metacat/record.py --problem abc cba mrrjjj \
     --seeds 20713988,20716342 --out tests/lockstep/traces-known-failures/fixes
 # and the same for abc aabbcc kkjjii, seed 20226148
 ```
 
-- **Reference.** Each trace ends with an `end` record of reason `error`.  The comparer
+`traces-known-failures/reference/` is history: in October 2026, before the ruling that only the patched build is
+run, the same three seeds were recorded once on the reconstruction without the fixes, to keep what the fixes remove.
+Those three files are stored data that nothing runs, and no tool can record on that build any more.
+
+- **Reference (stored, historical).** Each trace ends with an `end` record of reason `error`.  The comparer
   registers each one as a reference crash (`known_divergences.toml`,
   `match.class = "reference-crash"`).  Petacat replays them in lockstep to each crash
   point.
@@ -253,9 +256,9 @@ python3 tests/lockstep/metacat/record.py --known-failures-patch --problem abc cb
   with no differences:
   `.venv/bin/python scripts/lockstep_corpus.py --traces tests/lockstep/traces-known-failures/fixes`.
 
-Every other recorded run, across the development, held-out and justify corpora, gives a
-byte-identical trace with and without the fixes, apart from the header's `revision`
-(`Metacat/VALIDATION.md`).
+Every other run, across the plain, justify and episode corpora, gave a byte-identical trace with and without the
+fixes, apart from the header's `revision` (`Metacat/VALIDATION.md`; stage T2 re-checked 1,191 traces against their
+old recordings).
 
 ## Translation logs: `record_translation.py`
 
@@ -277,7 +280,7 @@ scripts/compare_translation_log.py --fixture
 ## Rule English and event names
 
 Two more wrap-and-log recorders, built on `wrap.py` (the shared driver prelude and container
-runner).  Each runs the *unpatched* `Metacat/build/source`, wraps Metacat procedures from the
+runner).  Each runs the patched `Metacat/build/source` (without the recorder patch), wraps Metacat procedures from the
 driver, prints tab-separated records and changes nothing Metacat computes.  The comparers are in
 `scripts/`; both need Docker and the `metacat:1.2` image, and read the lockstep traces
 (`record.py`) to replay the same runs in Petacat.
@@ -344,7 +347,7 @@ the cap), as the fidelity net recorded; `abc cba abcd` seeds 1-5 give `dcba` 5 o
 ## Snag explanations, snag sweep and fidelity net: `record_snags.py`, `record_answers.py`
 
 Two more "wrap and log" recorders (they share `wrap.py`: the driver prelude, the container run,
-seed and problem-list parsing).  Both run the *unpatched* `Metacat/build/source`, wrap Metacat
+seed and problem-list parsing).  Both run the patched `Metacat/build/source` (without the recorder patch), wrap Metacat
 procedures from the driver, and print tab-separated lines; nothing is drawn or changed.  Output of
 equal arguments is byte-identical.
 

@@ -7,6 +7,7 @@ END<TAB>key<TAB>codelet-count<TAB>outcome"""
 import argparse, os, sys, time, shutil
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import record
+record.require_patched()  # exits unless build/source is the patched Metacat (ruling 70)
 
 ap = argparse.ArgumentParser()
 ap.add_argument("i"); ap.add_argument("m"); ap.add_argument("t"); ap.add_argument("seeds")

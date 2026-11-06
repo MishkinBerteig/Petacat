@@ -5,19 +5,19 @@ Plain Python 3, standard library only.  See tests/lockstep/metacat/README.md.
 
     python3 tests/lockstep/metacat/record.py --problem abc abd xyz --seeds 1-10
     python3 tests/lockstep/metacat/record.py --names            # opening names
-    python3 tests/lockstep/metacat/record.py --seeds 1-5 --baseline   # unpatched
+    python3 tests/lockstep/metacat/record.py --seeds 1-5 --baseline   # no recorder patch
 
 Each (problem, seed) runs in its own ``metacat:1.2`` container (linux/amd64,
-Chez Scheme 9.5.4, no network) on a copy of the reconstructed ``Metacat/build/source``
-with ``recorder.patch`` applied: ``Metacat/build/recorder-source`` for the reference
-reconstruction, ``Metacat/build/recorder-source-kf`` for the reconstruction with the
-bundle's second patch group (``Metacat/patches/fixes/``, the known-failure fixes).  By
-default the copy is of whichever of the two ``build/source`` is (``reconstruct.py``
-verifies it); ``--reference`` and ``--known-failures-patch`` choose one explicitly.  The
-two give byte-identical traces except on the three seeds of
-``Metacat/KNOWN-FAILURES.md``.  The header's ``revision`` names the bundle manifest and,
-with the fixes, ends in ``+known-failure-fixes``.  The plain trace is gzipped (mtime 0, so
-equal traces are equal bytes) into ``<out>/<slug>/<seed>.metacat.jsonl.gz``.
+Chez Scheme 9.5.4, no network) on a copy of the patched ``Metacat/build/source`` with
+``recorder.patch`` applied (``Metacat/build/recorder-source-kf``).  "Patched" is the
+reconstruction with the bundle's second patch group, the known-failure fixes
+(``Metacat/patches/fixes/``).  It is the only build this module can run: every container
+start goes through ``run_container``, which first calls ``require_patched`` and exits
+unless ``Metacat/build/source`` verifies as the patched build (``reconstruct.py`` does the
+verification).  There is no flag that picks another build.  The header's ``revision``
+names the bundle manifest and always ends in ``+known-failure-fixes``.  The plain trace
+is gzipped (mtime 0, so equal traces are equal bytes) into
+``<out>/<slug>/<seed>.metacat.jsonl.gz``.
 
 Episodes and justify mode (task J)::
 
@@ -55,7 +55,6 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[2]
 METACAT = REPO / "Metacat"
 SOURCE = METACAT / "build" / "source"
-RECORDER_SOURCE = METACAT / "build" / "recorder-source"
 WORK = METACAT / "build" / "recorder-work"
 PATCH = HERE / "recorder.patch"
 IMAGE = "metacat:1.2"
@@ -81,37 +80,47 @@ def _manifest() -> dict:
     return json.loads((METACAT / "manifest.json").read_text())
 
 
-def source_state() -> str:
-    """``reference`` or ``fixes``: which reconstruction ``build/source`` is."""
+RECORDER_SOURCE = METACAT / "build" / "recorder-source-kf"
+PATCHED_MARK = "fixes+"
+
+
+def require_patched() -> None:
+    """Exit unless ``Metacat/build/source`` verifies as the patched build (ruling 70).
+
+    The patched build is the reconstruction with the bundle's known-failure fixes.  A missing
+    tree, a tree that verifies as anything else, and a tree that verifies as nothing all
+    stop here, with no container started."""
     if not SOURCE.is_dir():
-        sys.exit(f"missing {SOURCE}; run Metacat/tools/reconstruct.py first")
+        sys.exit(f"missing {SOURCE}; run Metacat/tools/reconstruct.py first, then --apply-fixes "
+                 "(this harness runs only the patched Metacat)")
     state = _reconstruct().describe(SOURCE, _manifest())
-    if state is None:
-        sys.exit(f"{SOURCE} verifies neither as the reference reconstruction nor with the "
-                 "known-failure fixes; see Metacat/README.md")
-    return state
+    if state != "fixes":
+        sys.exit(f"{SOURCE} does not verify as the patched Metacat (the reconstruction with the "
+                 f"known-failure fixes; it verifies as {state!r}); this harness runs only the "
+                 "patched Metacat, see Metacat/README.md, 'Optional: the known-failure fixes'")
 
 
-def ensure_recorder_source(variant: str | None = None) -> tuple[Path, str]:
-    """Copy build/source as the ``variant`` reconstruction and apply recorder.patch.
+def source_state() -> str:
+    """``fixes``: ``build/source`` is the patched build.  Exits if it is not."""
+    require_patched()
+    return "fixes"
 
-    ``variant`` is ``reference``, ``fixes`` or None (whichever build/source is).  The copy
-    is redone when the variant's inputs change: recorder.patch or the bundle manifest.
-    Returns the copy and the variant it is."""
-    state = source_state()
-    variant = variant or state
-    target = METACAT / "build" / ("recorder-source-kf" if variant == "fixes" else "recorder-source")
+
+def ensure_recorder_source() -> Path:
+    """Copy the patched ``build/source`` and apply recorder.patch; return the copy.
+
+    The copy is redone when recorder.patch or the bundle manifest changes.  Exits unless
+    ``build/source`` is the patched build."""
+    require_patched()
+    target = RECORDER_SOURCE
     marker = target / ".recorder-patch.sha256"
-    want = f"{variant}+{sha256(PATCH)}+{sha256(METACAT / 'manifest.json')}"
+    want = f"fixes+{sha256(PATCH)}+{sha256(METACAT / 'manifest.json')}"
     if marker.exists() and marker.read_text().strip() == want \
             and marker.stat().st_mtime >= PATCH.stat().st_mtime:
-        return target, variant
+        return target
     if target.exists():
         shutil.rmtree(target)
     shutil.copytree(SOURCE, target)
-    if variant != state:
-        rec = _reconstruct()
-        (rec.apply_fixes if variant == "fixes" else rec.remove_fixes)(target, _manifest())
     with PATCH.open("rb") as handle:
         done = subprocess.run(["patch", "-p1", "-s", "-d", str(target)],
                               stdin=handle, capture_output=True, text=True)
@@ -119,7 +128,7 @@ def ensure_recorder_source(variant: str | None = None) -> tuple[Path, str]:
         shutil.rmtree(target, ignore_errors=True)
         sys.exit(f"{PATCH.name} does not apply:\n{done.stdout}{done.stderr}")
     marker.write_text(want + "\n")
-    return target, variant
+    return target
 
 
 def parse_seeds(text: str) -> list[int]:
@@ -291,7 +300,7 @@ def driver_text(problem: list[str], seed: int, cap: int, revision: str,
 
 def baseline_driver_text(problem: list[str], seed: int, cap: int,
                          answer: str | None = None, episode_runs: int = 0) -> str:
-    """The unpatched collector-style driver (studies/support-v1a/collector.ss.in;
+    """The collector-style driver, without the recorder patch, (studies/support-v1a/collector.ss.in;
     with ``episode_runs`` the episodic-v2 loop: memory cleared once, seeds S+k-1)."""
     i, m, t = problem
     a = f"'{answer}" if answer else "#f"
@@ -342,6 +351,18 @@ def docker_command(source: Path, rundir: Path) -> list[str]:
 
 
 def run_container(source: Path, rundir: Path, timeout: int) -> tuple[int, str, float]:
+    """Run a driver in the container on ``source``, which must be the patched build or its
+    recorder copy.  Every recorder reaches Docker only through here."""
+    require_patched()
+    source = Path(source)
+    if source.resolve() == SOURCE.resolve():
+        pass
+    elif source.resolve() == RECORDER_SOURCE.resolve():
+        marker = RECORDER_SOURCE / ".recorder-patch.sha256"
+        if not marker.exists() or not marker.read_text().startswith(PATCHED_MARK):
+            sys.exit(f"{source} is not marked as a copy of the patched Metacat")
+    else:
+        sys.exit(f"{source} is neither the patched Metacat/build/source nor its recorder copy")
     started = time.monotonic()
     done = subprocess.run(docker_command(source, rundir), capture_output=True,
                           text=True, timeout=timeout)
@@ -482,18 +503,12 @@ def main() -> None:
     parser.add_argument("--names", action="store_true",
                         help="write tests/lockstep/metacat/opening-names.<slug>.json and exit")
     parser.add_argument("--baseline", action="store_true",
-                        help="run the unpatched collector-style driver instead and print "
-                             "answer/codelet counts (no traces written)")
+                        help="run the collector-style driver, without the recorder patch, on "
+                             "the patched Metacat build/source, and print answer/codelet "
+                             "counts (no traces written)")
     parser.add_argument("--audit", action="store_true",
                         help="debug: shadow `random` and report raw draws attributed to "
                              "no decision (the trace itself is unchanged)")
-    variant = parser.add_mutually_exclusive_group()
-    variant.add_argument("--known-failures-patch", action="store_true",
-                         help="record Metacat with the bundle's second patch group (the "
-                              "known-failure fixes), whichever build/source is")
-    variant.add_argument("--reference", action="store_true",
-                         help="record the reference reconstruction (without the fixes), "
-                              "whichever build/source is")
     parser.add_argument("--keep-plain", action="store_true",
                         help="also keep the uncompressed .jsonl next to the .gz")
     parser.add_argument("--keep-work", action="store_true")
@@ -515,15 +530,13 @@ def main() -> None:
                          if args.episode_runs else ""), flush=True)
         return
 
-    source, variant = ensure_recorder_source(
-        "fixes" if args.known_failures_patch else "reference" if args.reference else None)
+    source = ensure_recorder_source()
     if args.names:
         dump_names(args, source, problem)
         return
 
-    revision = "metacat-bundle-manifest-sha256:" + sha256(METACAT / "manifest.json")
-    if variant == "fixes":
-        revision += "+known-failure-fixes"
+    revision = ("metacat-bundle-manifest-sha256:" + sha256(METACAT / "manifest.json")
+                + "+known-failure-fixes")
     seeds = parse_seeds(args.seeds)
     print(f"recording {slug_of(problem, args.answer)} seeds {seeds[0]}..{seeds[-1]} ({len(seeds)}) "
           f"cap {args.cap} jobs {args.jobs} snapshots {not args.no_snapshots}", flush=True)
