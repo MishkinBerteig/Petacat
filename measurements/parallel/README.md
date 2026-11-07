@@ -8,6 +8,7 @@ otherwise, figures were taken on a quiet machine.
 | File | What it shows |
 |---|---|
 | `cognitive-equivalence.md`, `serial-vs-stream-500.json` | The stream-serial reference, which the speculative executor reproduces bit for bit, against the faithful loop. 29 problems × 500 seeds, 29,000 runs: no distribution differs |
+| `multi-threaded-frequencies.md` | Answer frequencies of the speculative executor and free-running against single-threaded runs and patched Metacat, with a control for chance |
 | `abce-serial-vs-stream.md` | The deep answer `abce` to `wxyz → vxyz; abcd`, the signal free-running degraded, under the faithful loop and the stream reference |
 | `swarm-scaling.json` | The swarm from 1 to 17 processes on a six-problem mix, with every outcome identical to the serial run |
 | `swarm-vs-serial-xyz-2000.txt` | 2,000 runs of `abc → abd; xyz`, swarm against serial: 19.1 s against 239.4 s, with the same distribution |

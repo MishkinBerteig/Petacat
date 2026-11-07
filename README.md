@@ -903,6 +903,12 @@ distribution differs:**
 - the total variation distance is at most 0.07;
 - mean codelet counts agree.
 
+The speculative executor was measured the same way on the final patched Metacat, at 2 and 8 workers,
+over 8 problems of 1,000 seeds each (`measurements/parallel/multi-threaded-frequencies.md`). Its
+average total-variation distance from a single-threaded run is 0.028, against 0.026 for a
+single-threaded run on other seeds, which is pure chance, and no problem is significant. Patched
+Metacat's own distance from the single-threaded run is 0.032, also with no problem significant.
+
 The answer free-running lost was checked separately, at the original study's
 settings. `abce` to `wxyz → vxyz; abcd` was found in 13.7% of 8,000 faithful runs
 and 13.3% of 8,000 stream runs (z = 0.74; `measurements/parallel/abce-serial-vs-stream.md`).
