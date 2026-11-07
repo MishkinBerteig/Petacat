@@ -523,6 +523,20 @@ to see through the interleaving noise. Population parallelism (§12a) is exactly
 pays for that, which is a pleasing closure: the technique that makes free-running
 affordable to evaluate is the same technique that makes the GPU worth using.
 
+**Where the free-running work stands.** Free-running is built (`server/parallel/free_running.py`), and
+scripts and tests reach it, no service. It does not change before v2.0 is finished; after that it is
+likely to be expanded, wired into the UI and improved step by step. Three tools for this work were
+removed on 2026-11-05, in commit `d01cc12`, because no run mode used them, and git keeps them. Each
+reads back with `git show 'd01cc12^:<path>'`:
+- the **sharded coderack candidates**, one rack per codelet family and one per worker, with their
+  benchmark (`server/parallel/coderack_shards.py` as it was then, `scripts/bench_shards.py`,
+  `tests/module/test_coderack_shards.py`); the locked rack that free-running installs stays;
+- the **staleness probe**, which made the single-threaded loop read the Workspace as it stood N
+  codelets ago (`server/engine/staleness.py`, `scripts/measure_staleness.py`,
+  `tests/module/test_staleness.py`); its findings are in the README;
+- **population batching** (`server/parallel/population.py`, `scripts/bench_population.py`,
+  `tests/module/test_population.py`), which cannot pay at 59 Slipnet nodes.
+
 **Serial reference mode is retained permanently**, at every phase, for fidelity
 cross-validation against Marshall's semantics: parallel Petacat and serial Petacat
 should agree in distribution, and where they diverge we should know why.
