@@ -3288,6 +3288,150 @@
      }
     ]
    }
+  },
+  {
+   "id": "discovery/abcx-xwva-ijkr/s117-cap10000",
+   "kind": "discovery",
+   "problem": [
+    "abcx",
+    "xwva",
+    "ijkr"
+   ],
+   "seeds": [
+    117
+   ],
+   "cap": 10000,
+   "why": {
+    "engine_lines": 0,
+    "engine_arcs": 0,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [
+     "stage V2: the group-category row of rule.apply_first changes this run on Petacat's own stream: it answers rqpi in 2345 codelets with the row and vvvkji in 8347 codelets without it (a rule that swaps the letters of the group and the letter x and reverses the group, so group category must go first); six transform lists with a group-category transform are applied, none without a bond-facet transform"
+    ],
+    "most_new_in": [],
+    "note": "Metacat's recording of seed 117 is a different run (it gives up at codelet 7497) and replays to its end whether or not the row is there, so the row is shown by Petacat's own record here; the case is in the ratchet for the fidelity of the run to its end"
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 7498,
+      "run_length": 7498,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "discovery/pbcd-bpon-wfgh/s34-cap12000",
+   "kind": "discovery",
+   "problem": [
+    "pbcd",
+    "bpon",
+    "wfgh"
+   ],
+   "seeds": [
+    34
+   ],
+   "cap": 12000,
+   "why": {
+    "engine_lines": 0,
+    "engine_arcs": 0,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [
+     "stage V2: Metacat's own recording of seed 34 (give-up at codelet 7218) replays to its end with agreement 1.0 and 0 errors, and replays with 2 errors when apply-before? answers as if group category were not in rule.apply_first, so the row is shown on Metacat's own stream"
+    ],
+    "most_new_in": [],
+    "note": "Petacat's own run of seed 34 answers bpon in 3429 codelets and applies no group-category transform, so the row does not change Petacat's golden record; the ratchet entry holds the fidelity"
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 7219,
+      "run_length": 7219,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "discovery/abcxyz-cbazyx-ijkpqr/s35-cap6000",
+   "kind": "discovery",
+   "problem": [
+    "abcxyz",
+    "cbazyx",
+    "ijkpqr"
+   ],
+   "seeds": [
+    35
+   ],
+   "cap": 6000,
+   "why": {
+    "engine_lines": 0,
+    "engine_arcs": 0,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [
+     "stage V2: Metacat's recording of seed 35 passes the point (codelet 4544) where patched Metacat used to stop with Exception in cadr (rules.ss:1351), applying a (subobjects group-category opposite) rule to 10 transform lists with no bond-facet transform, and runs to the cap of 6000 codelets; replayed before the fix, Metacat Mode reached 4557 with agreement 0.7703 and 116 errors"
+    ],
+    "most_new_in": [],
+    "note": "Petacat's own run of seed 35 reaches the cap of 6000 codelets without applying a group-category transform, so the golden record does not take that path; the ratchet entry holds the fidelity"
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 6000,
+      "run_length": 6000,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "discovery/pqcd-cbpo-tugh/s1-cap6000",
+   "kind": "discovery",
+   "problem": [
+    "pqcd",
+    "cbpo",
+    "tugh"
+   ],
+   "seeds": [
+    1
+   ],
+   "cap": 6000,
+   "why": {
+    "engine_lines": 0,
+    "engine_arcs": 0,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [
+     "stage V2: Metacat's recording of seed 1, the first problem that showed the crash, passes the point (codelet 2389) where patched Metacat used to stop with Exception in cadr (rules.ss:1351), applying a (subobjects group-category opposite) rule to 218 transform lists with no bond-facet transform, and runs to the cap of 6000 codelets"
+    ],
+    "most_new_in": [],
+    "note": "Petacat's own run of seed 1 answers gfts in 3751 codelets without applying a group-category transform, so the golden record does not take that path; Metacat Mode before the fix also replayed Metacat's recording to its end with agreement 1.0 (the reversal changed no decision in this run); the ratchet entry holds the fidelity"
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 6000,
+      "run_length": 6000,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
   }
  ]
 }

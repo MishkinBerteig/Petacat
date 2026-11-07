@@ -266,10 +266,12 @@ archive into this repository or apply the patches yourself.
 `--output` builds the **patched Metacat**: Metacat 1.2, the bundle's two patches, and then the
 second patch group in `patches/fixes/` ([`0001-known-failures.patch`](patches/fixes/0001-known-failures.patch),
 [`0002-length-group-of-six-or-more.patch`](patches/fixes/0002-length-group-of-six-or-more.patch),
-[`0003-non-english-letter-invalid-input.patch`](patches/fixes/0003-non-english-letter-invalid-input.patch)
+[`0003-non-english-letter-invalid-input.patch`](patches/fixes/0003-non-english-letter-invalid-input.patch),
+[`0004-subobjects-group-category-reversal.patch`](patches/fixes/0004-subobjects-group-category-reversal.patch)
 and any later file). The tree without the second group, the reference
 reconstruction behind Petacat's published studies, still crashes on the three rare inputs in
-[KNOWN-FAILURES.md](KNOWN-FAILURES.md) on a bridge to a group of six or more objects, and on a letter outside a to z. It exists
+[KNOWN-FAILURES.md](KNOWN-FAILURES.md), on a bridge to a group of six or more objects, on a letter outside a to z, and on a rule that reverses
+all the groups of a string. It exists
 only inside the temporary directory of the build and is never left as a usable tree. The patched
 Metacat is the only Metacat: the GUI, Petacat's lockstep harness (`tests/lockstep/`) and every
 comparison use it. The fixes change no run except those that would have crashed. A crash of the
@@ -544,8 +546,8 @@ The manifest describes two patch groups:
 
 - `patches` and `reconstructed_files`: the reference reconstruction.
 - `fix_patches` and `fixed_files`: the known-failure fixes, always applied, and the
-  hashes of the four files they change (`CODE-FIXES.md`, `bridges.ss`,
-  `groups.ss`, `rules.ss`).
+  hashes of the five files they change (`CODE-FIXES.md`, `bridges.ss`,
+  `groups.ss`, `rules.ss`, `syntactic-sugar.ss`).
 
 `--apply-fixes` works in place. It first verifies the tree, dry-runs each patch, applies
 it with zero fuzz, and verifies the result, so a mismatched tree is never half-patched.
@@ -577,8 +579,9 @@ Both are standard unified diffs relative to the extracted source directory;
 the reconstruction helper handles their application and permissions. Together
 they make the reference reconstruction. The second patch group, always applied on top,
 [patches/fixes/0001-known-failures.patch](patches/fixes/0001-known-failures.patch),
-[patches/fixes/0002-length-group-of-six-or-more.patch](patches/fixes/0002-length-group-of-six-or-more.patch)
-and [patches/fixes/0003-non-english-letter-invalid-input.patch](patches/fixes/0003-non-english-letter-invalid-input.patch),
+[patches/fixes/0002-length-group-of-six-or-more.patch](patches/fixes/0002-length-group-of-six-or-more.patch),
+[patches/fixes/0003-non-english-letter-invalid-input.patch](patches/fixes/0003-non-english-letter-invalid-input.patch)
+and [patches/fixes/0004-subobjects-group-category-reversal.patch](patches/fixes/0004-subobjects-group-category-reversal.patch),
 go on top of them in that order; they are described [below](#second-patch-group-the-known-failure-fixes).
 
 The engine patch changes six upstream Scheme files and adds `headless.ss` and
@@ -632,7 +635,7 @@ settings; the engine algorithms and headless loader are otherwise unchanged.
 
 Two bugs in the original engine crashed three runs of the 969,000 in the
 support study, a third crashes a run whose bridge reaches a group of six or
-more objects, and a fourth crashes on a letter outside a to z. The second patch group fixes all four, in the spirit of the code
+more objects, a fourth crashes on a letter outside a to z, and a fifth on a rule that reverses all the groups of a string. The second patch group fixes all five, in the spirit of the code
 around them, and adds an entry to the reconstructed `CODE-FIXES.md` for each patch.
 
 - **A letter-based group with no letter** (`groups.ss`, `make-group`). While
@@ -664,13 +667,22 @@ around them, and adds an entry to the reconstructed `CODE-FIXES.md` for each pat
   for. The command line answers "Invalid input!", as it does for a digit inside a string, and `(mcat abc abd xyé)` is
   refused with "invalid syntax", as any other invalid token list is. Nothing else in the parser changes: lowering,
   separators, the digit rule and the seed rule are as they were.
+- **A rule that reverses all the groups of a string** (`rules.ss`, `apply-transforms` and
+  `same-dimension-as-GroupCtgy-medium?`; `0004-subobjects-group-category-reversal.patch`). Found by Petacat's reach study.
+  `rule-scout` builds the clause `(subobjects <GroupCtgy> <Opposite>)` on purpose, with its own English ("Reverse
+  starting and ending points of all objects in ..."), but a BondFacet change is made only for scope `self`, so the
+  transform of each subobject has no BondFacet partner and `(2nd (assq plato-bond-facet transforms))` was `(cadr #f)`
+  ("incorrect list structure #f", about 2 runs in 80 for `pqcd -> cbpo; tugh`). `apply-transforms` now takes the medium
+  from the object's own image when the list has none, so each group reverses along its own medium, and
+  `same-dimension-as-GroupCtgy-medium?` answers false for a letter, which has no medium (it used to stop with a
+  bad-message error once the first crash was out of the way).
 
 None of the fixes changes a run that did not crash. The second bug always crashed
 when it arose. The first crashed for a sameness group; for a successor or
 predecessor group it would instead have attached a letter description with no
 letter, a branch no recorded run reaches. Recordings of every demo problem are
 byte-identical with and without the first two fixes, and 266 recorded runs that
-never crashed are byte-identical with and without the third and the fourth
+never crashed are byte-identical with and without each of the third, the fourth and the fifth
 ([VALIDATION.md](VALIDATION.md)).
 
 ### Supporting tools

@@ -614,9 +614,14 @@ class IntrinsicChangeDescription:
         return bool(self.descriptor2) and _holds(self.descriptor2, _OBJECT_LETTER)
 
     def same_dimension_as_group_category_medium(self, other: IntrinsicChangeDescription) -> bool:
-        """True if self.dimension is the bond-facet of other's reference object."""
-        bf = getattr(other.reference_object, "bond_facet", None)
-        return bf is not None and self.dimension is bf
+        """True if self.dimension is the bond-facet of other's reference object.
+
+        Scheme: same-dimension-as-GroupCtgy-medium? (rules.ss:1048-1049).  A letter has no medium,
+        so only a group can answer true (Metacat sent ``get-bond-facet`` to the letter and stopped
+        with a bad-message error before the fourth patch of the known-failure fixes).
+        """
+        reference = other.reference_object
+        return isinstance(reference, Group) and self.dimension is reference.bond_facet
 
     def implied_by_opposite_group_category(self) -> bool:
         if not isinstance(self.reference_object, Group):
@@ -3297,14 +3302,28 @@ def _apply_transforms(
             # augmented with the bond-facet: (GroupCtgy Opposite medium).
             if e.transform is None:
                 if _holds(dim, _DIM_GROUP_CATEGORY):
-                    medium = next(
-                        (d for td, d in transforms if _holds(td, _DIM_BOND_FACET)),
-                        None,
-                    )
+                    medium = _group_category_medium(image, transforms)
                     e.transform = (dim, slipnet.relation(constants().vocab.theme_relation_opposite) or None, medium)
                 else:
                     e.transform = (dim, desc)
             raise
+
+
+def _group_category_medium(image: Any, transforms: list[tuple] | None) -> Any:
+    """The medium a group-category transform reverses along (``apply-transforms``, rules.ss:1351-1352).
+
+    ``(if (exists? BondFacet-transform) (2nd BondFacet-transform) (tell image 'get-bond-facet))``.
+    A ``(subobjects <GroupCtgy> <Opposite>)`` change has no BondFacet transform (``get-BondFacet-change``
+    fires for scope ``self`` only, rules.ss:1054-1059), so each object reverses along its own
+    medium, which its image carries.  A string image has no ``bond_facet``, as in Metacat, where it
+    answers no ``get-bond-facet`` message; no group-category change reaches one (a self
+    group-category change is made only for a bridge's group, and a subobjects change is applied to
+    the letters and groups inside the string).
+    """
+    for dimension, descriptor in transforms or ():
+        if _holds(dimension, _DIM_BOND_FACET):
+            return descriptor
+    return image.bond_facet
 
 
 def _apply_before(
@@ -3356,16 +3375,8 @@ def _transform_image(
         image.reverse_direction()
 
     elif _holds(dimension, "image_operation.reverse_medium"):
-        # GroupCtgy transforms need the bond-facet from a BondFacet "transform"
-        medium = None
-        if all_transforms:
-            for t in all_transforms:
-                td, td_desc = t
-                if _holds(td, _DIM_BOND_FACET):
-                    medium = td_desc
-                    break
-        if medium is not None:
-            image.reverse_medium(medium)
+        # rules.ss:1351-1352: the medium is the BondFacet "transform"'s, else the image's own.
+        image.reverse_medium(_group_category_medium(image, all_transforms))
 
     elif _holds(dimension, "image_operation.new_alpha_position_category"):
         image.new_alpha_position_category(descriptor)

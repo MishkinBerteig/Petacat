@@ -660,12 +660,20 @@
         "CODE-FIXES.md",
         "syntactic-sugar.ss"
       ]
+    },
+    {
+      "path": "patches/fixes/0004-subobjects-group-category-reversal.patch",
+      "sha256": "a9d539a073e2c3198719628358d89c56ad92b6ef53ec18a8adfb6869bb871c5d",
+      "files": [
+        "CODE-FIXES.md",
+        "rules.ss"
+      ]
     }
   ],
   "fixed_files": {
     "CODE-FIXES.md": {
-      "sha256": "3e884669b7228c25cc4f056b55a068b2b159c1adec861e548be4025fb2a04aeb",
-      "bytes": 11543,
+      "sha256": "a59672af85f532a0b629efd39b78d3d263ef9918367af4c51187dde2f7e86deb",
+      "bytes": 13470,
       "executable": false
     },
     "bridges.ss": {
@@ -679,8 +687,8 @@
       "executable": false
     },
     "rules.ss": {
-      "sha256": "c9da79c8d2c6681234c332e72f09f81c21ce59d3cc3c011b7f7836a2481c0eaf",
-      "bytes": 84147,
+      "sha256": "d2c065ee7b5e78ad664af381c1bb162e15af54031eaaeb340e6f7a21d62e540f",
+      "bytes": 84403,
       "executable": false
     },
     "syntactic-sugar.ss": {
@@ -689,7 +697,7 @@
       "executable": false
     }
   },
-  "fix_note": "Second patch group, always applied: fixes for the crashes in KNOWN-FAILURES.md (the three study crashes, the group of six or more, and a letter outside a to z). Not part of the reference reconstruction behind the published studies; tools/reconstruct.py --output applies it, and --apply-fixes brings an old reference tree up. fixed_files lists the files whose hashes change when it is applied.",
+  "fix_note": "Second patch group, always applied: fixes for the crashes in KNOWN-FAILURES.md (the three study crashes, the group of six or more, a letter outside a to z, and the reversal of the groups of a string). Not part of the reference reconstruction behind the published studies; tools/reconstruct.py --output applies it, and --apply-fixes brings an old reference tree up. fixed_files lists the files whose hashes change when it is applied.",
   "excluded_files": {
     "CLAUDE.md": "Repository-specific agent instructions.",
     "oracle/derived/convergence-p50.json": "Measured data are not part of this source reconstruction bundle.",

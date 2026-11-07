@@ -95,7 +95,7 @@ async def _apply(eng, batch):
 def _same_rows(a: cd.ConfigDocument, b: cd.ConfigDocument) -> None:
     for name in a.tables:
         if name.endswith("_types") or name in ("codelet_families", "codelet_phases", "posting_directions",
-                                               "demo_modes", "clause_types", "proposal_levels", "run_statuses",
+                                               "clause_types", "proposal_levels", "run_statuses",
                                                "rule_types", "theme_types", "bridge_orientations"):
             continue
         assert list(a.tables[name].items()) == list(b.tables[name].items()), name

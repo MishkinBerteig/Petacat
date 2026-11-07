@@ -228,10 +228,10 @@ byte-identical traces.
   to a run that reaches the 100,000-codelet cap: about 1 GB raw, 30 MB gzipped, a few minutes.
 
 
-## The three crash seeds, and a fourth
+## The three crash seeds, a fourth and a fifth
 
-The fourth, a Length concept mapping for a group of six or more objects, is at the end of this
-section.
+The fourth, a Length concept mapping for a group of six or more objects, and the fifth, the reversal of all the
+groups of a string, are at the end of this section.
 
 `Metacat/KNOWN-FAILURES.md` lists three seeds on which Metacat itself crashes:
 `abc cba mrrjjj` seeds 20713988 and 20716342, and `abc aabbcc kkjjii` seed 20226148.
@@ -272,6 +272,19 @@ gained `Metacat/patches/fixes/0002-length-group-of-six-or-more.patch`
 (`Metacat/KNOWN-FAILURES.md`, "A fourth crash").  Nothing is registered for it: the 83 runs
 recorded again run past the old crash point, and `data/aaa-aaaaaa-aaa.seed1.metacat.jsonl.gz`
 (the smallest, 1,614 codelets) is replayed to its end by `test_comparer.py`.
+
+**The fifth crash (found by the reach studies of round 2).**  A rule clause `(subobjects <GroupCtgy> <Opposite>)` that
+`rule-scout` builds on purpose (`rules.ss:637-641`) has no BondFacet transform, so `apply-transforms` took
+`(cadr #f)` at `rules.ss:1351`: `pqcd cbpo tugh` seeds 1 and 69, `defpqr pondcb hijstu` seed 79 and
+`abcxyz cbazyx ijkpqr` seeds 35 and 74 ended with `Exception in cadr: incorrect list structure #f` (about 2 runs in 80).
+The patch group gained `Metacat/patches/fixes/0004-subobjects-group-category-reversal.patch`
+(`Metacat/KNOWN-FAILURES.md`, "A rule that reverses all the groups of a string"): each object reverses along its own medium,
+which its image carries, and a letter, which has no medium, answers false to `same-dimension-as-GroupCtgy-medium?`.
+Metacat Mode follows (`_group_category_medium` in `server/engine/rules.py`).  Nothing is registered for it.  The five runs recorded
+again are identical to their old recordings up to the old crash point, and run on (four to the cap of 6,000 codelets, `abcxyz`
+seed 74 to the answer `kjirqp`); 720 runs of the three problems (seeds 1 to 240) end without an error, and their replays
+reach the end of Metacat's recording with agreement 1.0.  Four of them are in the extended golden baseline (stage V2,
+`tests/lockstep/README.md`).
 
 ## Translation logs: `record_translation.py`
 

@@ -8,9 +8,10 @@ with two exception signatures. The diagnosis found two bugs, not three. The
 reference reconstruction's patches are unchanged, so the published study keeps
 its exact reference.
 
-Two more crashes, found later by Petacat's lockstep checks and not by the study, have their own
-sections at the end ([A fourth crash: a group of six or more](#a-fourth-crash-a-group-of-six-or-more) and
-[A letter outside a to z](#a-letter-outside-a-to-z)).
+Three more crashes, found later by Petacat's lockstep checks and reach studies and not by the study, have their own
+sections at the end ([A fourth crash: a group of six or more](#a-fourth-crash-a-group-of-six-or-more),
+[A letter outside a to z](#a-letter-outside-a-to-z) and
+[A rule that reverses all the groups of a string](#a-rule-that-reverses-all-the-groups-of-a-string)).
 
 All three inputs and seeds are in the intended domain. The failures occurred
 in reference Metacat, not the Python port, during the held-out validation phase
@@ -314,3 +315,70 @@ in three lines (`abc abd x{c}z`, `abc abd {c}`, `{c}bc abd xyz`) and 200 whole l
 change is the validity of a token list, from valid to invalid, and only where a symbol holds a letter outside
 a to z: 104,023 of the 1,112,064 scalar values in each of the three lines, and 48 of the 200 whole lines. 266 recorded runs, recorded with
 and without 0003, are identical apart from the header's `revision`.
+
+## A rule that reverses all the groups of a string
+
+Added 2026-11-07. Metacat builds a rule clause of the form `(subobjects <GroupCtgy> <Opposite>)` on purpose:
+`rule-scout` abstracts it when every bridge of a cluster that spans the left side carries a group-category slippage
+(`rules.ss:607-641`), and it has its own English, "Reverse starting and ending points of all objects in string"
+(`get-change-phrase`, `rules.ss:1874-1883`). The rule form is found by a stage of Petacat's reach studies, and it
+stopped patched Metacat in about 2 runs in 80 for `pqcd -> cbpo; tugh` (seeds 1 and 69), once in 80 for
+`defpqr -> pondcb; hijstu` (seed 79) and twice in 80 for `abcxyz -> cbazyx; ijkpqr` (seeds 35 and 74). In each the
+run ended with `Exception in cadr: incorrect list structure #f`, at `rules.ss:1351`.
+
+**Cause.** `get-BondFacet-change` (`rules.ss:1054-1059`) makes the BondFacet change only for scope `self`, because the
+facet says which medium (letter category or length) a group is reversed along. A `subobjects` change has no BondFacet
+partner, so `get-intrinsic-transforms` (`rules.ss:1528-1548`) gives each subobject group the bare transform
+`(<GroupCtgy> <Opposite>)`, and `apply-transforms` (`rules.ss:1341-1353`) took the medium as
+`(2nd (assq plato-bond-facet transforms))`, which is `(cadr #f)`. Nothing stops the rule before that:
+`rule-evaluator` (`rules.ss:463`) calls `currently-works?` (`rules.ss:223-235`), which calls `apply-rule` without a guard.
+A second error was behind the first. When a rule of this form is applied to a string with a letter among its
+subobjects (the target `ijkm`, a group and a letter), `check-for-conflicts` asks `same-dimension-as-GroupCtgy-medium?`
+(`rules.ss:1049`), which sent `get-bond-facet` to the letter, and a letter has no such message: patched Metacat stops with
+`bad message "get-bond-facet" sent to object of type letter` (shown in stage V by a directed trial, a rule of this form
+applied to a string of letters; none of 1,000 recorded runs of five problems of this shape stopped on it; the four that stopped, stopped on the first crash).
+
+**The fix: the second patch group's `patches/fixes/0004-subobjects-group-category-reversal.patch`.** It keeps the
+rule and makes it do what its English says, in two places of `rules.ss`:
+- `apply-transforms` takes the medium from the BondFacet transform when the object has one, and otherwise from the
+  object's own image (`(tell image 'get-bond-facet)`, `images.ss:145`), so each group reverses along its own medium.
+  `reverse-medium` already does nothing for a letter image (`images.ss:241`).
+- `same-dimension-as-GroupCtgy-medium?` answers false for anything that is not a group (`(and (group? object) ...)`),
+  because a letter has no medium.
+
+Rejected: making `apply-rule` fail when a list has no medium (the rule then does other than it says), skipping the
+reversal (the same), and not building the clause at `rules.ss:637-641` (that changes perception, and removes a rule
+Metacat builds on purpose). The patch also adds §1.6 to the reconstructed `CODE-FIXES.md`.
+
+Other sites that could meet the same thing were read, and none needed a change (the patch is written on the lines it
+replaces, so no line of `rules.ss` moves and these citations stay true):
+- `get-change-phrase` (`rules.ss:1874-1883`) takes its non-`self` branch for the English of this rule and never asks for a facet. It
+  reads `(3rd BondFacet-change)` only for a `self` group-category change, which comes with the facet that
+  `get-BondFacet-change` makes (a self change is made for a bridge's object, a group: a letter has no group-category description).
+  The graphics files name these nodes only as Slipnet positions and theme labels (`slipnet-graphics.ss`, `theme-graphics.ss`),
+  and never read a rule's changes or transforms.
+- `attach-length-to-appropriate-groups` (`answers.ss:1075-1091`) tests `(exists? BondFacet-transform)` before it reads it.
+- The failure path: `apply-transforms` hands `fail` the three-element transform `(GroupCtgy Opposite medium)`
+  (`rules.ss:1303-1308`, `:1351-1353`), and the snag explanation reads `(tell (3rd transform) 'get-lowercase-name)`
+  (`trace.ss:1111-1115`). `fail` is called under a group-category transform only from inside `reverse-medium`
+  (`images.ss:239-253`), through `new-start-letter` or `new-length`, and only in a branch that exists because the medium
+  is the letter category or length, so the name is never asked of `#f`; with no medium `reverse-medium` calls nothing.
+- A group-category transform never reaches a string image, which has no `get-bond-facet` message (`images.ss:37-102`,
+  where it would reach `base-object`): a string has no group-category change, and the subobjects of a string are its
+  letters and groups. In the 720 recorded runs below the counting wrapper met no string image at one.
+
+**Verified on 2026-11-07.**
+- The five runs above, recorded again with the patch (with state snapshots), are identical record for record to the same
+  runs recorded without it, up to the codelet where they used to crash, and then run on without a crash: `pqcd` seeds 1
+  and 69, `defpqr` seed 79 and `abcxyz` seed 35 reach the cap of 6,000 codelets, and `abcxyz` seed 74 answers `kjirqp`
+  at 5,168 codelets.
+- 266 recorded runs that never crashed (the stage P sample: plain, justify, episodes, a person's actions, Self-watching
+  off and long runs, and `abc -> abd; xyz` seeds 1 to 10), recorded with and without the patch, are identical record for
+  record, state snapshots included, apart from the header's `revision`.
+- 720 further runs with snapshots, 240 seeds of each of the three problems, ended without an error: 305 answers, 393 caps
+  and 22 give-ups. A counting wrapper (in its own process, wrapping `apply-transforms` and `check-for-conflicts`) found the
+  runs that reached a transform list with a group-category transform and no BondFacet transform inside the recorded run:
+  seeds 1, 69 and 238 of `pqcd`, 79, 102 and 161 of `defpqr`, and 35 and 74 of `abcxyz`. The seeds of the letter case are in
+  `agents-workspace/metacat-cleanup/round2/V-crash/REPORT-FIX.md`.
+- With the target `ijkm` (a group and a letter), seeds 11 and 126 reach `check-for-conflicts` with a letter that has a
+  group-category transform, and answer `kjim`: a group reversed and the letter left as it is.

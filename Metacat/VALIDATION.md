@@ -131,6 +131,22 @@ Validated on 2026-11-06 (see [KNOWN-FAILURES.md](KNOWN-FAILURES.md), "A letter o
   without the patch are identical apart from the header's `revision`.
 - **The `(mcat ...)` form** refuses a symbol with such a letter ("invalid syntax") and accepts the plain forms.
 
+### 0004-subobjects-group-category-reversal.patch
+
+Validated on 2026-11-07 (see [KNOWN-FAILURES.md](KNOWN-FAILURES.md), "A rule that reverses all the groups of a string").
+
+- **Patching.** On a copy of the tree with 0001, 0002 and 0003 it applies with zero fuzz, and the result equals the
+  rebuilt `build/source` file for file. The result verifies as the fixed tree (`--verify build/source`, 69 files). The
+  bundle's 20 tests pass.
+- **The five crashes.** `pqcd -> cbpo; tugh` seeds 1 and 69, `defpqr -> pondcb; hijstu` seed 79 and `abcxyz -> cbazyx; ijkpqr`
+  seeds 35 and 74, recorded again with state snapshots, are identical record for record to the same runs recorded without
+  this patch, up to the codelet where they crashed, and then run on without a crash.
+- **No other run changes.** 266 recorded traces that never crashed (plain, justify, episode, person-action,
+  Self-watching-off and long runs, and `abc -> abd; xyz` seeds 1 to 10) were recorded with and without the patch, with the same
+  recorder and state snapshots on: all 266 pairs are identical apart from the header's `revision`.
+- **More runs of the three problems.** 720 runs (seeds 1 to 240 of each of the three problems) recorded with the patch ended
+  without an error: 305 answers, 393 caps and 22 give-ups.
+
 The fixes are not part of the reference reconstruction behind the published studies, which
 the bundle no longer builds or verifies: `--verify` accepts only the patched tree. Results gathered
 with the fixes are from a changed engine (KNOWN-FAILURES.md, "When Returning to This Work").

@@ -143,6 +143,11 @@ naming table in its `README.md`):
   for a group of six or more objects (`Metacat/KNOWN-FAILURES.md`, "A fourth crash"); nothing is
   registered for it.  The third, `0003-non-english-letter-invalid-input.patch`, makes a letter outside
   a to z "Invalid input!" rather than a crash in `init-mcat` (`THE-THREE-SYSTEMS.md`).
+  The fourth, `0004-subobjects-group-category-reversal.patch`, makes a rule that reverses all the groups
+  of a string (`(subobjects <GroupCtgy> <Opposite>)`, which has no BondFacet transform) reverse each group along its own
+  medium instead of stopping at `(cadr #f)` in `apply-transforms`, and makes `same-dimension-as-GroupCtgy-medium?` answer false for a letter
+  (`Metacat/KNOWN-FAILURES.md`, "A rule that reverses all the groups of a string"); Metacat Mode follows with
+  `_group_category_medium` in `server/engine/rules.py`, and nothing is registered for it.
 * **Seam test pins.** `test_seam.py`'s four ordinary runs were measured before and after
   the seam was added and matched exactly. Since then they have been re-pinned with each
   port fix, so they now guard the seam against later change.

@@ -250,7 +250,7 @@ runs the default configuration on NumPy. One caveat: the replay follows Metacat'
 runs Petacat's own random stream on the same inputs, so the check says that the situations Metacat reaches
 are handled as Metacat handles them, not that the baseline's own trajectory is Metacat's.
 
-**Every case is in a ratchet.** All 118 runs are in `ratchet-extended.json` (key `<case id>|<layout slug>/<seed>`, for
+**Every case is in a ratchet.** All 122 runs are in `ratchet-extended.json` (key `<case id>|<layout slug>/<seed>`, for
 example `episode/a-aa-b/s1x6-cap4000|episodes/a-aa-b/1.r1`), and all 188 runs of the original baseline are in
 `ratchet.json`, `ratchet-justify.json` and `ratchet-episodes.json`. `test_ratchet_covers_golden.py` fails for any run of
 either golden baseline that has no entry. The extended traces are recorded from the patched Metacat, one folder per
@@ -261,11 +261,11 @@ them `python`, is replayed with that backend whatever `--numeric-backend` says) 
 entry is full reach, agreement 1.0, 0 errors and 0 differing snapshots. The 8 episode answer reports stay checked
 by `scripts/compare_episode_answers.py`, which is not a ratchet.
 
-**What is in it** (77 cases, 118 runs, 8 episode answer reports; about 30 s in one process, the whole file
-recomputed in 6-12 s over a process pool): 50 discovery cases, 19 justify cases, 8 episodes; ten with a
+**What is in it** (81 cases, 122 runs, 8 episode answer reports; about 30 s in one process, the whole file
+recomputed in 6-12 s over a process pool): 54 discovery cases, 19 justify cases, 8 episodes; ten with a
 person's actions (the Options menu's group and rule codelet clamps, Clamp Themes with two themes, Undo last
-clamp, and the Self-watching check item: switched off in one case, off and on again in two), one episode with Clear Memory before run 4, 15 runs
-that the codelet cap ends, and the first appearance of `conflict` snags, `manual-clamp` events and cap-ended
+clamp, and the Self-watching check item: switched off in one case, off and on again in two), one episode with Clear Memory before run 4, 39 runs
+that the codelet cap ends in Petacat's own record, and the first appearance of `conflict` snags, `manual-clamp` events and cap-ended
 runs in any baseline. Five cases (`-selfwatchingoff-`) run with Self-watching mode off from the start, through a
 per-case `parameters` entry (`self_watching_enabled_default: false`). Twenty-nine were added by stage F of round 2 after
 the fidelity fixes below: the two that exposed a defect (`ly -> yl; cbaii`, `aazzz -> azzza; aye`), the five
@@ -304,6 +304,33 @@ every earlier line of `extended_baseline.jsonl` is unchanged (only the header's 
 They add no Petacat engine line or branch (measured with `scripts/golden_coverage.py`: 12,711 of 14,824 lines and 4,559
 of 5,894 branches with and without them); they are in because no run of either golden baseline goes there and
 Metacat could not run them before, and their ratchet entries hold the fidelity.
+
+Stage V2 added four cases for the reversal of all the groups of a string and the group-category row of
+`rule.apply_first` (patch 0004 and `_group_category_medium`; `Metacat/KNOWN-FAILURES.md`, "A rule that reverses all the groups
+of a string"). Each was recorded from the final patched Metacat with state snapshots and replayed in faithful mode with full
+reach, agreement 1.0, 0 errors and 0 differing snapshots, and then appended to the case file, so every earlier line of
+`extended_baseline.jsonl` is unchanged (only the header's case count and `cases_file_sha` moved) and `ratchet-extended.json`
+gained exactly four keys. A golden baseline holds Petacat's own run and a ratchet replays Metacat's recording, and the same seed gives
+different runs in the two, so what each stream does is measured and stated:
+- `abcx -> xwva; ijkr`, seed 117, cap 10000. Petacat's own run answers `rqpi` in 2,345 codelets with the group-category row of
+  `rule.apply_first` and `vvvkji` in 8,347 without it. Metacat's recording of seed 117 is a different run (it gives up at
+  codelet 7,497) and replays to its end whether or not the row is there, so this case shows the row in the golden record only.
+- `pbcd -> bpon; wfgh`, seed 34, cap 12000. Metacat's recording (give-up at codelet 7,218; reach 7,219) replays with 0 errors,
+  and with 2 errors when `apply-before?` answers as if group category were not in the row, so this case shows the row on
+  Metacat's own stream. Petacat's own run (answer `bpon`, 3,429 codelets) applies no group-category transform.
+- `abcxyz -> cbazyx; ijkpqr`, seed 35, cap 6000, and `pqcd -> cbpo; tugh`, seed 1, cap 6000. Metacat's recordings pass the
+  codelets (4,544 and 2,389) where patched Metacat used to stop with `Exception in cadr`, apply the rule to 10 and 218 transform
+  lists with no bond-facet transform, and run to the cap. Metacat Mode before the fix replayed the first to 4,557 with agreement
+  0.7703 and 116 errors, and the second to its end (the unreversed images changed no decision in that run). Petacat's own runs of
+  these two seeds (the cap with no answer, and `gfts` in 3,751 codelets) apply no group-category transform at all, so the
+  golden record does not take that path, and the ratchet entry is what holds the fidelity.
+
+They add no engine or database line or branch (measured with `scripts/golden_coverage.py`: 12,711 of 14,828 lines, 4,557 of 5,890
+branches, 798 of 849 database lines and 648 of 722 database arcs, with and without them). Neither golden baseline moved when
+`_group_category_medium` replaced the old skip in `rules.py`: both were captured again on the new code and are byte-identical to the
+committed files (apart from the four new lines), because no golden run applies a transform list with a group category and no
+bond-facet transform. Metacat Mode replays 720 recordings (seeds 1 to 240 of `pqcd -> cbpo; tugh`, `defpqr -> pondcb; hijstu` and
+`abcxyz -> cbazyx; ijkpqr`, 8 of which reach such a list) to their ends with agreement 1.0, 0 errors and 0 differing snapshots.
 
 | | Original baseline | Original + extended |
 | --- | --- | --- |

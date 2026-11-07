@@ -71,6 +71,18 @@
   "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
+ "discovery/abcx-xwva-ijkr/s117-cap10000|abcx-xwva-ijkr/117": {
+  "agreement": 1.0,
+  "reach": 7498,
+  "state_snapshots_differing": 0,
+  "unregistered_errors": 0
+ },
+ "discovery/abcxyz-cbazyx-ijkpqr/s35-cap6000|abcxyz-cbazyx-ijkpqr/35": {
+  "agreement": 1.0,
+  "reach": 6000,
+  "state_snapshots_differing": 0,
+  "unregistered_errors": 0
+ },
  "discovery/bbbpqr-bbbpqq-ef/s1-cap5000|bbbpqr-bbbpqq-ef/1": {
   "agreement": 1.0,
   "reach": 5000,
@@ -170,6 +182,18 @@
  "discovery/ndnroh-ndnrohi-bbbxnx/s1-person-cap3000|ndnroh-ndnrohi-bbbxnx/1": {
   "agreement": 1.0,
   "reach": 3000,
+  "state_snapshots_differing": 0,
+  "unregistered_errors": 0
+ },
+ "discovery/pbcd-bpon-wfgh/s34-cap12000|pbcd-bpon-wfgh/34": {
+  "agreement": 1.0,
+  "reach": 7219,
+  "state_snapshots_differing": 0,
+  "unregistered_errors": 0
+ },
+ "discovery/pqcd-cbpo-tugh/s1-cap6000|pqcd-cbpo-tugh/1": {
+  "agreement": 1.0,
+  "reach": 6000,
   "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },

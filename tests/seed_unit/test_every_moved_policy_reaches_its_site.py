@@ -10,7 +10,8 @@ stays) must change something.  A row is either
 
 * ``run``: a real run in which the site is reached differs from the standard run (found with
   ``agents-workspace/metacat-cleanup/round2/S6-policy/work/mutate_policy.py``); or
-* ``direct``: the site is called on its own, because no demo problem at seeds 1-3 reaches it.
+* ``direct``: the site is called on its own, because no run reaches it (only bond category in
+  ``dimension.reverses_together``, for the reason given at ``DIRECT``).
 
 The seed binds each role to what the engine's code used to name (``tests/support/role_table.py``).
 """
@@ -54,6 +55,7 @@ RUNS = {
     ("rule.relation_only_dimension", "plato-direction-category"): (("abc", "cba", "mrrjjj"), 1, None),
     ("rule.relation_only_dimension", "plato-group-category"): (("zyx", "xyy", "z"), 2, None),
     ("rule.apply_by_length", "plato-length"): (("zyx", "xyy", "z"), 2, None),
+    ("rule.apply_first", "plato-group-category"): (("abcx", "xwva", "ijkr"), 117, None),
     ("descriptor.generic", "plato-letter"): (("a", "b", "z"), 1, None),
     ("descriptor.generic", "plato-group"): (("abc", "abd", "xyz"), 1, None),
     ("image_operation.letter_or_group", "plato-object-category"): (("aabc", "aabd", "ijkk"), 1, None),
@@ -63,22 +65,27 @@ RUNS = {
     ("image_operation.reverse_medium", "plato-group-category"): (("zyx", "xyy", "z"), 2, None),
 }
 
-#: The two members no problem reaches, checked by calling the site (below).  Searched: the 41 demo
+#: The one member no problem reaches, checked by calling the site (below).  Searched: the 41 demo
 #: problems at seeds 1-3 and the 158 problems of ``tests/lockstep/data/*.txt`` at seeds 1-2 (workspace
-#: ``S6-policy/work/search_sites2.log``): dropping either changes none of those runs, and the Scheme says why.
+#: ``S6-policy/work/search_sites2.log``), and later 6,819 runs of Petacat's own and 293 recorded Metacat
+#: runs (workspace ``X-reach/REPORT.md``): dropping it changes none of them, and the Scheme says why.
 #:
-#: * ``dimension.reverses_together`` / bond category: a group's group category is derived from its bond
-#:   category one to one (``groups.ss:79``, successor <-> succgrp, predecessor <-> predgrp, sameness <->
-#:   samegrp), so a bridge between two groups always carries a group-category mapping that is opposite
-#:   exactly when the bond-category mapping is; ``reversible-CM-type?`` (``concept-mappings.ss:84-87``) is
-#:   asked of all the mappings at once (``andmap`` of ``opposite-mapping?``), so the bond-category member
-#:   never changes its answer.
-#: * ``rule.apply_first`` / group category: in the rule's transform list the group-category transform comes
-#:   after at most the direction transform (``rule.dimension_order``), and ``reverse_direction`` and
-#:   ``reverse_medium`` act on different parts of an image, so applying them in either order gives one image.
+#: * ``dimension.reverses_together`` / bond category: the site's list of mappings comes from
+#:   ``get-relevant-descriptions`` (``bridges.ss:924-927``, ``:1022-1025``), which filters a bridge object's
+#:   ``descriptions`` (``workspace-objects.ss:247-248``).  A group's bond category is not there: it sits in
+#:   ``bond-descriptions`` (``groups.ss:30``, ``:279-286``), and nothing writes it to ``descriptions``
+#:   (``new-description`` and ``build-description`` send bond types to the other list first).  So for
+#:   this Standard Configuration no list holds a bond-category mapping, and the bond-category member of
+#:   ``reversible-CM-type?`` (``concept-mappings.ss:84-87``) never changes its answer.  A configuration
+#:   that made bond category an ordinary description would change that.
+#:
+#: ``rule.apply_first`` / group category used to be direct as well, on a wrong reason (that the group-category
+#: transform comes after at most the direction transform).  An object's list holds the transforms of every
+#: clause that names it, the extrinsic ones first (``rules.ss:1286-1289``), so a rule that swaps a letter and
+#: reverses a group puts group category behind letter category, and the two operations do not commute
+#: (``abcx -> xwva; ijkr``, seed 117, in the runs above).
 DIRECT = (
     ("dimension.reverses_together", "plato-bond-category"),
-    ("rule.apply_first", "plato-group-category"),
 )
 
 #: Every member of the roles of this stage that the seed binds (the two tables above must cover them).

@@ -1,0 +1,55 @@
+--- a/rules.ss
++++ b/rules.ss
+@@ -1046,7 +1046,7 @@
+ 	      (tell reference-object 'nested-member? (tell ic 'get-reference-object)))
+ 	    (change-to-letter? () (eq? descriptor2 plato-letter))
+ 	    (same-dimension-as-GroupCtgy-medium? (ic)
+-	      (eq? dimension (tell (tell ic 'get-reference-object) 'get-bond-facet)))
++	      (let ((object (tell ic 'get-reference-object))) (and (group? object) (eq? dimension (tell object 'get-bond-facet))))) ; a letter has no medium
+ 	    (implied-by-opposite-GroupCtgy? ()
+ 	      (and (group? reference-object)
+ 		   (eq? (tell reference-object 'get-ending-letter-category)
+@@ -1348,7 +1348,7 @@
+ 	    (sort (apply-before? (tell image 'get-length)) transforms)))
+       (for* each transform in ordered-transforms do
+ 	(if (eq? (1st transform) plato-group-category)
+-	  (let* ((medium (2nd (assq plato-bond-facet transforms)))
++	  (let* ((medium (let ((BondFacet-transform (assq plato-bond-facet transforms))) (if (exists? BondFacet-transform) (2nd BondFacet-transform) (tell image 'get-bond-facet)))) ; no BondFacet transform (a subobjects change): the image's own medium
+ 		 (GroupCtgy-transform (list plato-group-category plato-opposite medium)))
+ 	    (transform-image image GroupCtgy-transform (fail GroupCtgy-transform)))
+ 	  (transform-image image transform (fail transform)))))))
+--- a/CODE-FIXES.md
++++ b/CODE-FIXES.md
+@@ -150,6 +150,32 @@
+ **Effect on behaviour: none where it does not fire.** The only inputs that change are those with a
+ letter outside a to z that reached `init-mcat`, which used to crash.
+ 
++### 1.6 Reversing the groups of a string — `patches/fixes/0004-subobjects-group-category-reversal.patch`
++
++Also in the second patch group, and also a send to `#f`. Metacat builds a rule clause of the form
++`(subobjects <GroupCtgy> <Opposite>)` on purpose (`rule-scout`, `rules.ss:637-641`), and it has its
++own English, "Reverse starting and ending points of all objects in ..." (`get-change-phrase`,
++`rules.ss:1881-1883`). But a BondFacet change is made only for scope `self`
++(`get-BondFacet-change`, `rules.ss:1054-1059`), so the transform of each subobject is a bare
++`(<GroupCtgy> <Opposite>)` with no BondFacet partner. `apply-transforms` (`rules.ss:1341-1350`) took the
++medium as `(2nd (assq plato-bond-facet transforms))`, which is `(cadr #f)` when there is none:
++"incorrect list structure #f" (`pqcd -> cbpo; tugh`, seed 1, at codelet 2390).
++
++- **`apply-transforms`** now takes the medium from the BondFacet transform when the object has one,
++  and otherwise from the object's own image (`(tell image 'get-bond-facet)`, `images.ss:145`), so
++  each group reverses along its own medium, letter category or length. `reverse-medium` already does
++  nothing for a letter image (`images.ss:241`).
++- **`same-dimension-as-GroupCtgy-medium?`** (`check-for-conflicts`) sent `get-bond-facet` to the
++  change's reference object, and a letter has no such message: "bad message" (`rules.ss:1049`),
++  reachable once the first crash is out of the way, with a letter among the subobjects. A letter has
++  no medium, so it now answers false for a letter.
++
++Both changes are written on the lines they replace, so that no line of `rules.ss` moves and the line numbers
++cited for it elsewhere (`apply-transforms` at `rules.ss:1341-1353`) stay true.
++
++**Effect on behaviour: none where it does not fire.** A transform list with a BondFacet entry takes
++the same branch as before, and the objects that reach the new branch always ended in an error.
++
+ ---
+ 
+ ## 2. Headless mode — new files, GUI untouched
