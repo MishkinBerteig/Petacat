@@ -215,6 +215,22 @@ describe('RunControlsPanel — which problem a run button acts on', () => {
     )
   })
 
+  it('sends no seed when the Seed field is blank, so the server picks a random one', async () => {
+    setup({
+      runId: null,
+      runParams: null,
+      formInputs: { initial: 'abc', modified: 'abd', target: 'xyz', answer: '', seed: '' },
+      createRun,
+      runToAnswer,
+    })
+
+    render(<RunControlsPanel />)
+    fireEvent.click(screen.getByRole('button', { name: /run to answer/i }))
+
+    await waitFor(() => expect(createRun).toHaveBeenCalled())
+    expect(createRun.mock.calls[createRun.mock.calls.length - 1][0].seed).toBeUndefined()
+  })
+
   it('starts a NEW run when an answer is added, switching to justification mode', async () => {
     setup({
       runId: 12,

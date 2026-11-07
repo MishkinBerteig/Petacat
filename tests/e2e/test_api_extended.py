@@ -481,7 +481,7 @@ async def test_admin_export(app_client):
     assert "help_topics" in data
 
 
-#: The fifteen collections the configuration is made of.
+#: The seventeen collections the configuration is made of.
 _CONFIG_COLLECTIONS = (
     "slipnet_nodes",
     "slipnet_links",
@@ -494,6 +494,8 @@ _CONFIG_COLLECTIONS = (
     "posting_rules",
     "initial_description_rules",
     "initial_activation_rules",
+    "input_character_ranges",
+    "input_lowering_ranges",
     "codelet_patterns",
     "commentary_templates",
     "slipnet_layout",
@@ -513,7 +515,7 @@ async def test_export_writes_every_collection(app_client):
 
 @pytest.mark.asyncio
 async def test_import_reports_every_collection_it_was_given(app_client):
-    """Import applies all fifteen and names each one with its row count.
+    """Import applies all seventeen and names each one with its row count.
 
     The reply is what a caller reads to know what was written, so it accounts for the
     payload it received.
@@ -795,7 +797,7 @@ async def test_the_websocket_pushes_a_flat_run_snapshot(app_client):
 
     create = await app_client.post(
         "/api/runs",
-        json={"initial": "abc", "modified": "abd", "target": "xyz", "seed": 0},
+        json={"initial": "abc", "modified": "abd", "target": "xyz", "seed": 1},
     )
     run_id = create.json()["run_id"]
 
@@ -876,7 +878,7 @@ async def test_a_comparison_carries_its_abstractness_and_its_verdict(app_client)
             create = await app_client.post(
                 "/api/runs",
                 json={
-                    "initial": "abc", "modified": "abd", "target": target, "seed": 0,
+                    "initial": "abc", "modified": "abd", "target": target, "seed": 1,
                 },
             )
             await app_client.post(
@@ -914,14 +916,14 @@ async def test_comparing_answers_is_said_in_the_runs_commentary(app_client):
 
     run = await app_client.post(
         "/api/runs",
-        json={"initial": "abc", "modified": "abd", "target": "xyz", "seed": 0},
+        json={"initial": "abc", "modified": "abd", "target": "xyz", "seed": 1},
     )
     run_id = run.json()["run_id"]
     if len(_global_memory.answers) < 2:
         for target in ("xyz", "mrrjjj"):
             create = await app_client.post(
                 "/api/runs",
-                json={"initial": "abc", "modified": "abd", "target": target, "seed": 0},
+                json={"initial": "abc", "modified": "abd", "target": target, "seed": 1},
             )
             await app_client.post(
                 f"/api/runs/{create.json()['run_id']}/run", json={"max_steps": 4000}
@@ -1187,7 +1189,7 @@ async def test_a_trace_event_can_be_addressed_and_displayed(app_client):
     """
     create = await app_client.post(
         "/api/runs",
-        json={"initial": "abc", "modified": "abd", "target": "xyz", "seed": 0},
+        json={"initial": "abc", "modified": "abd", "target": "xyz", "seed": 1},
     )
     run_id = create.json()["run_id"]
     await app_client.post(f"/api/runs/{run_id}/run", json={"max_steps": 3000})
@@ -1221,7 +1223,7 @@ async def test_the_trace_exports_as_a_downloadable_file(app_client):
     """
     create = await app_client.post(
         "/api/runs",
-        json={"initial": "abc", "modified": "abd", "target": "xyz", "seed": 0},
+        json={"initial": "abc", "modified": "abd", "target": "xyz", "seed": 1},
     )
     run_id = create.json()["run_id"]
     await app_client.post(f"/api/runs/{run_id}/run", json={"max_steps": 1500})
@@ -1246,7 +1248,7 @@ async def test_export_and_the_numbered_event_are_different_endpoints(app_client)
     """
     create = await app_client.post(
         "/api/runs",
-        json={"initial": "abc", "modified": "abd", "target": "xyz", "seed": 0},
+        json={"initial": "abc", "modified": "abd", "target": "xyz", "seed": 1},
     )
     run_id = create.json()["run_id"]
     await app_client.post(f"/api/runs/{run_id}/run", json={"max_steps": 1500})

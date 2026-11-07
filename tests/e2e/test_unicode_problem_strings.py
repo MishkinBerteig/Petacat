@@ -1,12 +1,15 @@
-"""Any Unicode text is a valid problem string, in Training Mode and in Metacat Mode, end to end.
+"""Any Unicode text is a valid problem string in Training Mode, kept exactly; Metacat Mode reads it through Metacat's parser.
 
 A Training Mode Session whose problems use a broad corpus (spaces, separators, an arrow, digits, NFC and
 NFD, Greek, Cyrillic, Hebrew, CJK, Devanagari, emoji and ZWJ and flag sequences, a tab, a line break, a
 BOM, a bidirectional override, a 1,000-character string) is created, run with a small codelet cap,
-Stopped, and its problems read back from the database exactly equal.  A Metacat Mode run created with
-the same strings stores and returns them exactly, and appears in Run History and Review unchanged.
-Demo Problems (Admin view) take them too.  U+0000 and a lone surrogate, the two things a database
-cannot store, are refused with a 422 that names the field and the reason, never a 500.
+Stopped, and its problems read back from the database exactly equal.  U+0000 and a lone surrogate, the two
+things a database cannot store, are refused with a 422 that names the field and the reason, never a 500.
+
+Metacat Mode does not keep text exactly: it reads each problem through a port of Metacat's input parser
+(``server/services/input_parser.py``), so the same corpus is lowered, split on punctuation or refused with
+``Invalid input!``.  What it stores is what the parser read (``test_input_parser_doors.py`` has the table).
+Demo Problems (Admin view) are read the same way.
 
 Whether the engine behaves well on every string is not what these tests assert: a run that errors on
 a string is recorded in the session's problem row (``first_error``), and the strings are stored regardless.
@@ -120,59 +123,80 @@ async def test_the_two_unstorable_cases_are_refused_with_a_422_that_says_why(app
             })
             assert resp.status_code == 422, (field, resp.text)
             assert field in resp.json()["detail"] and words in str(resp.json()["detail"]), resp.text
-    # The same refusals from Metacat Mode's run creation and the Admin view's Demo Problems.
-    for bad, words in (("a\x00b", "U+0000"), ("\ud800", "not valid Unicode")):
+    # Metacat Mode's run creation and the Admin view's Demo Problems refuse the same two with the
+    # parser's own message, because they are not valid input to Metacat's parser: NUL separates
+    # (and leaves too many tokens), and a lone surrogate cannot reach Metacat at all.
+    for bad in ("a\x00b", "\ud800"):
         resp = await post_ascii(app_client, "/api/runs", {**ok, "answer": bad})
-        assert resp.status_code == 422 and words in str(resp.json()["detail"]), resp.text
-        resp = await post_ascii(app_client, "/api/admin/demos", {**ok, "name": "bad", "initial": bad})
-        assert resp.status_code == 422 and words in str(resp.json()["detail"]), resp.text
+        assert resp.status_code == 400 and resp.json()["detail"] == "Invalid input!", resp.text
+        resp = await post_ascii(app_client, "/api/admin/demos", {**ok, "name": "bad", "answer": bad})
+        assert resp.status_code == 400 and resp.json()["detail"] == "Invalid input!", resp.text
+    # NUL is a separator to Metacat's parser, so it is never stored: a NUL inside the Initial field only
+    # splits it into two strings, and the demo holds what the parser read.
+    resp = await post_ascii(app_client, "/api/admin/demos", {**ok, "name": "nul", "initial": "a\x00b"})
+    assert resp.status_code == 201, resp.text
+    assert (resp.json()["initial"], resp.json()["modified"], resp.json()["target"], resp.json()["answer"]) == ("a", "b", "abd", "xyz")
+    assert (await app_client.delete(f"/api/admin/demos/{resp.json()['id']}")).status_code == 200
 
 
 @pytest.mark.asyncio
-async def test_metacat_mode_refuses_empty_strings_with_a_422_not_a_crash(app_client):
+async def test_metacat_mode_refuses_empty_strings_as_invalid_input_and_reads_an_empty_answer_as_none(app_client):
     ok = {"initial": "abc", "modified": "abd", "target": "xyz"}
-    for field, words in (("initial", "initial must not be empty"), ("modified", "modified must not be empty"),
-                         ("target", "target must not be empty"), ("answer", "answer must not be empty")):
+    for field in ("initial", "modified", "target"):
         resp = await app_client.post("/api/runs", json={**ok, field: ""})
-        assert resp.status_code == 422 and words in str(resp.json()["detail"]), (field, resp.text)
+        assert resp.status_code == 400 and resp.json()["detail"] == "Invalid input!", (field, resp.text)
         resp = await app_client.post("/api/swarm", json={**ok, field: "", "count": 1})
-        assert resp.status_code == 422 and words in str(resp.json()["detail"]), (field, resp.text)
+        assert resp.status_code == 400 and resp.json()["detail"] == "Invalid input!", (field, resp.text)
+    # Metacat's line has no answer where the Answer field is blank: a discovery run.
+    resp = await app_client.post("/api/runs", json={**ok, "answer": "", "seed": 1})
+    assert resp.status_code == 200 and resp.json()["answer"] is None and resp.json()["justify_mode"] is False
 
 
 @pytest.mark.asyncio
-async def test_metacat_mode_runs_with_unicode_strings_store_and_return_them_exactly(app_client, test_engine):
+async def test_metacat_mode_stores_what_the_parser_read_for_every_corpus_string(app_client, test_engine):
+    from server.services.input_parser import InvalidInput, read_problem
+    from tests.support.standard_configuration import standard_meta
+
+    meta = standard_meta()
     factory = async_sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
-    steps: dict[int, int] = {}
+    outcomes: dict[int, str] = {}
     for i, p in enumerate(corpus_problems()):
+        try:
+            read = read_problem(meta, p["initial"], p["modified"], p["target"], p.get("answer"), 1)
+        except InvalidInput:
+            read = None
         resp = await app_client.post("/api/runs", json={**p, "seed": 1})
+        if read is None:
+            assert resp.status_code == 400 and resp.json()["detail"] == "Invalid input!", (i, resp.text)
+            outcomes[i] = "refused"
+            continue
         assert resp.status_code == 200, (i, resp.text)
         body = resp.json()
-        assert exact({**body}) == exact(p), i
+        want = (read.initial, read.modified, read.target, read.answer)
+        assert exact(body) == want, i
         run_id = body["run_id"]
-        assert exact((await app_client.get(f"/api/runs/{run_id}")).json()) == exact(p)
         async with factory() as s:
             row = (await s.execute(select(Run).where(Run.id == run_id))).scalar_one()
-        assert (row.initial_string, row.modified_string, row.target_string, row.answer_string) == exact(p)
-        # Run History and Review show them unchanged.
-        assert exact((await app_client.get(f"/api/review/runs/{run_id}")).json()) == exact(p)
-        # A few codelets, with a small cap: the strings must still be there afterwards.  An engine
-        # error on a string is the engine's, and is recorded by the investigation, not asserted here.
-        step = await app_client.post(f"/api/runs/{run_id}/step", json={"n": 3})
-        steps[i] = step.status_code
-    print("Metacat Mode step status by corpus index:", steps)
-    listed = (await app_client.get("/api/runs", params={"limit": 200})).json()["runs"]
-    shown = {exact(r) for r in listed}
-    assert {exact(p) for p in corpus_problems()} <= shown
+        assert (row.initial_string, row.modified_string, row.target_string, row.answer_string) == want
+        assert exact((await app_client.get(f"/api/review/runs/{run_id}")).json()) == want
+        outcomes[i] = "read"
+    print("Metacat Mode outcome by corpus index:", outcomes)
+    # The corpus is mostly not Metacat input; "ABC"-like strings and punctuation-only ones are.
+    assert "refused" in outcomes.values()
+    assert any(CORPUS[i] == "ABC" for i, o in outcomes.items()) or "read" in outcomes.values()
 
 
 @pytest.mark.asyncio
-async def test_demo_problems_take_any_unicode_text(app_client, test_engine):
-    p = {"name": "unicode demo " + "n" * 100, "section": "s" * 50, "initial": "a b\nc", "modified": "x" * 500, "target": "漢字 😀", "answer": "é\t"}
+async def test_demo_problems_take_any_unicode_name_section_and_description_and_keep_the_parsed_problem(app_client, test_engine):
+    p = {"name": "unicode demo 漢字 😀 " + "n" * 100, "section": "s" * 50 + "é", "description": "説明\n" + "d" * 500,
+         "initial": "a", "modified": "XY", "target": "x-z", "answer": None}
     resp = await app_client.post("/api/admin/demos", json=p)
     assert resp.status_code == 201, resp.text
     demo_id = resp.json()["id"]
     got = (await app_client.get("/api/admin/demos")).json()
     mine = next(d for d in got if d["id"] == demo_id)
-    assert (mine["name"], mine["section"]) == (p["name"], p["section"])  # no 64/16-character caps
-    assert (mine["initial"], mine["modified"], mine["target"], mine["answer"]) == (p["initial"], p["modified"], p["target"], p["answer"])
+    # No 64/16-character caps on the text columns; the problem is what the parser read:
+    # a XY x-z -> the tokens a xy x z.
+    assert (mine["initial"], mine["modified"], mine["target"], mine["answer"]) == ("a", "xy", "x", "z")
+    assert (mine["name"], mine["section"], mine["description"]) == (p["name"], p["section"], p["description"])
     assert (await app_client.delete(f"/api/admin/demos/{demo_id}")).status_code == 200

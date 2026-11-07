@@ -1,11 +1,14 @@
-"""The one problem-string check: any Unicode text is valid, and only what the database cannot store is refused.
+"""The problem-string check of Training Mode: any Unicode text is valid, and only what the database cannot store is refused.
 
-Metacat Mode and Training Mode share it (``server/services/problem_text.py``).  A string may hold any
+A Training Mode Session takes this check (``server/services/problem_text.py``); Metacat Mode does not.
+Metacat Mode reads every problem through a port of Metacat's input parser instead (lowering case,
+splitting on punctuation, refusing a digit inside a string and a letter outside a to z), which
+``tests/unit/test_input_parser_doors.py`` and ``tests/lockstep/test_input_parser.py`` hold.  A string may hold any
 script, emoji and combining sequences, spaces, tabs, line breaks, punctuation, any case and any length,
 and is kept exactly: no trimming, no case change, no normalisation.  Refused, each with a message that
 says why: U+0000 (PostgreSQL ``text`` and ``jsonb`` cannot store it) and a lone surrogate (not UTF-8 text).
-Every problem keeps the structural rule, in both modes: initial, modified and target non-empty,
-answer null or non-empty.  The request models of every route that takes a problem apply the check.
+Every problem keeps the structural rule: initial, modified and target non-empty,
+answer null or non-empty.  The Training Mode Session request model (``ProblemInput``) applies the check.
 """
 
 from __future__ import annotations
@@ -15,9 +18,6 @@ import unicodedata
 import pytest
 from pydantic import ValidationError
 
-from server.api.admin import DemoProblemRequest
-from server.api.runs import CreateRunRequest
-from server.api.swarm import SwarmRequest
 from server.api.training_mode_sessions import ProblemInput
 from server.services.problem_text import (
     ProblemTextError, check_deep, check_problem, check_problem_mapping, check_string,
@@ -85,11 +85,8 @@ def test_non_strings_are_refused():
 
 @pytest.mark.parametrize("model,extra", [
     (ProblemInput, {}),
-    (CreateRunRequest, {}),
-    (SwarmRequest, {}),
-    (DemoProblemRequest, {"name": "n"}),
 ])
-def test_every_request_model_accepts_the_corpus_and_keeps_it_exactly(model, extra):
+def test_the_training_mode_request_model_accepts_the_corpus_and_keeps_it_exactly(model, extra):
     for s in CORPUS:
         m = model(initial=s, modified=s, target=s, answer=s, **extra)
         assert (m.initial, m.modified, m.target, m.answer) == (s, s, s, s)
@@ -97,9 +94,9 @@ def test_every_request_model_accepts_the_corpus_and_keeps_it_exactly(model, extr
 
 
 @pytest.mark.parametrize("model,extra", [
-    (ProblemInput, {}), (CreateRunRequest, {}), (SwarmRequest, {}), (DemoProblemRequest, {"name": "n"}),
+    (ProblemInput, {}),
 ])
-def test_every_request_model_refuses_nul_and_a_lone_surrogate_with_a_message(model, extra):
+def test_the_training_mode_request_model_refuses_nul_and_a_lone_surrogate_with_a_message(model, extra):
     for bad, msg in (("a\x00", r"U\+0000"), ("\ud800", "not valid Unicode")):
         for field in ("initial", "modified", "target", "answer"):
             values = {"initial": "a", "modified": "b", "target": "c", **extra, field: bad}
@@ -107,20 +104,14 @@ def test_every_request_model_refuses_nul_and_a_lone_surrogate_with_a_message(mod
                 model(**values)
 
 
-def test_every_request_model_keeps_the_structural_rule():
+def test_the_training_mode_request_model_keeps_the_structural_rule():
     with pytest.raises(ValidationError, match="initial must not be empty"):
         ProblemInput(initial="", modified="b", target="c")
     with pytest.raises(ValidationError, match="answer must not be empty"):
         ProblemInput(initial="a", modified="b", target="c", answer="")
     assert ProblemInput(initial="a", modified="b", target="c", answer=None).answer is None
-    for model, extra in ((CreateRunRequest, {}), (SwarmRequest, {})):
-        with pytest.raises(ValidationError, match="initial must not be empty"):
-            model(initial="", modified="b", target="c", **extra)
-        with pytest.raises(ValidationError, match="target must not be empty"):
-            model(initial="a", modified="b", target="", **extra)
-        with pytest.raises(ValidationError, match="answer must not be empty"):
-            model(initial="a", modified="b", target="c", answer="", **extra)
-        assert model(initial="a", modified="b", target="c", answer=None, **extra).answer is None
+    with pytest.raises(ValidationError, match="target must not be empty"):
+        ProblemInput(initial="a", modified="b", target="")
 
 
 def test_check_deep_accepts_any_nesting_of_text_and_names_the_path_of_a_bad_string():

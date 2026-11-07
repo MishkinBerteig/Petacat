@@ -12,7 +12,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.engine.memory import clause_types_of
 from server.db import get_session
-from server.services.problem_text import check_problem
 from server.services.vocabulary_payload import run_vocabulary_payload
 from server.models.run import Run
 
@@ -38,7 +37,10 @@ class CreateRunRequest(BaseModel):
     modified: str
     target: str
     answer: str | None = None
-    seed: int = 0
+    #: Omitted, the door picks a random seed and the response states it.  A seed is a whole
+    #: number from 1 to the configuration's largest seed (Metacat's parser); anything else is
+    #: ``Invalid input!``.
+    seed: int | None = None
     #: Set at creation so the whole run uses it, rather than being applied after
     #: the engine has already been initialised.
     spreading_threshold: int | None = None
@@ -64,15 +66,6 @@ class CreateRunRequest(BaseModel):
     #: the override was applied.
     parameters: dict[str, Any] | None = None
 
-    @model_validator(mode="after")
-    def _problem_text(self) -> "CreateRunRequest":
-        # Any Unicode text is a valid problem string; only U+0000 and a lone surrogate are
-        # refused, because they cannot be stored; initial, modified and target must be non-empty and
-        # an answer is null or non-empty (an empty one crashes the engine).  See ``server.services.problem_text``.
-        check_problem(self.initial, self.modified, self.target, self.answer, require_nonempty=True)
-        return self
-
-
 
 class StepRequest(BaseModel):
     n: int = 1
@@ -96,6 +89,8 @@ class RunResponse(BaseModel):
     modified: str
     target: str
     answer: str | None
+    #: The seed the run uses; a request that gave none gets a random one, stated here.
+    seed: int | None = None
     #: The answer was supplied for the engine to justify, not discovered by it.
     justify_mode: bool = False
     #: Which Slipnet nodes were allowed to spread; the run row always states it.
@@ -188,7 +183,7 @@ async def create_run(
             workers=req.workers, parameters=req.parameters,
         )
     except ValueError as exc:
-        # An unknown mode name. Rejected rather than defaulted: silently giving a Fast
+        # Invalid input (Metacat's parser), or an unknown mode name. Rejected rather than defaulted: silently giving a Fast
         # Run to someone who asked for Audit would only show up when the record they
         # expected turned out not to exist.
         raise HTTPException(400, str(exc)) from None
@@ -201,6 +196,7 @@ async def create_run(
         modified=info.modified,
         target=info.target,
         answer=info.answer,
+        seed=info.seed,
         justify_mode=info.justify_mode,
         spreading_threshold=info.spreading_threshold,
         mode=info.mode,
@@ -227,6 +223,7 @@ async def get_run(
         modified=info.modified,
         target=info.target,
         answer=info.answer,
+        seed=info.seed,
         justify_mode=info.justify_mode,
         spreading_threshold=info.spreading_threshold,
         mode=info.mode,
@@ -556,6 +553,7 @@ async def run_to_completion(
         modified=info.modified,
         target=info.target,
         answer=info.answer,
+        seed=info.seed,
         justify_mode=info.justify_mode,
         spreading_threshold=info.spreading_threshold,
         mode=info.mode,
@@ -594,6 +592,7 @@ async def reset_run(
         modified=info.modified,
         target=info.target,
         answer=info.answer,
+        seed=info.seed,
         justify_mode=info.justify_mode,
         spreading_threshold=info.spreading_threshold,
         mode=info.mode,

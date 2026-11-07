@@ -28,7 +28,7 @@ license change was authorised by Dr. Marshall directly (see
 > end-to-end. Episodic Memory (Metacat-Mode learning) shapes the runs that inherit it: a run
 > declines an answer already held for the same problem and rules, so repeating a
 > problem across Metacat Mode's [episodic runs](#persistence-modes-and-episodic-runs)
-> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 6,508 test cases covering the engine, the API, and the
+> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 6,599 test cases covering the engine, the API, and the
 > help/config system, run on both the CPU and the GPU numeric backends. Underneath the seven components sits an execution
 > substrate — three [persistence modes](#persistence-modes-and-episodic-runs),
 > a [GPU numeric substrate](#the-numeric-substrate), and
@@ -139,7 +139,7 @@ spot open (`abc -> abd; xyz -> ?`) is one turn; with the sliding window, a singl
 Training Mode Session will have many turns. A Training episode holds many runs, and a run holds
 one or more turns. Metacat Mode's runs stay single-turn.
 
-What exists is the ground: any Unicode text as input in both modes, the configuration in the
+What exists is the ground: any UTF-8 text as input in Training Mode (Metacat Mode reads problems through Metacat's input parser), the configuration in the
 database, the one change API and journal, and a Training Mode Session that runs its own evolving
 configuration. Neither idea is built yet: not the in-worker learner (only its seam), and not
 multi-turn runs.
@@ -356,11 +356,17 @@ view. The two left-hand panels split along *what* versus *how*:
 
 **Problem Input** (top-left) defines the problem: the four strings (Initial,
 Modified, Target, and optionally Answer — supplying an Answer switches the
-engine into justification mode), the **Seed**, and the demo dropdown. A string can
-be any Unicode text (any script, emoji, spaces, punctuation, line breaks, any case
-and length) and is kept exactly as typed or pasted; each field is a one-row box that
-grows with its content, pasting keeps line breaks, Shift+Enter types one and plain
-Enter does nothing, as it did in the single-line input it replaced.
+engine into justification mode), the **Seed**, and the demo dropdown. Metacat Mode
+reads the fields as one line, `initial modified target [answer] [seed]`, through a port
+of Metacat's own input parser: uppercase is lowered, punctuation, spaces, emoji and
+combining marks separate strings (`x-z` in Target is target `x` with the answer `z`),
+and a digit inside a string, a letter outside a to z or a seed outside 1 to 4294967295
+is refused with `Invalid input!`. A blank Seed is a random seed, recorded and shown. The
+panel shows the strings the parser read. The parser's rules are in the Metacat Standard
+Configuration (`input_parser.json`, the Slipnet's letter nodes and the `largest_seed`
+engine parameter). A Training Mode Session does not use it: its problems are any UTF-8
+text kept exactly. Each field is a one-row box that grows with its content, pasting keeps
+line breaks, Shift+Enter types one and plain Enter does nothing.
 
 **Run Controls** (below it) decides how that problem executes, in eight groups: Run, Episodic Memory, Recording, Engine parameters, What this run is, Manual stepping, Swarm, and Settings.
 
@@ -469,7 +475,7 @@ Petacat has two test suites:
   plugin against the serial runs it claims to equal), `lockstep` (Petacat's decision
   traces against Metacat's), and `e2e` (full HTTP
   stack against a running database). All eight run in a single command against
-  the local Postgres — 6,508 cases, which includes the numeric matrix's second
+  the local Postgres — 6,599 cases, which includes the numeric matrix's second
   pass over the 1149 backend-sensitive tests. See
   [TESTING.md](TESTING.md) for the layer breakdown, the numeric backend matrix,
   the session ceiling, the unit-test rules, determinism requirements, test-double
@@ -1778,6 +1784,7 @@ files are not read again (see [`seed_data/README.md`](seed_data/README.md) and
 | `enums.json` | The 18 enum tables (bridge types, proposal levels, link types, clamp types, …), with the `role` column that binds a row to the engine's vocabulary, and, in `string_kinds`, `bridge_types` and `rule_types`, the one definition of the four-string frame (which bridge joins which strings; see `seed_data/README.md`) |
 | `roles.json` | The roles the engine looks Slipnet nodes and codelet types up by (64 node-role rows, 5 codelet-type-role rows), including the sets of dimensions that behave one way and the image operation each dimension performs |
 | `initial_program.json` | The initial-description program: the descriptions every letter is given before the first codelet (18 rules: 6 for the letters, 10 for every new group, 2 for a translated string, each subject applied in order) and the concepts that start fully active (1 rule) |
+| `input_parser.json` | Metacat's input parser, which Metacat Mode reads every problem through: 713 ranges of characters that are letters (alphabetic) or digits (numeric) and 156 ranges that say how a character is lowered, both generated from Metacat's own Chez Scheme by `scripts/generate_input_parser_seed.py`. The letters a string may hold are the Slipnet's letter nodes, and the largest seed is the engine parameter `largest_seed` (4294967295). A Training Mode Session does not read them |
 | `theme_relations.json` | The Themespace's 5 relations |
 | `slipnet_layout.json` | Grid positions for the Slipnet visualisation |
 | `help_topics.en.json` | Help popover text for every dashboard panel + glossary (English) |

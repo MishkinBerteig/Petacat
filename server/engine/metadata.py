@@ -256,6 +256,18 @@ class InitialActivationRuleSpec:
     condition: str
 
 
+#: A row of ``input_character_ranges``: ``(kind, first, last)``.  The characters ``first`` to ``last``
+#: (Unicode scalar values, inclusive) are ``alphabetic`` or ``numeric``.  Read only by Metacat Mode's
+#: input parser.  A plain tuple, not a record: there are 713 rows, and every Training Mode Session
+#: ships the whole provider to its workers (``tests/parallel/test_session_budgets.py``).
+InputCharacterRangeSpec = tuple[str, int, int]
+
+#: A row of ``input_lowering_ranges``: ``(first, last, step, delta)``.  The characters ``first``,
+#: ``first + step``, ... to ``last`` lower to the character ``delta`` further on.  Read only by
+#: Metacat Mode's input parser.  A plain tuple, for the reason above.
+InputLoweringRangeSpec = tuple[int, int, int, int]
+
+
 @dataclass(frozen=True)
 class ThemeDimensionSpec:
     slipnet_node: str
@@ -290,6 +302,10 @@ class MetadataProvider:
     #: ``ordinal`` (``server/engine/initial_program.py``).
     initial_description_rules: tuple[InitialDescriptionRuleSpec, ...] = ()
     initial_activation_rules: tuple[InitialActivationRuleSpec, ...] = ()
+    #: Metacat's input parser, which only Metacat Mode's doors read (``server/services/input_parser.py``):
+    #: which characters are letters or digits, and how each is lowered.  Both by ``first``.
+    input_character_ranges: tuple[InputCharacterRangeSpec, ...] = ()
+    input_lowering_ranges: tuple[InputLoweringRangeSpec, ...] = ()
     #: Theme relations, ordered by ``ordinal``.
     theme_relations: tuple[ThemeRelationSpec, ...] = ()
     #: The rows of the enum tables bound to a role of the vocabulary
@@ -562,6 +578,15 @@ class MetadataProvider:
                 key=lambda r: (r["ordinal"], r["rule_key"].encode()),
             )
         )
+        parser = _load("input_parser.json")
+        input_character_ranges = tuple(
+            (r["kind"], r["first"], r["last"])
+            for r in sorted(parser["character_ranges"], key=lambda r: (r["kind"].encode(), r["first"]))
+        )
+        input_lowering_ranges = tuple(
+            (r["first"], r["last"], r["step"], r["delta"])
+            for r in sorted(parser["lowering_ranges"], key=lambda r: r["first"])
+        )
         theme_relations = tuple(
             ThemeRelationSpec(
                 name=r["name"],
@@ -645,6 +670,8 @@ class MetadataProvider:
             codelet_roles=codelet_roles,
             initial_description_rules=initial_description_rules,
             initial_activation_rules=initial_activation_rules,
+            input_character_ranges=input_character_ranges,
+            input_lowering_ranges=input_lowering_ranges,
             theme_relations=theme_relations,
             vocabulary_bindings=vocabulary_bindings(enum_rows),
             string_kinds=string_kinds,

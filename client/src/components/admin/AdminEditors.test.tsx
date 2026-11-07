@@ -18,6 +18,7 @@ import { SlipnetLinkEditor } from './SlipnetLinkEditor'
 import { ThemeDimensionEditor } from './ThemeDimensionEditor'
 import { PostingRuleEditor } from './PostingRuleEditor'
 import { InitialProgramEditor } from './InitialProgramEditor'
+import { InputParserEditor } from './InputParserEditor'
 import { SlipnetLayoutEditor } from './SlipnetLayoutEditor'
 import { CommentaryTemplateEditor } from './CommentaryTemplateEditor'
 import { HelpTopicEditor } from './HelpTopicEditor'
@@ -122,6 +123,16 @@ describe('DemoEditor — demo problems', () => {
     // The fields not edited travel with it, since PUT replaces the row.
     expect(calls[0].body.target).toBe('xyz')
     expect(calls[0].body.seed).toBe(7)
+  })
+
+  it('sends no seed for a demo whose Seed is blank, so the server picks and stores a random one', async () => {
+    serve([{ ...demo, seed: null }])
+    render(<DemoEditor />)
+
+    await editCell('abc-xyz', 'renamed')
+
+    await waitFor(() => expect(calls).toHaveLength(1))
+    expect(calls[0].body.seed).toBeNull()
   })
 
   it('creates a demo', async () => {
@@ -316,6 +327,48 @@ describe('InitialProgramEditor — the initial-description program', () => {
     await waitFor(() => expect(calls).toHaveLength(1))
     expect(calls[0]).toMatchObject({ method: 'PUT', url: '/api/admin/initial-activation-rules/1' })
     expect(calls[0].body.node_role).toBe('dimension.length')
+  })
+})
+
+describe('InputParserEditor — Metacat\'s input parser', () => {
+  const character = { id: 1, kind: 'alphabetic', first: 97, last: 122 }
+  const lowering = { id: 2, first: 65, last: 90, step: 1, delta: 32 }
+
+  function serveParser() {
+    stubFetch((url, init) => {
+      if (method(init) !== 'GET') return ok(character)
+      return ok(url === '/api/admin/input-character-ranges' ? [character] : [lowering])
+    })
+  }
+
+  it('lists both tables, each from its own route', async () => {
+    serveParser()
+    render(<InputParserEditor />)
+    expect(await screen.findByText('alphabetic')).toBeTruthy()
+    expect(screen.getByText('32')).toBeTruthy()
+    expect(screen.getByText(/A Training Mode Session does not use these rows/)).toBeTruthy()
+  })
+
+  it('changes the last character of a range and sends the whole row', async () => {
+    serveParser()
+    render(<InputParserEditor />)
+
+    await editCell('122', '123')
+
+    await waitFor(() => expect(calls).toHaveLength(1))
+    expect(calls[0]).toMatchObject({ method: 'PUT', url: '/api/admin/input-character-ranges/1' })
+    expect(calls[0].body).toEqual({ kind: 'alphabetic', first: 97, last: 123 })
+  })
+
+  it('changes how a range lowers and sends the whole row', async () => {
+    serveParser()
+    render(<InputParserEditor />)
+
+    await editCell('32', '0')
+
+    await waitFor(() => expect(calls).toHaveLength(1))
+    expect(calls[0]).toMatchObject({ method: 'PUT', url: '/api/admin/input-lowering-ranges/2' })
+    expect(calls[0].body).toEqual({ first: 65, last: 90, step: 1, delta: 0 })
   })
 })
 

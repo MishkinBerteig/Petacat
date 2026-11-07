@@ -10,12 +10,12 @@ from types import SimpleNamespace
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, inspect as sa_inspect, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.db import get_session
-from server.services.problem_text import check_problem
+from server.services.input_parser import InvalidInput, ParserConfigurationError, read_problem
 from server.engine.rational import canonical_rational
 from server.models.journal import GLOBAL_CONFIGURATION_ID
 from server.services import journal
@@ -33,6 +33,8 @@ from server.models.metadata import (
     FormulaCoefficient,
     HelpTopic,
     InitialActivationRule,
+    InputCharacterRange,
+    InputLoweringRange,
     InitialDescriptionRule,
     PostingRule,
     SlipnetLayoutPos,
@@ -352,15 +354,29 @@ class DemoProblemRequest(BaseModel):
     modified: str
     target: str
     answer: str | None = None
-    seed: int = 0
+    #: Omitted, a random seed is picked and stored, as for a run.  A seed is a whole number
+    #: from 1 to the configuration's largest seed; anything else is ``Invalid input!``.
+    seed: int | None = None
     description: str = ""
 
-    @model_validator(mode="after")
-    def _problem_text(self) -> "DemoProblemRequest":
-        # Any Unicode text is a valid problem string; only U+0000 and a lone surrogate are
-        # refused, because they cannot be stored.  See ``server.services.problem_text``.
-        check_problem(self.initial, self.modified, self.target, self.answer)
-        return self
+
+def _read_demo(req: DemoProblemRequest) -> dict[str, Any]:
+    """A demo problem's strings, answer and seed as Metacat's input parser reads them.
+
+    Metacat Mode's door (``input_parser.py``), like a run's: the catalogue holds what the parser
+    read, so a demo always runs.  A random seed is picked when none is given and is stored.
+    """
+    from server.api.runs import get_run_service
+
+    try:
+        problem = read_problem(
+            get_run_service().meta, req.initial, req.modified, req.target, req.answer, req.seed)
+    except (InvalidInput, ParserConfigurationError) as exc:
+        raise HTTPException(400, str(exc)) from None
+    return dict(
+        initial=problem.initial, modified=problem.modified, target=problem.target,
+        answer=problem.answer, seed=problem.seed,
+    )
 
 
 
@@ -889,12 +905,8 @@ async def create_demo(
     demo = await _insert(session, DemoProblem, dict(
         name=req.name,
         section=req.section,
-        initial=req.initial,
-        modified=req.modified,
-        target=req.target,
-        answer=req.answer,
-        seed=req.seed,
         description=req.description,
+        **_read_demo(req),
     ))
     return DemoProblemResponse(
         id=demo.id,
@@ -920,12 +932,8 @@ async def update_demo(
     demo = await _update(session, DemoProblem, key, dict(
         name=req.name,
         section=req.section,
-        initial=req.initial,
-        modified=req.modified,
-        target=req.target,
-        answer=req.answer,
-        seed=req.seed,
         description=req.description,
+        **_read_demo(req),
     ))
     return DemoProblemResponse(
         id=demo.id,
@@ -1170,6 +1178,134 @@ async def delete_initial_activation_rule(rule_id: int, session: AsyncSession = D
         session, InitialActivationRule, rule_id, f"Initial activation rule {rule_id} not found")
     await _delete(session, InitialActivationRule, key)
     return {"deleted": rule_id}
+
+
+# ------------------------------------------------------------------
+# Metacat's input parser (Metacat Mode's doors only)
+# ------------------------------------------------------------------
+
+
+class InputCharacterRangeRequest(BaseModel):
+    #: ``alphabetic`` or ``numeric`` (``server/services/input_parser.py``).
+    kind: str = Field(min_length=1)
+    #: Unicode scalar values, inclusive.
+    first: int = Field(ge=0, le=0x10FFFF)
+    last: int = Field(ge=0, le=0x10FFFF)
+
+
+class InputCharacterRangeResponse(BaseModel):
+    id: int
+    kind: str
+    first: int
+    last: int
+
+
+class InputLoweringRangeRequest(BaseModel):
+    #: The characters ``first``, ``first + step``, ... to ``last`` each lower to the character
+    #: ``delta`` further on.
+    first: int = Field(ge=0, le=0x10FFFF)
+    last: int = Field(ge=0, le=0x10FFFF)
+    step: int = Field(default=1, ge=1)
+    delta: int
+
+
+class InputLoweringRangeResponse(BaseModel):
+    id: int
+    first: int
+    last: int
+    step: int
+    delta: int
+
+
+def _input_character_range_response(r: Any) -> InputCharacterRangeResponse:
+    return InputCharacterRangeResponse(id=r.id, kind=r.kind, first=r.first, last=r.last)
+
+
+def _input_lowering_range_response(r: Any) -> InputLoweringRangeResponse:
+    return InputLoweringRangeResponse(id=r.id, first=r.first, last=r.last, step=r.step, delta=r.delta)
+
+
+def _input_character_range_values(req: InputCharacterRangeRequest) -> dict:
+    from server.services.input_parser import CHARACTER_KINDS
+
+    if req.kind not in CHARACTER_KINDS:
+        raise HTTPException(422, f"kind must be one of {', '.join(CHARACTER_KINDS)}")
+    if req.last < req.first:
+        raise HTTPException(422, "last must not be before first")
+    return dict(kind=req.kind, first=req.first, last=req.last)
+
+
+def _input_lowering_range_values(req: InputLoweringRangeRequest) -> dict:
+    if req.last < req.first:
+        raise HTTPException(422, "last must not be before first")
+    if not 0 <= req.first + req.delta <= 0x10FFFF or not 0 <= req.last + req.delta <= 0x10FFFF:
+        raise HTTPException(422, "first and last must each lower to a character")
+    return dict(first=req.first, last=req.last, step=req.step, delta=req.delta)
+
+
+@router.get("/input-character-ranges", response_model=list[InputCharacterRangeResponse])
+async def list_input_character_ranges(session: AsyncSession = Depends(get_session)):
+    result = await session.execute(
+        select(InputCharacterRange).order_by(InputCharacterRange.kind.collate("C"), InputCharacterRange.first))
+    return [_input_character_range_response(r) for r in result.scalars().all()]
+
+
+@router.post("/input-character-ranges", response_model=InputCharacterRangeResponse, status_code=201)
+async def create_input_character_range(
+    req: InputCharacterRangeRequest, session: AsyncSession = Depends(get_session),
+):
+    row = await _insert(session, InputCharacterRange, _input_character_range_values(req))
+    return _input_character_range_response(row)
+
+
+@router.put("/input-character-ranges/{range_id}", response_model=InputCharacterRangeResponse)
+async def update_input_character_range(
+    range_id: int, req: InputCharacterRangeRequest, session: AsyncSession = Depends(get_session),
+):
+    key = await _existing(
+        session, InputCharacterRange, range_id, f"Input character range {range_id} not found")
+    row = await _update(session, InputCharacterRange, key, _input_character_range_values(req))
+    return _input_character_range_response(row)
+
+
+@router.delete("/input-character-ranges/{range_id}")
+async def delete_input_character_range(range_id: int, session: AsyncSession = Depends(get_session)):
+    key = await _existing(
+        session, InputCharacterRange, range_id, f"Input character range {range_id} not found")
+    await _delete(session, InputCharacterRange, key)
+    return {"deleted": range_id}
+
+
+@router.get("/input-lowering-ranges", response_model=list[InputLoweringRangeResponse])
+async def list_input_lowering_ranges(session: AsyncSession = Depends(get_session)):
+    result = await session.execute(select(InputLoweringRange).order_by(InputLoweringRange.first))
+    return [_input_lowering_range_response(r) for r in result.scalars().all()]
+
+
+@router.post("/input-lowering-ranges", response_model=InputLoweringRangeResponse, status_code=201)
+async def create_input_lowering_range(
+    req: InputLoweringRangeRequest, session: AsyncSession = Depends(get_session),
+):
+    row = await _insert(session, InputLoweringRange, _input_lowering_range_values(req))
+    return _input_lowering_range_response(row)
+
+
+@router.put("/input-lowering-ranges/{range_id}", response_model=InputLoweringRangeResponse)
+async def update_input_lowering_range(
+    range_id: int, req: InputLoweringRangeRequest, session: AsyncSession = Depends(get_session),
+):
+    key = await _existing(
+        session, InputLoweringRange, range_id, f"Input lowering range {range_id} not found")
+    row = await _update(session, InputLoweringRange, key, _input_lowering_range_values(req))
+    return _input_lowering_range_response(row)
+
+
+@router.delete("/input-lowering-ranges/{range_id}")
+async def delete_input_lowering_range(range_id: int, session: AsyncSession = Depends(get_session)):
+    key = await _existing(
+        session, InputLoweringRange, range_id, f"Input lowering range {range_id} not found")
+    await _delete(session, InputLoweringRange, key)
+    return {"deleted": range_id}
 
 
 # ------------------------------------------------------------------
@@ -1536,6 +1672,10 @@ async def export_metadata(session: AsyncSession = Depends(get_session)):
         select(InitialActivationRule).order_by(
             InitialActivationRule.ordinal, InitialActivationRule.rule_key.collate("C"))
     )
+    input_characters_result = await session.execute(
+        select(InputCharacterRange).order_by(InputCharacterRange.kind.collate("C"), InputCharacterRange.first))
+    input_lowering_result = await session.execute(
+        select(InputLoweringRange).order_by(InputLoweringRange.first))
     patterns_result = await session.execute(
         select(CodeletPatternDef).order_by(CodeletPatternDef.ordinal, CodeletPatternDef.id)
     )
@@ -1660,6 +1800,14 @@ async def export_metadata(session: AsyncSession = Depends(get_session)):
             }
             for r in initial_activations_result.scalars().all()
         ],
+        "input_character_ranges": [
+            {"id": r.id, "kind": r.kind, "first": r.first, "last": r.last}
+            for r in input_characters_result.scalars().all()
+        ],
+        "input_lowering_ranges": [
+            {"id": r.id, "first": r.first, "last": r.last, "step": r.step, "delta": r.delta}
+            for r in input_lowering_result.scalars().all()
+        ],
         "codelet_patterns": [
             {
                 "id": r.id, "pattern_name": r.pattern_name,
@@ -1706,7 +1854,7 @@ async def export_metadata(session: AsyncSession = Depends(get_session)):
 #: Every collection ``GET /export`` writes, and where it lands on the way back in:
 #: the model, the primary key a row is matched on, and any payload key whose name
 #: differs from the ORM attribute.  Export and import read this one list, so the two
-#: cover the same fifteen collections.
+#: cover the same seventeen collections.
 _IMPORTABLE: tuple[tuple[str, type, str, dict[str, str]], ...] = (
     ("slipnet_nodes", SlipnetNodeDef, "name", {}),
     ("slipnet_links", SlipnetLinkDef, "id", {}),
@@ -1719,6 +1867,8 @@ _IMPORTABLE: tuple[tuple[str, type, str, dict[str, str]], ...] = (
     ("posting_rules", PostingRule, "id", {}),
     ("initial_description_rules", InitialDescriptionRule, "id", {}),
     ("initial_activation_rules", InitialActivationRule, "id", {}),
+    ("input_character_ranges", InputCharacterRange, "id", {}),
+    ("input_lowering_ranges", InputLoweringRange, "id", {}),
     ("codelet_patterns", CodeletPatternDef, "id", {}),
     ("commentary_templates", CommentaryTemplate, "id", {}),
     ("slipnet_layout", SlipnetLayoutPos, "node_name", {}),
@@ -1800,7 +1950,7 @@ async def import_metadata(
     data: dict,
     session: AsyncSession = Depends(get_session),
 ):
-    """Import metadata from a JSON object — the same fifteen collections ``/export`` writes.
+    """Import metadata from a JSON object — the same seventeen collections ``/export`` writes.
 
     Every collection present in the payload is applied; the response names each one and
     how many rows it carried, so what was written is legible from the reply. Configuration

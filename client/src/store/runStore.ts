@@ -506,7 +506,25 @@ export const useRunStore = create<RunStore>((set, get) => ({
     set({
       themeEdit: null,
       runId: info.run_id,
-      runParams: params,
+      // What the server read, not what was typed: Metacat's input parser lowers case, splits on
+      // punctuation and may pick the seed, so these are the strings and the seed the run holds,
+      // and they are what the next press of Run compares the form with.
+      runParams: {
+        ...params,
+        initial: info.initial,
+        modified: info.modified,
+        target: info.target,
+        answer: info.answer ?? undefined,
+        seed: info.seed ?? params.seed,
+      },
+      formInputs: {
+        ...get().formInputs,
+        initial: info.initial,
+        modified: info.modified,
+        target: info.target,
+        answer: info.justify_mode ? (info.answer ?? '') : '',
+        seed: info.seed != null ? String(info.seed) : get().formInputs.seed,
+      },
       runMode: info.mode ?? get().persistenceMode,
       // Echoed by the server; the request is the fallback for a response without it.
       runJustifyMode: info.justify_mode ?? !!params.answer,

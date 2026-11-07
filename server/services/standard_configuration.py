@@ -48,6 +48,7 @@ BULK_SEED_FILES = (
     "posting_rules.json",
     "roles.json",
     "initial_program.json",
+    "input_parser.json",
     "theme_relations.json",
 )
 

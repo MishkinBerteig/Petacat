@@ -7,6 +7,12 @@
 // run mechanics: Reset re-initializes the current run with exactly the strings
 // and seed shown here, which is only legible when they sit together. Changing
 // any field instead means the next Run starts a new run.
+//
+// Metacat Mode reads the fields as one line, left to right -- initial modified target
+// [answer] [seed] -- through a port of Metacat's own input parser, on the server. The panel
+// holds no copy of its rules: it sends the text, and shows what the server read (the
+// lowered strings, the seed it picked) or its refusal, "Invalid input!". Training Mode
+// Sessions do not use this panel or that parser.
 // ---------------------------------------------------------------------------
 
 import { useState, useEffect, useCallback, useLayoutEffect, useRef } from 'react';
@@ -205,13 +211,15 @@ export function ProblemInputPanel() {
           type="text"
           value={formInputs.seed}
           onChange={(e) => setFormInput('seed', e.target.value)}
-          placeholder="0"
+          placeholder="random"
           style={{ width: '100%' }}
           disabled={isRunning}
         />
         <span className="text-xs text-muted">
           With one worker, the same problem, seed and memory reproduce a run
-          exactly. Blank or 0 = seed 0.
+          exactly. Blank = a random seed, shown here once the run starts.
+          A seed is a whole number from 1 up; 0 and negative numbers are
+          Invalid input!
         </span>
       </div>
 

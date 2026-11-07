@@ -33,7 +33,7 @@ count every engine-size figure in this document uses. Seed data: 59 slipnet node
 integration + 8 module files run locally; 9 e2e files currently require Docker, which
 WP2.1 removes).
 
-> **As built.** `server/engine/` holds 55 modules and 39,509 lines. The multi-core machinery
+> **As built.** `server/engine/` holds 55 modules and 39,537 lines. The multi-core machinery
 > (`free_running.py`, `coderack_shards.py`, `population.py`) moved out to the detachable
 > plugin package `server/parallel/`, which is not counted here. Later: `population.py`,
 > the sharded coderack candidates (`coderack_shards.py` keeps only the locked rack),
@@ -123,7 +123,7 @@ incidental.
 The database boundary is confined to twelve files:
 
 > **As built.** The database boundary spans `api/`, `services/`, `models/` and `db.py`,
-> with 129 endpoints taking `Depends(get_session)`.
+> with 137 endpoints taking `Depends(get_session)`.
 
 | Module | Role at the boundary |
 |--------|----------------------|
@@ -133,7 +133,7 @@ The database boundary is confined to twelve files:
 | `server/services/snapshot_service.py` | State serializers + `save_cycle_snapshot` |
 | `server/services/metadata_service.py` | DB → `MetadataProvider` |
 | `server/models/{run,metadata}.py` | ORM definitions |
-| `server/api/{runs,admin,memory,docs,controls}.py` | 75 endpoints taking `Depends(get_session)` |
+| `server/api/{runs,admin,memory,docs,controls}.py` | 83 endpoints taking `Depends(get_session)` |
 
 `server/api/ws.py` takes **no session at all**, and `controls.py` takes one only for
 `POST /spreading-threshold` — a deliberate choice, since the threshold changes what

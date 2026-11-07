@@ -29,13 +29,21 @@ GROUPS: list[tuple[str, str, str]] = [
         "Metacat Mode: creating, driving and reading a run. On `POST /api/runs`, `mode` is the "
         "persistence mode (Fast, Normal or Audit: how the run is recorded), a v1.2 name that "
         "stays as it is, and `workers` is the run mode (1 is single-threaded, more is the exact "
-        "speculative executor).",
+        "speculative executor). **Input.** The fields are read left to right as one line, "
+        "`initial modified target [answer] [seed]`, through a port of Metacat's own input parser "
+        "(uppercase is lowered, punctuation separates strings, a digit inside a string or a letter "
+        "outside a to z is invalid); the run holds the strings it read, and the response shows them. "
+        "Input it cannot read is a 400 whose detail is exactly `Invalid input!`, with nothing "
+        "created. `seed` is optional: a whole number from 1 to the configuration's `largest_seed`, "
+        "and none picks a random seed that the response states.",
     ),
     (
         "/api/swarm",
         "Swarm",
         "Metacat Mode, multi-core across runs: one problem over many seeds on every core, giving the "
-        "answer distribution, plus pool status (a detachable plugin; 503 when absent).",
+        "answer distribution, plus pool status (a detachable plugin; 503 when absent). The problem is "
+        "read through Metacat's input parser as for a run (a 400 `Invalid input!` otherwise), and "
+        "every seed must be a whole number from 1 to `largest_seed`.",
     ),
     (
         "/api/training-mode/sessions",
@@ -95,7 +103,7 @@ GROUPS: list[tuple[str, str, str]] = [
         "node is added to it, or removed from it only when no rule still triggers the node. A "
         "configuration that declares no such parameter leaves every parameter alone.",
     ),
-    ("/api/admin", "Configuration", "Metacat Mode: the editable copy of the seed data (the global configuration). A Training Mode Session copies it when created and never changes it."),
+    ("/api/admin", "Configuration", "Metacat Mode: the editable copy of the seed data (the global configuration). A Training Mode Session copies it when created and never changes it. Demo problems are read through Metacat's input parser like a run (a 400 `Invalid input!` otherwise) and store what it read, with a random seed when none is given; `input-character-ranges` and `input-lowering-ranges` are the parser's rules."),
     ("/api/docs", "Help", "In-app help topics, the glossary and search."),
     ("/api/system", "System", "What the process resolved at startup."),
 ]

@@ -449,6 +449,9 @@ _READ_BY_ANOTHER_LAYER = {
     # The one default run length of bulk work (the Swarm, a Training Mode Session's creation and
     # both client forms); a single run has no limit.
     "default_max_codelets",
+    # The largest seed Metacat's input parser accepts (``services/input_parser.py``): read at Metacat
+    # Mode's doors only, never by a run or a Training Mode Session.
+    "largest_seed",
 }
 
 def test_every_engine_parameter_is_classified():

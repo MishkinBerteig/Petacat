@@ -246,7 +246,7 @@ async def test_the_five_codelet_patterns_are_listed(app_client):
     """`gui.ss:599-603` names five, and each says which codelet types it pins."""
     run = await app_client.post(
         "/api/runs",
-        json={"initial": "abc", "modified": "abd", "target": "xyz", "seed": 0},
+        json={"initial": "abc", "modified": "abd", "target": "xyz", "seed": 1},
     )
     run_id = run.json()["run_id"]
 
@@ -267,7 +267,7 @@ async def test_a_codelet_pattern_clamps_and_releases_every_entry(app_client):
     """`trace.ss:1583-1593` clamps and unclamps the whole pattern."""
     run = await app_client.post(
         "/api/runs",
-        json={"initial": "abc", "modified": "abd", "target": "xyz", "seed": 0},
+        json={"initial": "abc", "modified": "abd", "target": "xyz", "seed": 1},
     )
     run_id = run.json()["run_id"]
 
@@ -299,7 +299,7 @@ async def test_a_codelet_pattern_clamps_and_releases_every_entry(app_client):
 async def test_an_unknown_codelet_pattern_is_answered_with_the_ones_that_exist(app_client):
     run = await app_client.post(
         "/api/runs",
-        json={"initial": "abc", "modified": "abd", "target": "xyz", "seed": 0},
+        json={"initial": "abc", "modified": "abd", "target": "xyz", "seed": 1},
     )
     run_id = run.json()["run_id"]
 
@@ -316,7 +316,7 @@ async def test_clamped_themes_can_be_released(app_client):
     """`DELETE /clamp-themes` puts the Themespace back to building on evidence alone."""
     run = await app_client.post(
         "/api/runs",
-        json={"initial": "abc", "modified": "abd", "target": "xyz", "seed": 0},
+        json={"initial": "abc", "modified": "abd", "target": "xyz", "seed": 1},
     )
     run_id = run.json()["run_id"]
     await app_client.post(f"/api/runs/{run_id}/run", json={"max_steps": 400})
@@ -375,7 +375,7 @@ PATTERN = {
 async def _new_run(app_client) -> int:
     run = await app_client.post(
         "/api/runs",
-        json={"initial": "abc", "modified": "abd", "target": "xyz", "seed": 0},
+        json={"initial": "abc", "modified": "abd", "target": "xyz", "seed": 1},
     )
     run_id = run.json()["run_id"]
     await app_client.post(f"/api/runs/{run_id}/step", json={"count": 30})

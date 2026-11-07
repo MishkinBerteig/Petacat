@@ -56,6 +56,8 @@ const SPECS: Record<string, Spec> = {
   '/admin/posting-rules': { table: 'posting_rules', surrogate: true },
   '/admin/initial-description-rules': { table: 'initial_description_rules', surrogate: true },
   '/admin/initial-activation-rules': { table: 'initial_activation_rules', surrogate: true },
+  '/admin/input-character-ranges': { table: 'input_character_ranges', surrogate: true },
+  '/admin/input-lowering-ranges': { table: 'input_lowering_ranges', surrogate: true },
   '/admin/commentary-templates': { table: 'commentary_templates', surrogate: true },
   '/admin/slipnet-layout': { table: 'slipnet_layout' },
 }

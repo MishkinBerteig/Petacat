@@ -7,6 +7,7 @@ import { ParamsEditor } from './ParamsEditor'
 import { DemoEditor } from './DemoEditor'
 import { EnumEditor } from './EnumEditor'
 import { InitialProgramEditor } from './InitialProgramEditor'
+import { InputParserEditor } from './InputParserEditor'
 import { ThemeDimensionEditor } from './ThemeDimensionEditor'
 import { PostingRuleEditor } from './PostingRuleEditor'
 import { CommentaryTemplateEditor } from './CommentaryTemplateEditor'
@@ -38,6 +39,7 @@ const TABS = [
   { key: 'theme-dims', label: 'Theme Dimensions' },
   { key: 'posting', label: 'Posting Rules' },
   { key: 'initial-program', label: 'Initial Descriptions' },
+  { key: 'input-parser', label: 'Input Parser' },
   { key: 'commentary', label: 'Commentary Templates' },
   { key: 'layout', label: 'Slipnet Layout' },
   { key: 'help', label: 'Help Topics' },
@@ -49,7 +51,7 @@ const TABS = [
 const MANAGER_TABS: readonly string[] = ['configurations']
 
 /** The tabs that belong to the global configuration only: the engine's vocabulary and content. */
-const GLOBAL_ONLY_TABS: readonly string[] = ['enums', 'help']
+const GLOBAL_ONLY_TABS: readonly string[] = ['enums', 'help', 'input-parser']
 
 type TabKey = typeof TABS[number]['key']
 
@@ -271,6 +273,8 @@ export function AdminLayout({ editNodeName, onClearEditNode }: AdminLayoutProps)
             <div role="status" data-testid="global-only">
               {activeTab === 'enums'
                 ? "The enum tables are the engine's vocabulary, and only the global configuration (Metacat Mode) has them."
+                : activeTab === 'input-parser'
+                ? "Metacat's input parser belongs to Metacat Mode, so only the global configuration shows it. A Training Mode Session takes any UTF-8 text as given and does not read it."
                 : 'Help topics are content shared by every mode, not part of a configuration. Open the global configuration to edit them.'}
             </div>
           ) : (
@@ -293,6 +297,7 @@ export function AdminLayout({ editNodeName, onClearEditNode }: AdminLayoutProps)
               {activeTab === 'theme-dims' && <ThemeDimensionEditor configuration={openId} />}
               {activeTab === 'posting' && <PostingRuleEditor configuration={openId} />}
               {activeTab === 'initial-program' && <InitialProgramEditor configuration={openId} />}
+              {activeTab === 'input-parser' && <InputParserEditor configuration={openId} />}
               {activeTab === 'commentary' && <CommentaryTemplateEditor configuration={openId} />}
               {activeTab === 'layout' && <SlipnetLayoutEditor configuration={openId} />}
               {activeTab === 'help' && <HelpTopicEditor />}

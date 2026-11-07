@@ -81,6 +81,3 @@ rows are Metacat's own behaviour, and the patch leaves them alone.
   Metacat Standard Configuration.
 - **Training Mode** does not use it. A Training Mode Session takes any UTF-8 text exactly as given,
   because perceiving new kinds of input is what Training Mode is for.
-
-The patch and Metacat Mode's parser were being built when this document was written. Until both land,
-[`HELP.md`](HELP.md) describes what the program does today.

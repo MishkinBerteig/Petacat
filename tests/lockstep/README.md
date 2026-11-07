@@ -371,6 +371,20 @@ spreading-activation threshold control.
 a clamp event's number is the run's and not the process's). `scripts/compare_episode_answers.py` had
 stopped working at `d4b4cd2` (`explain_answer` now needs the run's `meta`) and was repaired.
 
+## Metacat's input parser
+
+Metacat Mode reads every problem through a port of Metacat's input parser
+(`server/services/input_parser.py`; the fields are read as one line, `initial modified target [answer]
+[seed]`). `tests/lockstep/metacat/record_parser.py` runs the real `tokenize-string`, `char-noise?` and
+`valid-token-list?` of the patched Metacat under its Chez Scheme and writes
+`tests/lockstep/data/parser_metacat.json.gz` (its format is at the top of the script).
+`tests/lockstep/test_input_parser.py` compares the port with that recording on every Unicode scalar
+value (lowering, `char-alphabetic?`, `char-numeric?`), on the three one-character lines for every scalar
+value, and on about 200 whole lines; any difference is a defect. The replay harness and the recorders
+call the engine directly, as `init-mcat` does, so neither goes through the parser. The port's rules
+are configuration (`seed_data/input_parser.json`, generated from the same recording by
+`scripts/generate_input_parser_seed.py`); see `seed_data/README.md`, "The input parser".
+
 ## Rule English and event names
 
 Two text checks that are not part of the decision-trace comparison: the English of every rule

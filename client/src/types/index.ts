@@ -22,7 +22,11 @@ export interface RunParams {
   modified: string;
   target: string;
   answer?: string;
-  seed: number;
+  /**
+   * A whole number from 1 to the configuration's largest seed. Left out, the server picks
+   * a random one and states it in the response (Metacat's parser).
+   */
+  seed?: number;
   /** Set at creation so the engine is initialised with it. Defaults to 100. */
   spreading_threshold?: number;
   /** Persistence mode. Omitted means the server default, `normal`. */
@@ -159,6 +163,8 @@ export interface RunInfo {
   modified: string;
   target: string;
   answer: string | null;
+  /** The seed the run uses; a request that gave none got a random one, stated here. */
+  seed?: number | null;
   /**
    * The answer was supplied for the engine to justify rather than discovered by
    * it. Both arrive in `answer`, so a display needs this to avoid reporting a

@@ -23,7 +23,7 @@ resolve and apply a batch of 8 ops or fewer              <= 0.5 ms
 hash per version (per-field digests, previous cached)    <= 2 ms
 worker compose on a version change                       <= 1 ms
 per-task overhead from the configuration                 <= 0.1 ms
-a task's configuration bytes (the snapshot)              <= 150 KB
+a task's configuration bytes (the snapshot)              <= 170 KB
 journal growth per non-empty entry, code-free            <= 4 KB
 =======================================================  =================
 
@@ -60,7 +60,10 @@ BATCH_MS = 0.5
 HASH_MS = 2.0
 COMPOSE_MS = 1.0
 TASK_MS = 0.1
-SNAPSHOT_KB = 150
+# 150 KB until Round 2 stage Q, which put Metacat's input parser in the Metacat Standard Configuration
+# (869 character and lowering ranges, about 17 KB pickled, shipped with the rest of the provider although a
+# Training Mode Session never reads them).  The task measured 149.2 KB before and 166.9 KB after.
+SNAPSHOT_KB = 170
 
 CONFIGURATION_ID = 7
 

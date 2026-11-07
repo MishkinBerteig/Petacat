@@ -96,7 +96,8 @@ export function RunControlsPanel() {
       modified: formInputs.modified,
       target: formInputs.target,
       answer: formInputs.answer || undefined,
-      seed: formInputs.seed ? parseInt(formInputs.seed, 10) : 0,
+      // Blank means no seed given: the server picks a random one and the form then shows it.
+      seed: formInputs.seed.trim() ? Number(formInputs.seed) : undefined,
     }),
     [formInputs],
   );

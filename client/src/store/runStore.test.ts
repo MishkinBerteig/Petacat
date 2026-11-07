@@ -731,4 +731,25 @@ describe('runStore — clearing Episodic Memory', () => {
     // still the full one.
     expect(store.getState().epoch).toBe(0)
   })
+
+  it('holds what the server read, not what was typed, and the seed it picked', async () => {
+    // Metacat's input parser lowers case, splits on punctuation and picks a random seed when none
+    // was given; the store keeps and shows the result, so the next press of Run compares with it.
+    createRun.mockResolvedValueOnce({
+      run_id: 5, status: 'initialized', codelet_count: 0, temperature: 100,
+      initial: 'abc', modified: 'abd', target: 'x', answer: 'z', seed: 424242, justify_mode: true,
+    })
+    const useRunStore = await freshStore()
+
+    await useRunStore.getState().createRun({ initial: 'ABC', modified: 'abd', target: 'x-z' })
+
+    const state = useRunStore.getState()
+    expect(createRun.mock.calls[createRun.mock.calls.length - 1][0]).not.toHaveProperty('seed')
+    expect(state.runParams).toMatchObject({
+      initial: 'abc', modified: 'abd', target: 'x', answer: 'z', seed: 424242,
+    })
+    expect(state.formInputs).toMatchObject({
+      initial: 'abc', target: 'x', answer: 'z', seed: '424242',
+    })
+  })
 })

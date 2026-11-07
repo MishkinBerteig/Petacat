@@ -44,7 +44,7 @@ from server.engine.commentary import CommentaryLog
 from server.engine.hashing import config_hash, memory_hash
 from server.engine.parameters import resolved_parameters, validate_overrides
 from server.services.sinks import MODE_AUDIT, MODE_FAST, MODE_NORMAL, sink_for_mode
-from server.services.problem_text import check_problem
+from server.services.input_parser import read_problem
 
 # The multi-core subsystem is a plugin (``server/parallel/``): reached through
 # ``load()`` so that a checkout without it still serves every serial Run.
@@ -185,6 +185,10 @@ class RunInfo:
     #: neither the row nor a live runner says, as for rows written before it was
     #: recorded.
     workers: int | None = None
+    #: The seed the run used.  A request that gave none gets a random one at the door
+    #: (``input_parser.py``), so this is how the person learns it.  None where the caller
+    #: built the info from a live runner and the run row was not read.
+    seed: int | None = None
 
 
 @dataclass
@@ -217,6 +221,8 @@ class RunService:
         #: Worker count per live run.  1 is the serial loop — the permanent reference
         #: mode — and is the default, so nothing changes unless a run asks for it.
         self._workers: dict[int, int] = {}
+        #: The seed each live run was created with (a request that gave none got a random one).
+        self._seeds: dict[int, int] = {}
         #: Last parallel telemetry per run — the speculative executor's counters plus
         #: ``executor`` — worker count, aborts, barriers, time split.
         self._parallel_telemetry: dict[int, dict] = {}
@@ -293,7 +299,7 @@ class RunService:
         modified: str,
         target: str,
         answer: str | None = None,
-        seed: int = 0,
+        seed: int | None = None,
         spreading_threshold: int | None = None,
         mode: str = MODE_NORMAL,
         workers: int = 1,
@@ -320,13 +326,17 @@ class RunService:
         reconstruction replays the faithful loop's action log forward, which a
         stream-mode run is not.
         """
-        # Any Unicode text is a valid problem string; only U+0000 and a lone surrogate are
-        # refused, and initial, modified and target must be non-empty and an answer null or non-empty
-        # (a ProblemTextError, a ValueError the API turns into an error).
-        check_problem(initial, modified, target, answer, require_nonempty=True)
+        # Metacat Mode's door: the fields are read as one line through Metacat's input parser
+        # (``input_parser.py``), so the run holds the strings the parser read, not the text as
+        # typed.  A line it cannot read is refused with ``Invalid input!`` (a ValueError the API
+        # turns into a 400), and no seed picks a random one that the run records.  A Training Mode
+        # Session never comes through here.
+        base_meta = self.meta  # read once: this Run holds it for life
+        problem = read_problem(base_meta, initial, modified, target, answer, seed)
+        initial, modified, target = problem.initial, problem.modified, problem.target
+        answer, seed = problem.answer, problem.seed
         # Validated before anything is created, so a bad override cannot leave a
         # half-built Run behind. Raises ValueError, which the API turns into a 400.
-        base_meta = self.meta  # read once: this Run holds it for life
         overrides = validate_overrides(parameters, base_meta)
         # Read in the same breath (no await between): the revision names the configuration
         # ``base_meta`` is, so the journal can reconstruct it for a replay.
@@ -413,6 +423,7 @@ class RunService:
         self._runners[run.id] = runner
         self._modes[run.id] = mode
         self._workers[run.id] = workers
+        self._seeds[run.id] = seed
 
         await session.commit()
 
@@ -429,6 +440,7 @@ class RunService:
             spreading_threshold=threshold,
             mode=mode,
             workers=workers,
+            seed=seed,
         )
 
     def _create_fast_run(
@@ -472,6 +484,7 @@ class RunService:
         self._sinks[run_id] = sink
         self._modes[run_id] = MODE_FAST
         self._workers[run_id] = workers
+        self._seeds[run_id] = seed
 
         return RunInfo(
             run_id=run_id,
@@ -486,6 +499,7 @@ class RunService:
             spreading_threshold=threshold,
             mode=MODE_FAST,
             workers=workers,
+            seed=seed,
         )
 
     def _is_fast(self, run_id: int) -> bool:
@@ -611,6 +625,7 @@ class RunService:
                 spreading_threshold=runner.ctx.spreading_activation_threshold,
                 mode=MODE_FAST,
                 workers=self._workers.get(run_id),
+                seed=self._seeds.get(run_id),
             )
 
         result = await session.execute(select(Run).where(Run.id == run_id))
@@ -639,6 +654,7 @@ class RunService:
                     run.workers if run.workers is not None
                     else self._workers.get(run_id)
                 ),
+                seed=run.seed,
             )
 
         return RunInfo(
@@ -654,6 +670,7 @@ class RunService:
             spreading_threshold=int(run.spreading_threshold),
             mode=run.mode or MODE_NORMAL,
             workers=run.workers,
+            seed=run.seed,
         )
 
     def get_runner(self, run_id: int) -> EngineRunner | None:
@@ -812,6 +829,7 @@ class RunService:
             run_id=run_id,
             mode=self._modes.get(run_id, MODE_NORMAL),
             workers=self._workers.get(run_id),
+            seed=self._seeds.get(run_id),
             status=status_str,
             codelet_count=runner.ctx.codelet_count,
             temperature=runner.ctx.temperature.value,
@@ -906,6 +924,7 @@ class RunService:
                 spreading_threshold=runner.ctx.spreading_activation_threshold,
                 mode=MODE_FAST,
                 workers=self._workers.get(run_id),
+                seed=self._seeds.get(run_id),
             )
 
         await self._flush_sink(session, run_id)
@@ -930,6 +949,7 @@ class RunService:
             run_id=run_id,
             mode=self._modes.get(run_id, MODE_NORMAL),
             workers=self._workers.get(run_id),
+            seed=self._seeds.get(run_id),
             status=status_str,
             codelet_count=runner.ctx.codelet_count,
             temperature=runner.ctx.temperature.value,
@@ -1047,6 +1067,7 @@ class RunService:
             ),
             mode=self._modes.get(run_id, MODE_NORMAL),
             workers=self._workers.get(run_id),
+            seed=self._seeds.get(run_id),
         )
 
     async def delete_run(self, session: AsyncSession, run_id: int) -> None:
@@ -1067,6 +1088,7 @@ class RunService:
             self._sinks.pop(run_id, None)
             self._modes.pop(run_id, None)
             self._workers.pop(run_id, None)
+            self._seeds.pop(run_id, None)
             self._parallel_telemetry.pop(run_id, None)
             return
 

@@ -26,10 +26,12 @@ from collections import Counter
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field
 
 from server.api.runs import get_run_service
-from server.services.problem_text import check_problem
+from server.services.input_parser import (
+    InvalidInput, ParserConfigurationError, check_seeds, read_fields, rules_from,
+)
 from server.engine import hardware
 from server.engine.numeric import available_backends
 from server.engine.parameters import UnknownParameter, validate_overrides
@@ -79,15 +81,6 @@ class SwarmRequest(BaseModel):
     backend: str | None = None
     #: Return one entry per run.  Off gives the distribution and telemetry only.
     include_runs: bool = True
-
-    @model_validator(mode="after")
-    def _problem_text(self) -> "SwarmRequest":
-        # Any Unicode text is a valid problem string; only U+0000 and a lone surrogate are
-        # refused, because they cannot be stored; initial, modified and target must be non-empty and
-        # an answer is null or non-empty (an empty one crashes the engine).  See ``server.services.problem_text``.
-        check_problem(self.initial, self.modified, self.target, self.answer, require_nonempty=True)
-        return self
-
 
 
 class SwarmRunOutcome(BaseModel):
@@ -203,6 +196,18 @@ async def run_swarm(req: SwarmRequest) -> SwarmResponse:
     seeds = _seeds(req)
     # The run service's current metadata: what a Run created now would execute under.
     meta = get_run_service().meta
+    # Metacat Mode's door: the fields are read as one line through Metacat's input parser
+    # (``input_parser.py``) and every seed must be one the parser accepts.  The seeds come
+    # from ``seeds`` or ``count``, so a seed on the line itself is refused.  The runs hold the
+    # strings the parser read.  A Training Mode Session never comes through here.
+    try:
+        rules = rules_from(meta)
+        problem = read_fields(
+            rules, req.initial, req.modified, req.target, req.answer, seed_allowed=False,
+        )
+        check_seeds(rules, seeds)
+    except (InvalidInput, ParserConfigurationError) as exc:
+        raise HTTPException(400, str(exc)) from None
     try:
         overrides = validate_overrides(req.parameters, meta)
     except (UnknownParameter, ValueError) as exc:
@@ -219,7 +224,7 @@ async def run_swarm(req: SwarmRequest) -> SwarmResponse:
     swarm = swarm_module.default_swarm()
     tasks = [
         swarm_module.RunTask(
-            req.initial, req.modified, req.target, req.answer, seed, max_steps,
+            problem.initial, problem.modified, problem.target, problem.answer, seed, max_steps,
             parameters=overrides or None, backend=backend,
         )
         for seed in seeds

@@ -28,7 +28,8 @@ function merged(rows: DemoProblem[], id: number, patch: Partial<DemoProblem>) {
     modified: take('modified') ?? '',
     target: take('target') ?? '',
     answer: take('answer') || null,
-    seed: Number(take('seed') ?? 0),
+    // Blank is no seed given: the server picks a random one and stores it (Metacat's parser).
+    seed: take('seed') ? Number(take('seed')) : null,
     description: take('description') ?? '',
   }
 }

@@ -118,5 +118,6 @@
   "commentary_progress_little_below": 50,
   "commentary_progress_some_below": 80,
   "commentary_reminding_strong_above": 70,
-  "commentary_reminding_some_above": 30
+  "commentary_reminding_some_above": 30,
+  "largest_seed": 4294967295
 }

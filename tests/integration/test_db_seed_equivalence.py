@@ -365,6 +365,15 @@ def _expected_tables() -> dict[str, list[dict]]:
          "condition": r["condition"]}
         for i, r in enumerate(program["activation_rules"], start=1)
     ]
+    parser = _file("input_parser.json")
+    out["input_character_ranges"] = [
+        {"id": i, "kind": r["kind"], "first": r["first"], "last": r["last"]}
+        for i, r in enumerate(parser["character_ranges"], start=1)
+    ]
+    out["input_lowering_ranges"] = [
+        {"id": i, "first": r["first"], "last": r["last"], "step": r["step"], "delta": r["delta"]}
+        for i, r in enumerate(parser["lowering_ranges"], start=1)
+    ]
     out["slipnet_layout"] = sorted(
         (
             {"node_name": n, "grid_row": p[0], "grid_col": p[1], "sort_order": i}

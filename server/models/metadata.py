@@ -558,6 +558,43 @@ class InitialActivationRule(Base):
     condition = Column(Text, nullable=False)
 
 
+class InputCharacterRange(Base):
+    """A run of characters of one kind, for Metacat Mode's input parser (``input_parser.py``).
+
+    ``kind`` is ``alphabetic`` (Scheme's ``char-alphabetic?``) or ``numeric`` (``char-numeric?``);
+    the characters ``first`` to ``last`` (Unicode scalar values, inclusive) are of that kind.
+    A character in no row of either kind is a separator.  A character may be in both kinds.
+    Generated from Metacat's own Chez Scheme by ``scripts/generate_input_parser_seed.py``, so
+    a Python upgrade cannot change what Metacat Mode perceives.  A Training Mode Session never
+    reads these rows.
+    """
+
+    __tablename__ = "input_character_ranges"
+    __table_args__ = (UniqueConstraint("kind", "first", name="uq_input_character_range"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    kind = Column(Text, nullable=False)
+    first = Column(Integer, nullable=False)
+    last = Column(Integer, nullable=False)
+
+
+class InputLoweringRange(Base):
+    """How Metacat Mode's input parser lowers characters (Scheme's ``char-downcase``).
+
+    The characters ``first``, ``first + step``, ... up to ``last`` are each replaced by the
+    character ``delta`` further on.  A character in no row is its own lowered form.  Generated
+    with ``input_character_ranges``.  A Training Mode Session never reads these rows.
+    """
+
+    __tablename__ = "input_lowering_ranges"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    first = Column(Integer, nullable=False, unique=True)
+    last = Column(Integer, nullable=False)
+    step = Column(Integer, nullable=False, default=1)
+    delta = Column(Integer, nullable=False)
+
+
 class SlipnetLayoutPos(Base):
     """Grid position for slipnet visualization."""
 

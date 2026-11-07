@@ -24,6 +24,8 @@ from server.engine.metadata import (
     CodeletSpec,
     DemoProblem,
     InitialActivationRuleSpec,
+    InputCharacterRangeSpec,
+    InputLoweringRangeSpec,
     InitialDescriptionRuleSpec,
     LinkTypeSpec,
     MetadataProvider,
@@ -54,6 +56,8 @@ from server.models.metadata import (
     FailureKindDef,
     FormulaCoefficient,
     InitialActivationRule,
+    InputCharacterRange,
+    InputLoweringRange,
     InitialDescriptionRule,
     LinkTypeDef,
     ParamValueTypeDef,
@@ -118,6 +122,8 @@ PROVIDER_FIELD_TABLES: dict[str, tuple[str, ...]] = {
     "codelet_roles": ("codelet_type_roles",),
     "initial_description_rules": ("initial_description_rules",),
     "initial_activation_rules": ("initial_activation_rules",),
+    "input_character_ranges": ("input_character_ranges",),
+    "input_lowering_ranges": ("input_lowering_ranges",),
     "theme_relations": ("theme_relations",),
     "vocabulary_bindings": tuple(ROLE_COLUMN),
     "string_kinds": ("string_kinds",),
@@ -346,6 +352,20 @@ def _field_initial_activation_rules(tables: Mapping[str, Any]) -> tuple[InitialA
     )
 
 
+def _field_input_character_ranges(tables: Mapping[str, Any]) -> tuple[InputCharacterRangeSpec, ...]:
+    return tuple(
+        (r["kind"], r["first"], r["last"])
+        for r in _rows(tables["input_character_ranges"])
+    )
+
+
+def _field_input_lowering_ranges(tables: Mapping[str, Any]) -> tuple[InputLoweringRangeSpec, ...]:
+    return tuple(
+        (r["first"], r["last"], r["step"], r["delta"])
+        for r in _rows(tables["input_lowering_ranges"])
+    )
+
+
 def _field_theme_relations(tables: Mapping[str, Any]) -> tuple[ThemeRelationSpec, ...]:
     return tuple(
         ThemeRelationSpec(
@@ -442,6 +462,8 @@ _FIELD_BUILDERS = {
     "codelet_roles": _field_codelet_roles,
     "initial_description_rules": _field_initial_description_rules,
     "initial_activation_rules": _field_initial_activation_rules,
+    "input_character_ranges": _field_input_character_ranges,
+    "input_lowering_ranges": _field_input_lowering_ranges,
     "theme_relations": _field_theme_relations,
     "vocabulary_bindings": _field_vocabulary_bindings,
     "string_kinds": _field_string_kinds,
@@ -507,6 +529,8 @@ async def load_rows_from_db(session: AsyncSession) -> dict[str, list[dict[str, A
         "theme_relations": ThemeRelation,
         "initial_description_rules": InitialDescriptionRule,
         "initial_activation_rules": InitialActivationRule,
+        "input_character_ranges": InputCharacterRange,
+        "input_lowering_ranges": InputLoweringRange,
         **ENUM_TABLE_MODELS,
     }
     queries = {

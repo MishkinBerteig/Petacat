@@ -149,6 +149,19 @@ describe('ProblemInputPanel — problem identity lives here', () => {
     expect((screen.getByLabelText(/seed/i) as HTMLInputElement).value).toBe('7')
   })
 
+  it('says a blank seed is a random one and that 0 is invalid, holding no copy of the rules', () => {
+    setup({
+      runId: null,
+      formInputs: { initial: 'abc', modified: 'abd', target: 'xyz', answer: '', seed: '' },
+      reset,
+    })
+
+    render(<ProblemInputPanel />)
+    expect((screen.getByLabelText(/seed/i) as HTMLInputElement).placeholder).toBe('random')
+    expect(screen.getByText(/Blank = a random seed/)).toBeTruthy()
+    expect(screen.queryByText(/seed 0/)).toBeNull()
+  })
+
   it('does not overwrite typed input when the workspace refreshes mid-run', () => {
     // The form adopts a run's problem once, keyed on run id. A later workspace
     // refresh for the *same* run must not stamp the old strings back over an

@@ -1,10 +1,17 @@
-"""The one check every problem string passes: initial, modified, target and answer.
+"""The problem-string check of Training Mode: any UTF-8 text, kept exactly.
 
-Any Unicode text is a valid problem string, in Metacat Mode and in Training Mode alike:
-any script, emoji and combining sequences, spaces, tabs, line breaks, punctuation, any
-case, any length.  A string is stored and returned exactly as given: no trimming, no case
-change and no Unicode normalisation, so the NFC and NFD spellings of one letter are two
-different strings (duplicates are exact string matches only).
+**Training Mode only.**  A Training Mode Session takes any Unicode text as a problem string: any
+script, emoji and combining sequences, spaces, tabs, line breaks, punctuation, any case, any length.  A
+string is stored and returned exactly as given: no trimming, no case change and no Unicode
+normalisation, so the NFC and NFD spellings of one letter are two different strings (duplicates are
+exact string matches only).  Perceiving new kinds of input is what Training Mode is for.
+
+Metacat Mode does not use this check for its problems.  Its three doors (``RunService.create_run``,
+``POST /api/swarm`` and the Admin view's Demo Problems) read every problem through a port of Metacat's own
+input parser (``server/services/input_parser.py``), whose rules are in the Metacat Standard
+Configuration: uppercase is lowered, punctuation separates strings, and a digit inside a string or a
+letter outside a to z is ``Invalid input!``.  ``check_string`` and ``check_deep`` are still used for
+configuration and journal text in both modes, because they refuse only what the database cannot store.
 
 This check refuses only what cannot be text in the database:
 
@@ -12,9 +19,9 @@ This check refuses only what cannot be text in the database:
 * a string that is not valid Unicode (a lone surrogate, such as JSON ``"\\ud800"``), which
   cannot be encoded as UTF-8.
 
-Structure is separate and the same in both modes: ``initial``, ``modified`` and ``target`` must be
-non-empty and ``answer`` absent (discovery) or non-empty, because an empty string crashes or hangs the
-engine; every request model and ``RunService.create_run`` pass ``require_nonempty=True`` for that.
+Structure is separate: ``initial``, ``modified`` and ``target`` must be non-empty and ``answer`` absent
+(discovery) or non-empty, because an empty string crashes or hangs the engine; the Training Mode
+Session request model and ``training_mode_session_service`` pass ``require_nonempty=True`` for that.
 """
 
 from __future__ import annotations

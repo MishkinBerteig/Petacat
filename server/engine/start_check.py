@@ -129,6 +129,7 @@ OPTIONAL_ENGINE_PARAMETERS: tuple[tuple[str, str], ...] = (
     ("clampable_codelet_patterns", "codelet_patterns.py: no menu"),
     ("theme_dimension_labels", "serialization.py: the node's short name"),
     ("theme_relation_labels", "serialization.py: no relation labels"),
+    ("largest_seed", "services/input_parser.py: Metacat Mode's doors only; absent, the request stops with an error (a Training Mode Session never reads it)"),
 )
 
 #: Formula coefficients read by ``meta.get_formula_coeff`` with a literal name, and where.

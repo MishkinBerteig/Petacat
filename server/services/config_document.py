@@ -619,6 +619,15 @@ def rows_from_standard_files(seed_dir: str) -> dict[str, list[dict[str, Any]]]:
         }
         for r in program.get("activation_rules", [])
     ]
+    parser = load("input_parser.json")
+    rows["input_character_ranges"] = [
+        {"kind": r["kind"], "first": r["first"], "last": r["last"]}
+        for r in parser["character_ranges"]
+    ]
+    rows["input_lowering_ranges"] = [
+        {"first": r["first"], "last": r["last"], "step": r["step"], "delta": r["delta"]}
+        for r in parser["lowering_ranges"]
+    ]
     rows["theme_relations"] = [
         {
             "name": r["name"],
