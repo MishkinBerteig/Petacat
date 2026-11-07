@@ -121,13 +121,24 @@ def episode_clears(first: Path) -> tuple[int, ...]:
     return tuple(clears)
 
 
+def answer_key(a) -> str:
+    return "%s|%s" % (a.problem[3], "/".join(a.top_rule_description.split("\n")))
+
+
+def ans_line(a, memory) -> str:
+    """The ``ANS`` line for one answer: its key and the snag explanation the memory holds for it
+    (``get-snag-explanation``, ``answers.ss:302-307``).  A function of its own so a test can call it."""
+    from server.engine.answer_comparison import snag_explanation_for
+
+    return "ANS\t%s\t%s" % (answer_key(a), snag_explanation_for(a, memory))
+
+
 def petacat_answer_lines(first_trace: Path) -> list[str]:
     """Replay the episode whose first run is ``first_trace``; return ``record_answers.py``-style
     END/ANS/EXPL/CMP lines for the memory it leaves."""
     from server.engine.answer_comparison import (
         compare_answers_text,
         explain_answer,
-        snag_explanation_for,
     )
     from server.engine.memory import EpisodicMemory
     from server.engine.metadata import MetadataProvider
@@ -149,11 +160,10 @@ def petacat_answer_lines(first_trace: Path) -> list[str]:
     provider = MetadataProvider.from_standard_configuration(str(Path(__file__).resolve().parent.parent / "seed_data"))
     templates = provider.commentary_templates
 
-    def key(a):
-        return "%s|%s" % (a.problem[3], "/".join(a.top_rule_description.split("\n")))
+    key = answer_key
 
     for a in memory.answers:
-        lines.append("ANS\t%s\t%s" % (key(a), snag_explanation_for(a, memory, templates)))
+        lines.append(ans_line(a, memory))
         e = explain_answer(a, memory, templates, meta=provider)
         lines.append("EXPL\t%s\t%s\t%s" % (key(a), e["eliza_text"], e["technical_text"]))
     for a in memory.answers:

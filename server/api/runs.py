@@ -334,15 +334,15 @@ async def list_runs(
     # Mode and the two hashes come from a second query rather than from ``RunInfo``,
     # which does not carry them.  One statement over the ids just returned, so the
     # cost is a single round trip regardless of the page size.
-    identity: dict[int, tuple[str, str | None, str | None]] = {}
+    identity: dict[int, tuple[str, str | None, str | None, int | None]] = {}
     if runs:
         rows = await session.execute(
-            select(Run.id, Run.mode, Run.config_hash, Run.memory_hash).where(
+            select(Run.id, Run.mode, Run.config_hash, Run.memory_hash, Run.seed).where(
                 Run.id.in_([r.run_id for r in runs])
             )
         )
         identity = {
-            row.id: (row.mode or "normal", row.config_hash, row.memory_hash)
+            row.id: (row.mode or "normal", row.config_hash, row.memory_hash, row.seed)
             for row in rows
         }
 
@@ -350,7 +350,7 @@ async def list_runs(
     for r in runs:
         # A run listed but absent from the identity query predates the mode column,
         # and "normal" is what it was: the column's server default backfills it.
-        mode, config, memory = identity.get(r.run_id, ("normal", None, None))
+        mode, config, memory, seed = identity.get(r.run_id, ("normal", None, None, None))
         items.append(
             RunListItem(
                 run_id=r.run_id,
@@ -365,6 +365,7 @@ async def list_runs(
                 spreading_threshold=r.spreading_threshold,
                 mode=mode,
                 workers=r.workers,
+                seed=seed,
                 config_hash=config,
                 memory_hash=memory,
             )

@@ -151,8 +151,8 @@ outside the matrix take it too and the run is entirely what it says it is.
   architecture   106 collected    106 run    106 passed      0 failed      0 skipped  complete
   integration    366 collected    366 run    366 passed      0 failed      0 skipped  complete
   parallel       304 collected    304 run    304 passed      0 failed      0 skipped  complete
-  lockstep       265 collected    265 run    265 passed      0 failed      0 skipped  complete
-  e2e            689 collected    689 run    689 passed      0 failed      0 skipped  complete
+  lockstep       266 collected    266 run    266 passed      0 failed      0 skipped  complete
+  e2e            690 collected    690 run    690 passed      0 failed      0 skipped  complete
 
   run complete in 13.9 min against a 60 min ceiling
 ```
@@ -230,8 +230,8 @@ that allowance.
 | **architecture** | `tests/architecture/` | How the source tree is allowed to depend on itself | The repository's source, `seed_data/*.json`, child interpreters | 106 |
 | **integration** | `tests/integration/` | Agreement between the repository's artifacts, and the harness's own rules | Real `seed_data/*.json`, the ORM declarations, the generated client files, the documentation, a real pytest session | 366 |
 | **parallel** | `tests/parallel/` | The detachable multi-core plugin (`server/parallel/`): each executor against the serial run it claims to equal | Real engine objects and `seed_data/*.json`, worker processes and threads; each test pins the backend it compares on | 304 |
-| **lockstep** | `tests/lockstep/` | Petacat's decision traces against Metacat's: naming, helper conformance, tracing/replay RNGs, determinism guards, the comparer | Real engine in faithful mode (numeric backend off, or a named backend); recorded Metacat traces | 265 |
-| **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 689 |
+| **lockstep** | `tests/lockstep/` | Petacat's decision traces against Metacat's: naming, helper conformance, tracing/replay RNGs, determinism guards, the comparer | Real engine in faithful mode (numeric backend off, or a named backend); recorded Metacat traces | 266 |
+| **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 690 |
 
 Those counts are cases, so they include the second pass the numeric matrix makes
 over the 1149 backend-sensitive tests.
@@ -267,7 +267,7 @@ first**, then move up toward the API and GUI.
 
 All eight layers run in one command — the
 [required command](#the-required-command) — and, since Petacat runs natively, all
-eight actually run: **6,599 cases**, every one of them executed. A layer that is
+eight actually run: **6,601 cases**, every one of them executed. A layer that is
 normally skipped is not a layer that is normally green, and none of these is.
 
 Wall-clock time depends heavily on the machine and on what else it is doing. The
@@ -668,7 +668,7 @@ changing what it records.
 | `test_snag_explanations.py` | 2 | Every snag in eight Metacat runs (CHANGE, SWAP, CONFLICT, group-category reversal) explained, and its two comment lines worded, exactly as Metacat 1.2 logged them |
 | `test_rule_english_tools.py` | 8 | The rule-English recorder and comparer (no Docker): problem-list and Metacat-record parsing, clause-structure keys, exact pairing, fixture-table rows |
 | `test_event_tools.py` | 6 | The event-name recorder and comparer (no Docker): record parsing, run-list reading, per-run comparison, fixture-table rows, `--pick` selection |
-| `test_snag_and_answer_tools.py` | 26 | The snag and episode-answer recorders, comparers and the snag and fidelity sweep drivers (no Docker): record parsing, order-sensitive and order-insensitive answer comparison, problem-list data files, sweep stage selection |
+| `test_snag_and_answer_tools.py` | 27 | The snag and episode-answer recorders, comparers and the snag and fidelity sweep drivers (no Docker): record parsing, order-sensitive and order-insensitive answer comparison, problem-list data files, sweep stage selection |
 | `test_frequencies.py` | 17 | The answer-frequency tools (no Docker): recording parsing, frequency tables, total variation, pooled two-sample chi-square, the support-v1a reference counts against the committed measurement |
 
 **`tests/e2e/` — the HTTP API against a real database**
@@ -717,7 +717,7 @@ changing what it records.
 | `test_swarm_api.py` | 5 | `POST /api/swarm` equals the serial runs, persists nothing, and rejects bad requests; `GET /api/swarm` reports the pool |
 | `test_training_mode_sessions_api.py` | 49 | Training Mode Sessions over HTTP: every stored run is the serial run; the 25 + 5 workflow (problems added while it runs); the finished long-poll; pause, resume, close, cancel, delete; the database written only when a problem finishes; a restart redoes what was cut off to the identical result and rebuilds the shared memory exactly; one worker is a serial episode and many replay from the merge log; fair sharing of the cores; every error policy; worker-failure retries, charged only to the run that broke the pool; a policy pause survives a concurrent status change; live counts never step backwards; a summary's finished cursor comes from the same snapshot as its counts; seed ranges fit the database; configuration change stalls or is adopted; validation, export, defaults and fixed settings |
 | `test_unicode_problem_strings.py` | 6 | Any Unicode text in Training Mode, end to end: a Training Mode Session of 20 corpus problems runs, is Stopped and reads back exactly from the database and the API; NFC and NFD problems both kept; U+0000 and a lone surrogate are a 422 in sessions; Metacat Mode reads the same corpus through Metacat's parser (stores what it read, or refuses with `Invalid input!`, in the runs row and Review), demo problems take Unicode names, sections and descriptions, and an empty string is `Invalid input!`, not a crash, in runs and the Swarm |
-| `test_input_parser_doors.py` | 13 | Metacat Mode's three doors read a problem through Metacat's input parser: one case per row of the table in `THE-THREE-SYSTEMS.md` through `POST /api/runs`, a refusal is a 400 `Invalid input!` that creates nothing, no seed picks a random one that is recorded and shown, a Fast run with no database statement, Swarm (problem and seeds), Admin's demo problems (stored as read, a random seed when none), every shipped demo runs, and a Training Mode Session keeps `abC`, `xy1`, `é`, `日本` and emoji exactly |
+| `test_input_parser_doors.py` | 14 | Metacat Mode's three doors read a problem through Metacat's input parser: one case per row of the table in `THE-THREE-SYSTEMS.md` through `POST /api/runs`, a refusal is a 400 `Invalid input!` that creates nothing, no seed picks a random one that is recorded and shown, a Fast run with no database statement, Swarm (problem and seeds), Admin's demo problems (stored as read, a random seed when none), every shipped demo runs, and a Training Mode Session keeps `abC`, `xy1`, `é`, `日本` and emoji exactly |
 | `test_unlimited_text.py` | 9 | All other text is unlimited too: a Training Mode Session's name and note and a configuration's name and note of any length and script are stored and returned exactly; configuration text (names, labels, formulas, a multi-character glyph) round-trips through the change API, and codelet type and help topic text holds any length; the journal's actor, channel, group and note are stored exactly; U+0000 and a lone surrogate are a 4xx naming the field at every entry point (session, configuration, and every string and key of a change batch); a caller's value for a fixed-vocabulary column is checked first, a 4xx never a 500 |
 | `test_step0_config_from_db.py` | 47 | Step 0's guard tests: a shipped value reproduces the run and a changed one moves it |
 

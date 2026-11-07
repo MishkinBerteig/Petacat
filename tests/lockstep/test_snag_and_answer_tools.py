@@ -159,6 +159,28 @@ EPISODE = [
 ]
 
 
+def test_the_ans_line_calls_the_snag_explanation_the_way_the_engine_takes_it():
+    """``scripts/compare_episode_answers.py`` once passed a third argument ``snag_explanation_for`` does
+    not take, which raised a TypeError on any memory holding a snag.  Call its function on one."""
+    from types import SimpleNamespace
+
+    from server.engine.memory import EpisodicMemory, SnagDescription
+
+    snag = SnagDescription(
+        problem=("abc", "abd", "xyz"), codelet_count=1, temperature=50.0, theme_pattern={},
+        description="Replace letter category of rightmost letter by successor",
+        rule_signature=["sig"], translated_rule_signature=[], explanation="cannot change z",
+    )
+    memory = EpisodicMemory()
+    memory.store_snag(snag)
+    memory.get_equivalent_snag = lambda a: snag
+    answer = SimpleNamespace(
+        problem=("abc", "abd", "xyz", "wyz"), top_rule_description="Change z\nto y",
+        top_rule_signature=["sig"],
+    )
+    assert cea.ans_line(answer, memory) == "ANS\twyz|Change z/to y\tcannot change z"
+
+
 def _swap_first_two(lines, kind):
     idx = [i for i, l in enumerate(lines) if l.startswith(kind + "\t")]
     out = list(lines)

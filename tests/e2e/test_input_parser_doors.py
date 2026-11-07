@@ -322,3 +322,14 @@ async def test_a_scenario_changes_what_metacat_mode_perceives_through_admin_with
     seeded = await client.post("/api/runs", json={"initial": "abc", "modified": "abd", "target": "xyz 5"})
     # "5" is now a separator, not a seed: the line is three strings, and the seed is a random one.
     assert seeded.status_code == 200 and seeded.json()["seed"] != 5
+
+
+@pytest.mark.asyncio
+async def test_the_run_history_list_shows_the_recorded_seed_of_a_run_created_with_none(app_client):
+    made = (await app_client.post("/api/runs", json={"initial": "abc", "modified": "abd", "target": "xyz"})).json()
+    explicit = (await app_client.post("/api/runs", json={
+        "initial": "abc", "modified": "abd", "target": "xyz", "seed": SEED})).json()
+    listed = {r["run_id"]: r for r in (await app_client.get("/api/runs", params={"limit": 200})).json()["runs"]}
+    assert 1 <= made["seed"] <= SEED_MAX
+    assert listed[made["run_id"]]["seed"] == made["seed"]
+    assert listed[explicit["run_id"]]["seed"] == SEED
