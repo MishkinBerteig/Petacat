@@ -3240,6 +3240,54 @@
      }
     ]
    }
+  },
+  {
+   "id": "discovery/pqrs-ppqqrrss-ttt/s1-person-offon-cap3000",
+   "kind": "discovery",
+   "problem": [
+    "pqrs",
+    "ppqqrrss",
+    "ttt"
+   ],
+   "seeds": [
+    1
+   ],
+   "cap": 3000,
+   "interventions": [
+    {
+     "at": 302,
+     "op": "set_self_watching",
+     "enabled": false
+    },
+    {
+     "at": 900,
+     "op": "set_self_watching",
+     "enabled": true
+    }
+   ],
+   "why": {
+    "engine_lines": 0,
+    "engine_arcs": 0,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [
+     "Self-watching switched off at codelet 302 and back on at 900, in the middle of a run; a jootser codelet runs from codelet 957 and progress-watcher from 1101 in Metacat's recording (stage Y of round 2)"
+    ],
+    "most_new_in": [],
+    "note": "no line or branch that the cases before it leave unreached; admitted because no earlier case compares the switch back on with Metacat (xqc -> xqd; mrrjjj ends at codelet 319 in Metacat, before its switches)"
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 3000,
+      "run_length": 3000,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
   }
  ]
 }

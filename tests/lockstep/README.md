@@ -250,7 +250,7 @@ runs the default configuration on NumPy. One caveat: the replay follows Metacat'
 runs Petacat's own random stream on the same inputs, so the check says that the situations Metacat reaches
 are handled as Metacat handles them, not that the baseline's own trajectory is Metacat's.
 
-**Every case is in a ratchet.** All 117 runs are in `ratchet-extended.json` (key `<case id>|<layout slug>/<seed>`, for
+**Every case is in a ratchet.** All 118 runs are in `ratchet-extended.json` (key `<case id>|<layout slug>/<seed>`, for
 example `episode/a-aa-b/s1x6-cap4000|episodes/a-aa-b/1.r1`), and all 188 runs of the original baseline are in
 `ratchet.json`, `ratchet-justify.json` and `ratchet-episodes.json`. `test_ratchet_covers_golden.py` fails for any run of
 either golden baseline that has no entry. The extended traces are recorded from the patched Metacat, one folder per
@@ -261,10 +261,10 @@ them `python`, is replayed with that backend whatever `--numeric-backend` says) 
 entry is full reach, agreement 1.0, 0 errors and 0 differing snapshots. The 8 episode answer reports stay checked
 by `scripts/compare_episode_answers.py`, which is not a ratchet.
 
-**What is in it** (76 cases, 117 runs, 8 episode answer reports; about 30 s in one process, the whole file
-recomputed in 6-12 s over a process pool): 45 discovery cases, 19 justify cases, 8 episodes; four with a
+**What is in it** (77 cases, 118 runs, 8 episode answer reports; about 30 s in one process, the whole file
+recomputed in 6-12 s over a process pool): 50 discovery cases, 19 justify cases, 8 episodes; ten with a
 person's actions (the Options menu's group and rule codelet clamps, Clamp Themes with two themes, Undo last
-clamp, the Self-watching check item off and on again), one episode with Clear Memory before run 4, 15 runs
+clamp, and the Self-watching check item: switched off in one case, off and on again in two), one episode with Clear Memory before run 4, 15 runs
 that the codelet cap ends, and the first appearance of `conflict` snags, `manual-clamp` events and cap-ended
 runs in any baseline. Five cases (`-selfwatchingoff-`) run with Self-watching mode off from the start, through a
 per-case `parameters` entry (`self_watching_enabled_default: false`). Twenty-nine were added by stage F of round 2 after
@@ -282,6 +282,18 @@ alphabetic position (first <-> last of the alphabet). Dropping the binding of `p
 `rule.letter_or_alphabetic_dimension` or from `image_operation.new_alpha_position_category` changes these runs and none of
 the 41 demo problems at seeds 1-3. Each was recorded with `record.py` (seeds 1-4, cap 3000) and replayed in faithful mode:
 agreement 1.0, no errors, no differing snapshot, in all 16 runs. The coverage table below was measured before stage 6.
+
+Stage Y added one case, `discovery/pqrs-ppqqrrss-ttt/s1-person-offon-cap3000` (seed 1, cap 3000, Self-watching off at
+codelet 302 and on at 900), because no earlier case compares the switch back on with Metacat. `xqc -> xqd; mrrjjj`
+(`s1-person-cap5000`) has the same two switches, at 500 and 900, but Metacat's recording of it ends at codelet 319 with the answer `mrrjkk`, before either switch, so it does not compare them; Petacat's own golden run of that case (the baseline
+runs Petacat's stream, not Metacat's) ends at codelet 663, past the first only. The earlier README line that called it the
+case of the check item "off and on again" was wrong for this reason. In the new case Metacat's recording runs to the cap, 3,000
+codelets, past both switches (the header's `interventions` carry both), and a `jootser` codelet is picked at codelet 957 and
+a `progress-watcher` at 1101, after the switch on and none between 302 and 900, so the switch on has an effect. Petacat's own
+golden run also reaches 3,000 codelets. The replay against the recording has reach 3000, agreement 1.0, 0 errors and 0 differing
+snapshots. Every earlier line of `extended_baseline.jsonl` is unchanged (only the header's case count and `cases_file_sha`
+moved), and `ratchet-extended.json` gained that one key. It adds no engine or database line or branch (measured with
+`scripts/golden_coverage.py`: 12,715 of 14,831 lines and 4,559 of 5,894 branches with and without it).
 
 Stage T4 added three cases that run past a group of six objects, which patched Metacat reaches only since patch 0002
 (`build-bridge` is guarded the way `attach-length-description` already is): `aaa -> aaaaaa; aaa` seed 1 (answers

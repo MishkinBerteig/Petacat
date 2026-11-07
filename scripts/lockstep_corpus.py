@@ -18,7 +18,7 @@ mode's ``off`` (``python``, ``numpy``, ``mlx``, ``mlx-cpu``), writing under
 is meant to change nothing, and it never updates one.
 
 ``--extended`` replays the extended golden baseline's cases
-(``tests/lockstep/golden/extended_cases.json``, 76 cases, 117 runs) from
+(``tests/lockstep/golden/extended_cases.json``, 77 cases, 118 runs) from
 ``tests/lockstep/traces-extended/<case id>/``, each laid out like the other corpora
 (``<slug>/<seed>...``, ``justify/...`` or ``episodes/...`` by the case's kind) and recorded
 from the patched Metacat with the case's own cap, answer, memory clears, interventions and

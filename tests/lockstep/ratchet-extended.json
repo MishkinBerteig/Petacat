@@ -179,6 +179,12 @@
   "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
+ "discovery/pqrs-ppqqrrss-ttt/s1-person-offon-cap3000|pqrs-ppqqrrss-ttt/1": {
+  "agreement": 1.0,
+  "reach": 3000,
+  "state_snapshots_differing": 0,
+  "unregistered_errors": 0
+ },
  "discovery/qcii-qqcciiii-bcdab/s1-cap3000|qcii-qqcciiii-bcdab/1": {
   "agreement": 1.0,
   "reach": 3000,
