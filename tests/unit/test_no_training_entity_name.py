@@ -7,7 +7,8 @@ must not remain in any scanned file.
 Allowed: "Training Mode" (and ``training_mode``, ``training-mode``, ``TRAINING_MODE_SOURCES``,
 ``TrainingMode``), "Training episode", the table ``training_memory_merges`` (S5 kept it as
 the session's Episodic Memory record, written at Stop), "corpus training" (Phase 4's
-corpus-mode training) and "training population" (a Fast population of runs).
+corpus-mode training), "training population" (a Fast population of runs) and "LLM training text"
+(the corpora Training Mode is meant to learn from, in the project's own definition).
 
 Not scanned, because they record the past or quote the old names: ``PHASE * PLAN.md``,
 ``DISCREPANCIES*.md``, ``FUTURE_DIRECTION*.md``, ``SELF_WATCHING_AUDIT.md``, ``CLAUDE.md``
@@ -32,7 +33,7 @@ SUFFIXES = {".py", ".ts", ".tsx", ".json", ".md", ".sh", ".css", ".html"}
 ALLOWED = re.compile(
     r"Training[ -][Mm]ode|training[ -]mode|training_mode|TRAINING_MODE|TrainingMode|trainingMode"
     r"|[Tt]raining episodes?|training_memory_merges|[Cc]orpus[ -]training|training\s+(?:#\s*)?population"
-    r"|pre-training|test_no_training_entity_name"
+    r"|pre-training|test_no_training_entity_name|LLM training text"
 )
 FORBIDDEN = re.compile(r"training", re.IGNORECASE)
 
