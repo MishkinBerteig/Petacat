@@ -145,7 +145,7 @@ outside the matrix take it too and the run is entirely what it says it is.
   gpu  mlx      float32    1150 tests
   whole suite requested: the full matrix is required of this run
 
-  unit          2004 collected   2004 run   2004 passed      0 failed      0 skipped  complete
+  unit          2008 collected   2008 run   2008 passed      0 failed      0 skipped  complete
   seed_unit     1802 collected   1802 run   1802 passed      0 failed      0 skipped  complete
   module        1065 collected   1065 run   1065 passed      0 failed      0 skipped  complete
   architecture   106 collected    106 run    106 passed      0 failed      0 skipped  complete
@@ -224,7 +224,7 @@ that allowance.
 
 | Layer | Directory | Scope | May depend on | Cases |
 |-------|-----------|-------|---------------|-------|
-| **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 2004 |
+| **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 2008 |
 | **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 1802 |
 | **module** | `tests/module/` | Several real components assembled and driven | Real engine objects and `seed_data/*.json`; no DB, no HTTP | 1065 |
 | **architecture** | `tests/architecture/` | How the source tree is allowed to depend on itself | The repository's source, `seed_data/*.json`, child interpreters | 106 |
@@ -267,7 +267,7 @@ first**, then move up toward the API and GUI.
 
 All eight layers run in one command — the
 [required command](#the-required-command) — and, since Petacat runs natively, all
-eight actually run: **6,604 cases**, every one of them executed. A layer that is
+eight actually run: **6,608 cases**, every one of them executed. A layer that is
 normally skipped is not a layer that is normally green, and none of these is.
 
 Wall-clock time depends heavily on the machine and on what else it is doing. The
@@ -462,7 +462,7 @@ changing what it records.
 | `test_codelet_dsl.py` | 3 | Compiling a codelet body: what the interpreter accepts and refuses |
 | `test_clamp_commentary.py` | 12 | A clamp announces itself and its undoing in Metacat's words; remindings newest first with a whole-number strength; the "stumped" answer |
 | `test_commentary.py` | 29 | The `CommentaryLog`, and the emit helpers whose English is written in Python |
-| `test_compare_harness.py` | 18 | The oracle comparison's decision logic: what gets flagged, and how, and its engine-parameter passthrough; the shipped reference sets in `measurements/reference/` |
+| `test_compare_harness.py` | 22 | The oracle comparison's decision logic: what gets flagged, and how, and its engine-parameter passthrough; the reference loader on a directory built by the test; the refusal of the derived default reference, of a copy of the derived files and of `make_reference_sets.py` without `--user-asked-for-support-v1a` (none of these tests reads the study or a derived file) |
 | `test_concept_mappings.py` | 31 | `ConceptMapping`: identity, slippage, distinguishing descriptors |
 | `test_descriptions.py` | 23 | `Description`: relevance, strength, descriptor predicates |
 | `test_episodic_memory.py` | 12 | `EpisodicMemory`: identifier scoping, `answer_present`; the list kept newest first as Metacat conses it, the oldest-first window listing, remindings newest first |
@@ -649,7 +649,7 @@ changing what it records.
 | File | Fns | Covers |
 |------|----:|--------|
 | `test_commentary.py` | 1 | Every comment-window paragraph (both voices) of 28 Metacat runs -- snags, all four clamps and their undoing, "I'm getting frustrated", answers, "Okay, I'm stumped" -- replayed in Petacat and compared as Metacat 1.2 logged them |
-| `test_comparer.py` | 33 | The trace comparer (a crash of patched Metacat on a group of six or more objects is an error, registered by nothing; the smallest such run, which patched Metacat now answers, replayed from a recorded trace): hand-made trace pairs with known faults give the expected classes; the registry's reference-crash class; proposed structures counted apart from state snapshots, and the ratchet on both |
+| `test_comparer.py` | 30 | The trace comparer (a crash of patched Metacat on a group of six or more objects is an error, registered by nothing; the smallest such run, which patched Metacat now answers, replayed from a recorded trace): hand-made trace pairs with known faults give the expected classes; the shipped registry holds no reference-crash entry; proposed structures counted apart from state snapshots, and the ratchet on both |
 | `test_input_parser.py` | 5 | Metacat Mode's input parser equals Metacat's own (`tests/lockstep/data/parser_metacat.json.gz`, recorded from the patched Metacat's Chez Scheme by `record_parser.py`): lowering and the two character classes on every Unicode scalar value, the tokens and validity of the three one-character lines for every scalar value, and about 200 whole lines; a lone surrogate is refused |
 | `test_desync_fixes.py` | 1 | Prefixes of three Metacat runs beyond the corpus that used to desynchronise the replay (`traces-desync/`) replay to their end with no error and no differing state (DISCREPANCIES5 G-Y2…G-Y4) |
 | `test_episodes.py` | 8 | Episodes and justify mode: recorder driver text, corpus globs, an episode's self-replay with memory carried, a forced fatal, justify self-replay |
@@ -659,7 +659,7 @@ changing what it records.
 | `test_event_names.py` | 2 | Every Trace event in eight Metacat runs (all event types, all three group directions, flips, slippages on all three bridges, translated rules, the three answer headers) named and headed exactly as Metacat 1.2 logged them |
 | `test_helpers.py` | 11 | Helper conformance: `prob`, `~`, `weighted_pick` and `pick` give Metacat's results for the same draws |
 | `test_naming.py` | 9 | Canonical names for plain values and every kind of object, and the opening state against Metacat's |
-| `test_patched_only.py` | 7 | Only the patched Metacat is ever run (ruling 70): `record.py` has no flag that chooses a build; every recorder reaches Docker only through `run_container`, which refuses a tree that fails verification, the reference tree made with Metacat's own tool (never run) and a recorder copy not marked patched; and every stored trace header in every corpus ends in `+known-failure-fixes` (`traces-known-failures/reference/` is the one exempt folder, stored data nothing runs) |
+| `test_patched_only.py` | 8 | Only the patched Metacat is ever run (ruling 70): `record.py` has no flag that chooses a build; every recorder reaches Docker only through `run_container`, which refuses a tree that fails verification, the reference tree made with Metacat's own tool (never run) and a recorder copy not marked patched; and every stored trace header in every corpus ends in `+known-failure-fixes` with no exception; the recordings of the crashes of the build without the fixes are gone |
 | `test_ratchet_covers_golden.py` | 4 | Every run of the original golden baseline (188) and of the extended one (123) has a lockstep ratchet entry (`ratchet.json`, `ratchet-justify.json`, `ratchet-episodes.json`, `ratchet-extended.json`), and every ratchet entry has agreement 1.0, no error and no differing state snapshot |
 | `test_replay.py` | 15 | Tracing rules, trace shape, self-replay, Guard 1, fatal and surplus paths, Guard 2 (slow); a committed Metacat trace replayed with the numeric backend on |
 | `test_seam.py` | 5 | The engine's trace seam changes nothing for an ordinary run; the initial clamp is held until Metacat's fixed unclamp time |
@@ -669,7 +669,7 @@ changing what it records.
 | `test_rule_english_tools.py` | 8 | The rule-English recorder and comparer (no Docker): problem-list and Metacat-record parsing, clause-structure keys, exact pairing, fixture-table rows |
 | `test_event_tools.py` | 6 | The event-name recorder and comparer (no Docker): record parsing, run-list reading, per-run comparison, fixture-table rows, `--pick` selection |
 | `test_snag_and_answer_tools.py` | 27 | The snag and episode-answer recorders, comparers and the snag and fidelity sweep drivers (no Docker): record parsing, order-sensitive and order-insensitive answer comparison, problem-list data files, sweep stage selection |
-| `test_frequencies.py` | 17 | The answer-frequency tools (no Docker): recording parsing, frequency tables, total variation, pooled two-sample chi-square, the support-v1a reference counts against the committed measurement |
+| `test_frequencies.py` | 19 | The answer-frequency tools (no Docker): recording parsing, frequency tables, total variation, pooled two-sample chi-square, the reference-count reader on a small archive built by the test; the `support-v1a` mode's refusal without `--user-asked-for-support-v1a`, with the study unread; the flag's name in all three tools |
 
 **`tests/e2e/` — the HTTP API against a real database**
 
@@ -786,12 +786,16 @@ itself perfectly, and every one of the reference's own answers arriving for the
 first time was read as an anomaly. The decision and the evidence are in
 `DISCREPANCIES3.md`.
 
-**The comparison now points at Metacat's measured behaviour instead.**
-`scripts/compare_to_metacat.py` runs 100 tries per problem from a fresh Episodic
-Memory against the single-run sets in `measurements/reference/`: every stopping
-state of Metacat's 50,000 construction and validation runs per problem in the
-support-v1a study, derived from `studies/support-v1a/data/main.tar.gz` by
-`scripts/make_reference_sets.py`. Its second mode, eight-run episodes with memory
+**The comparison pointed at Metacat's measured behaviour instead, and now has no reference until one is
+recorded on patched Metacat.** `scripts/compare_to_metacat.py` runs 100 tries per problem from a fresh Episodic
+Memory against single-run sets in `measurements/reference/`: every stopping state of Metacat's 50,000
+construction and validation runs per problem in the support-v1a study, derived from
+`studies/support-v1a/data/main.tar.gz` by `scripts/make_reference_sets.py`. **That study was recorded on the Metacat
+build without the known-failure fixes**, so it is not patched Metacat's behaviour. It is kept, and it is used only
+when the user specifically asks for it: `compare_to_metacat.py` (with its default reference, or any reference
+directory that names the study as its source), `make_reference_sets.py` and `compare_frequencies.py support-v1a` each
+refuse unless given `--user-asked-for-support-v1a`, and no test reads the study or a file derived from it. Until a
+reference is recorded on patched Metacat, the answer-frequency comparison has none. Its second mode, eight-run episodes with memory
 carried forward, needs convergence sets this repository does not have, because no
 study here keeps every run of an episode. It runs with `--reference` pointing at a
 directory that has them (a Metacat checkout's `oracle/derived/`); otherwise the
@@ -811,8 +815,8 @@ or changed, never pass or fail. Run it when the codelet scheduler, the random
 stream, the numeric backend or the update cycle moves:
 
 ```bash
-.venv/bin/python scripts/compare_to_metacat.py -n 100
-.venv/bin/python scripts/make_reference_sets.py   # rebuild measurements/reference/ (about two minutes)
+.venv/bin/python scripts/compare_to_metacat.py -n 100 --user-asked-for-support-v1a   # only when the user asks
+.venv/bin/python scripts/make_reference_sets.py --user-asked-for-support-v1a   # only when the user asks; rebuild measurements/reference/ (about two minutes)
 ```
 
 Its own decision logic *is* under test, in

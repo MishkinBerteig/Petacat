@@ -7,9 +7,9 @@ fixes.  Nothing in the harness may run the unpatched reconstruction, so:
 * every recorder reaches Docker through ``record.run_container``, which refuses a tree that
   does not verify as the patched build (proved here with a tree that fails verification, and
   with ``describe`` made to answer "reference"; no fix is taken off any tree);
-* every trace header the corpora hold ends in ``+known-failure-fixes``.  The one exempt folder,
-  ``traces-known-failures/reference/``, is stored data that nothing runs: it documents the
-  crashes the fixes remove.
+* every trace header the corpora hold ends in ``+known-failure-fixes``, with no exception.  (The
+  recordings of the three crashes of the build without the fixes were removed on 2026-11-08, at the
+  user's ruling; ``Metacat/KNOWN-FAILURES.md`` holds the record of how to reproduce each crash.)
 """
 
 from __future__ import annotations
@@ -29,7 +29,6 @@ METACAT_DIR = LOCKSTEP / "metacat"
 sys.path.insert(0, str(METACAT_DIR))
 
 import record  # noqa: E402
-EXEMPT = LOCKSTEP / "traces-known-failures" / "reference"
 MARK = "+known-failure-fixes"
 
 
@@ -137,8 +136,6 @@ def test_run_container_refuses_a_tree_that_verifies_as_the_reference(tmp_path, m
 
 def _corpus_traces():
     for path in sorted(LOCKSTEP.glob("traces*/**/*.metacat.jsonl.gz")):
-        if EXEMPT in path.parents:
-            continue
         yield path
 
 
@@ -154,3 +151,9 @@ def test_every_stored_trace_header_is_patched():
     if checked == 0:
         pytest.skip("no stored trace is present")
     assert not unpatched, f"{len(unpatched)} traces are not from the patched build, e.g. {unpatched[:5]}"
+
+
+def test_the_recordings_of_the_crashes_of_the_unpatched_build_are_gone():
+    # Removed on 2026-11-08 at the user's ruling.  Metacat/KNOWN-FAILURES.md is the record.
+    assert not (LOCKSTEP / "traces-known-failures" / "reference").exists()
+    assert not list(LOCKSTEP.glob("traces*/**/reference/*.metacat.jsonl.gz"))

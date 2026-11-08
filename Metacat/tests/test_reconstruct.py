@@ -1,6 +1,9 @@
 import importlib.util
 import json
 from pathlib import Path
+import re
+import shutil
+import subprocess
 import tempfile
 import unittest
 
@@ -170,6 +173,31 @@ class ReconstructionTests(unittest.TestCase):
         manifest = json.loads((BUNDLE / 'manifest.json').read_text())
         self.assertNotIn('modified', manifest)
         self.assertNotIn('captured_date', manifest)
+
+    def test_every_reproduction_case_is_in_the_record(self):
+        helper = (BUNDLE / 'tests/reproduce-failures.ss').read_text()
+        keys = re.findall(r'\("([a-z0-9-]+)" (?:run|trial|command-line|mcat-form)', helper)
+        self.assertEqual(len(keys), len(set(keys)))
+        self.assertGreaterEqual(len(keys), 19)
+        record = (BUNDLE / 'KNOWN-FAILURES.md').read_text()
+        self.assertIn('How to reproduce the problem behind each fix', record)
+        for key in keys:
+            with self.subTest(case=key):
+                self.assertIn('`%s`' % key, record)
+
+    @unittest.skipUnless(shutil.which('docker') and (BUNDLE / 'build/source').is_dir()
+                         and (BUNDLE.parent / 'scripts/reproduce-metacat-fixes.sh').is_file(),
+                         'needs Docker, the reconstruction in build/source and scripts/reproduce-metacat-fixes.sh')
+    def test_the_helper_proves_every_case_on_the_patched_build(self):
+        image = subprocess.run(['docker', 'image', 'inspect', 'metacat:1.2'],
+                               capture_output=True, text=True)
+        if image.returncode != 0:
+            self.skipTest('Docker is not running or the metacat:1.2 image is not built')
+        done = subprocess.run(['bash', str(BUNDLE.parent / 'scripts/reproduce-metacat-fixes.sh')],
+                              capture_output=True, text=True, timeout=1800)
+        self.assertEqual(done.returncode, 0, done.stdout[-3000:] + done.stderr[-1000:])
+        self.assertIn('all cases: exit 0', done.stdout)
+        self.assertEqual(done.stdout.count('the fixed path was taken'), 19)
 
 
 if __name__ == '__main__':

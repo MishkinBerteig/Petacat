@@ -55,6 +55,9 @@ from collections import Counter
 from multiprocessing import Pool
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+import support_v1a_guard as guard  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SEED_DIR = os.path.join(ROOT, "seed_data")
@@ -333,7 +336,10 @@ def main():
     ap.add_argument("--reference", default=REFERENCE,
                     help="directory holding the reference sets "
                          "(default: measurements/reference)")
+    guard.add_flag(ap)
     args = ap.parse_args()
+    if guard.is_derived_directory(args.reference):
+        guard.require(ap, args, f"compare with the reference sets in {args.reference}")
     if args.jobs <= 0:
         from server.engine import hardware
 

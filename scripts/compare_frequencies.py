@@ -52,6 +52,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "scripts"))
+
+import support_v1a_guard as guard  # noqa: E402
 
 DEFAULT_OUT = ROOT / "tests" / "lockstep" / "out"
 SUPPORT_TAR = ROOT / "studies" / "support-v1a" / "data" / "main.tar.gz"
@@ -436,8 +439,11 @@ def main() -> int:
                     help="Petacat processes (default: every logical core but one)")
     sv.add_argument("--only", help="comma-separated problem names (default all 19)")
     sv.add_argument("--json", help="write the results here")
+    guard.add_flag(sv)
     sv.set_defaults(func=cmd_support)
     args = ap.parse_args()
+    if args.cmd == "support-v1a":
+        guard.require(sv, args, "compare Petacat with the support-v1a study")
     return args.func(args)
 
 

@@ -8,6 +8,9 @@ with two exception signatures. The diagnosis found two bugs, not three. The
 reference reconstruction's patches are unchanged, so the published study keeps
 its exact reference.
 
+Everything needed to reproduce the problem behind each fix is in
+[How to reproduce the problem behind each fix](#how-to-reproduce-the-problem-behind-each-fix), below.
+
 Three more crashes, found later by Petacat's lockstep checks and reach studies and not by the study, have their own
 sections at the end ([A fourth crash: a group of six or more](#a-fourth-crash-a-group-of-six-or-more),
 [A letter outside a to z](#a-letter-outside-a-to-z) and
@@ -18,6 +21,258 @@ in reference Metacat, not the Python port, during the held-out validation phase
 of [support-v1/support-v1a](../studies/support-v1a/README.md). The completed
 campaign retained them as `*ERROR*` observations rather than dropping seeds,
 discarding chunks, or treating crashes as ordinary answers.
+
+## How to reproduce the problem behind each fix
+
+Added 2026-11-08, at the user's ruling: the recordings of the crashes were removed, but there must be a record, for each
+incremental patch, of exactly how to reproduce the problem that drove it. This section is that record. There is one entry
+per fix (0001 to 0004) and, inside it, one entry per case that drove the fix.
+
+**What "reproduce" can mean here.** A crash can be reproduced only by running a tree without the fix. **This project never
+runs such a tree**, and no tool in it can take a fix off. So the record gives, for each case:
+
+1. the exact input and settings, and the build the crash was seen on (which fixes of the second patch group were applied,
+   every one numbered before this fix and none after it, with the bundle manifest hash recorded at the time);
+2. the point where the run stopped: the codelet count, the exact error text and the call chain, with `file:line` on the
+   tree *before* the fix (the patches shift later lines; the line numbers in this section and in the sections below are
+   those of the tree before the fix they belong to);
+3. one command that runs the case on a tree;
+4. the proof that the patched build takes the fixed path at that point.
+
+**For someone who holds a tree without the fix.** Run the command of item 3 with that tree mounted as `/metacat` (change
+`src=` of the first `--mount` in the Docker command below to the folder of that tree; the tree must have the second patch
+group's earlier fixes, and none of this one). The helper then prints
+`REPRODUCER FAILED <case>: the run stopped with an exception at N codelets: <the error text>` for a run, and exits with
+status 1. The codelet count N and the error text are the ones in the entry. This project has not run the helper on such a
+tree, so that output is what the entry predicts, not something this project observed with the helper (the original
+observations are the study data and the recordings named in each entry).
+
+**The command that runs a case on the patched build** (from the `Metacat` folder, Docker running, `build/source` patched):
+
+```sh
+python3 tools/reconstruct.py --verify build/source
+docker build --platform linux/amd64 -t metacat:1.2 build/source/docker
+docker run --rm --platform linux/amd64 --network none --read-only \
+  --cpus 1 --memory 2g \
+  --mount "type=bind,src=$PWD/build/source,dst=/metacat,readonly" \
+  --mount "type=bind,src=$PWD/tests,dst=/tests,readonly" \
+  --workdir /metacat --entrypoint env metacat:1.2 \
+  -u DISPLAY scheme -q --script /tests/reproduce-failures.ss <case>
+```
+
+`bash scripts/reproduce-metacat-fixes.sh <case> ...` (from the repository root) does the same for the cases it is given (every case when it is given none) and
+exits 0 only if every case does. The cases are: `misc1-20713988`, `misc1-20716342`, `misc3-20226148` (0001),
+`fix2-aaa-seed1` (0002), `fix3-command-line`, `fix3-mcat-form` (0003), `fix4-pqcd-1`, `fix4-pqcd-69`, `fix4-pqcd-238`,
+`fix4-defpqr-79`, `fix4-defpqr-102`, `fix4-defpqr-161`, `fix4-abcxyz-35`, `fix4-abcxyz-74`, `fix4-ijkm-11`,
+`fix4-ijkm-126`, `fix4-ijkm-184`, `fix4-tugx-105` and `fix4-letter-trial` (0004).
+
+**How the helper proves the fixed path.** [`tests/reproduce-failures.ss`](tests/reproduce-failures.ss) is our own driver and
+contains no upstream source. After it loads the patched engine it wraps one engine procedure in its own process only
+(`set!` of the procedure's top-level name; no file of the source tree or of a patch is touched), calls the original unchanged,
+and writes an `EVENT` line with `*codelet-count*` when the situation that used to be fatal arises and the original returns. The
+wrappers draw no random number. Every run is a fresh process with freshly cleared Episodic Memory, Self-watching on (Metacat's
+default; no case changes it) and `init-mcat` with no answer. The helper exits 0 only when every expected event happens at the
+codelet its entry gives and the run ends as its entry says (answer and codelets, or the cap). If the patched build stops with an
+exception, it prints `REPRODUCER FAILED` and exits 1 (that would mean the patch is incomplete). Exit 2 is an unknown case.
+The cases of 0003 are refused before any run starts, so there the proof is the refusal.
+
+### 0001: two sends to `#f` (`patches/fixes/0001-known-failures.patch`)
+
+Seen on: the reference reconstruction, the bundle without the second patch group (no fix of it applied), bundle manifest
+`705c5ac90f2546753626c51c04f39dab3bc7a2d07e18fa4bd90f39df3459dda1` (the `revision` header, without the
+`+known-failure-fixes` mark, of the recordings made in October 2026), Chez Scheme 9.5.4 on Linux/amd64, engine/input revision
+`1d7f9f19f2e28b634e9c40c5b04b24cdb71baf26` of the study. All three: fresh Episodic Memory, cap 100,000 codelets, Self-watching
+at Metacat's default (on), no display. Original observations: the study data (attempt directories in
+"Where the Evidence Lives" below).
+
+| Case key | Input (initial, modified, target) | Seed | Stopped at | Exact error | Call chain (before the fix) |
+| --- | --- | ---: | --- | --- | --- |
+| `misc1-20713988` | `abc` `cba` `mrrjjj` | 20713988 | 2,835 codelets (the 2,836th was running; an `answer-finder`) | `Exception: attempt to apply non-procedure #f` | `answer-finder` -> `make-translated-string` -> `postorder-interior-walk` -> `instantiate-as-group` (`images.ss`) -> `make-group` (`groups.ss:47-51`, `get-uppercase-name` sent to `#f`; the `#f` is `initial-letter-category`, computed at `groups.ss:76`) |
+| `misc1-20716342` | `abc` `cba` `mrrjjj` | 20716342 | 1,981 codelets (the 1,982nd was running; an `answer-finder`) | the same | the same chain |
+| `misc3-20226148` | `abc` `aabbcc` `kkjjii` | 20226148 | 2,088 codelets (the 2,089th was running; a `rule-scout`) | `Exception in caddr: incorrect list structure #f` | `rule-scout` -> `make-rule` -> `transcribe-to-english` -> `get-change-phrase` (`rules.ss:1870-1874`, `(3rd BondFacet-change)` with `BondFacet-change` = `#f`); the `#f` comes from `change-descriptions->rule-clause-template` (`rules.ss:793-801`), which asked only the first change description for its BondFacet change |
+
+- **Command:** the Docker command above with `<case>` = `misc1-20713988`, `misc1-20716342` or `misc3-20226148`. Original form:
+  `scheme -q --script /tests/reproduce-failures.ss misc1-20713988` (the same file; before 2026-11-08 it printed the case banner
+  and the exception and exited 255 on the reference reconstruction).
+- **Recorder form** (the harness's own driver; patched build only): `python3 tests/lockstep/metacat/record.py --problem abc cba mrrjjj --seeds 20713988 --cap 100000 --jobs 1 --out <dir>`
+  (likewise `--seeds 20716342`, and `--problem abc aabbcc kkjjii --seeds 20226148`).
+- **Fixed path on the patched build** (helper output, `bash scripts/reproduce-metacat-fixes.sh <case>`):
+  `misc1-20713988`: `make-group` returns a letter-category group whose first object has no letter category, at codelet 2835, and the run answers `rrjjjm` after 2,835 codelets;
+  `misc1-20716342`: the same event at codelet 1981, answer `rrjjjm` after 1,981 codelets;
+  `misc3-20226148`: `change-descriptions->rule-clause-template` is called with a first change description that has no BondFacet change and a later one that has, at codelet 2088, and the run answers `kji` after 2,152 codelets.
+- **Evidence in the repository:** `studies/support-v1a/data/` (extracted per its README; the three attempt directories are listed under "Where the Evidence Lives"; `segment-000/condition.txt` holds the Scheme condition and `segment-000/collector.ss` the generated driver); the patched recordings `tests/lockstep/traces-known-failures/fixes/` (`abc-cba-mrrjjj/20713988`, `abc-cba-mrrjjj/20716342`, `abc-aabbcc-kkjjii/20226148`), which run to the answer. The unpatched recordings that once sat next to them were removed on 2026-11-08.
+
+### 0002: a Length mapping for a group of six or more (`patches/fixes/0002-length-group-of-six-or-more.patch`)
+
+Seen on: the reconstruction with fix 0001 only (the second patch group as it was before 0002), manifest
+`705c5ac90f2546753626c51c04f39dab3bc7a2d07e18fa4bd90f39df3459dda1`, trace header `revision` ending `+known-failure-fixes`. Found by
+the stage W wide check of 4,384 recorded runs: 83 ended in this error.
+
+| Case key | Input | Seed | Settings | Stopped at | Exact error | Call chain (before the fix) |
+| --- | --- | ---: | --- | --- | --- | --- |
+| `fix2-aaa-seed1` | `aaa` `aaaaaa` `aaa` | 1 | cap 5,000, snapshots on, fresh memory, Self-watching on | 608 codelets (the 609th was running; a `bridge-builder` whose bridge is `bridge(top, group(i.0-2,samegrp,-,letter-category), group(m.0-5,samegrp,-,letter-category))`) | `Exception: attempt to apply non-procedure #f` | `bridge-builder` -> `build-bridge` (`bridges.ss:1396-1411`, the horizontal Length mapping) -> `make-concept-mapping object1 plato-length length1 object2 plato-length #f` -> `get-CM-short-name` sent to `#f` (`concept-mappings.ss:40`); `#f` is `platonic-length` of a group of six objects (`groups.ss:86`, from `number->platonic-number`, `slipnet.ss:495-499`: the Slipnet has number nodes 1 to 5 only) |
+
+- **Command:** the Docker command with `<case>` = `fix2-aaa-seed1`. Recorder form: `python3 tests/lockstep/metacat/record.py --problem aaa aaaaaa aaa --seeds 1 --cap 5000 --jobs 1 --out <dir>`.
+- **Fixed path on the patched build:** `build-bridge` is called for a horizontal bridge whose two objects have platonic lengths that differ because one is `#f`, at codelet 608; it returns and the bridge has no Length concept-mapping; the run answers `aaaaaa` after 1,614 codelets.
+- **All 83 runs.** The smallest is the case above (row 3 of the table). Each row gives the input, the seed and the options of the recorder
+  command `python3 tests/lockstep/metacat/record.py --problem <initial> <modified> <target> --seeds <seed> --cap <cap> --jobs 1 <other options>`; every one was recorded with snapshots (the default), and every one stopped with `Exception: attempt to apply non-procedure #f` inside a `bridge-builder` building a bridge that joins a group of six or more objects. A justify run is `--answer`, a run with Self-watching off is `--self-watching off`, the one with a person's actions is `--intervene`, and the one episode run is run 1 of `--episode-runs 6` (`--seeds` is the episode seed).
+
+| # | Initial | Modified | Target | Seed | `--cap` | Other options | Stopped at (codelets) |
+| ---: | --- | --- | --- | ---: | ---: | --- | ---: |
+| 1 | `www` | `wwwwww` | `qp` | 1 | 5000 |  | 858 |
+| 2 | `www` | `wwwwww` | `qp` | 2 | 3000 | `--self-watching off` | 634 |
+| 3 | `aaa` | `aaaaaa` | `aaa` | 1 | 5000 |  | 608 |
+| 4 | `abc` | `abd` | `rstuvw` | 1 | 5000 | `--answer a` | 4749 |
+| 5 | `eee` | `eeeeee` | `eee` | 2 | 5000 |  | 288 |
+| 6 | `eee` | `eeeeee` | `eee` | 3 | 5000 |  | 671 |
+| 7 | `lll` | `llllll` | `lll` | 1 | 5000 |  | 538 |
+| 8 | `ooo` | `oooooo` | `ooo` | 1 | 5000 |  | 538 |
+| 9 | `bvb` | `vbb` | `opkaczc` | 1 | 5000 | `--answer ooooooo` | 1904 |
+| 10 | `eee` | `eeeeee` | `vuts` | 1 | 5000 |  | 597 |
+| 11 | `eee` | `eeeeee` | `vuts` | 2 | 3000 | `--self-watching off` | 554 |
+| 12 | `bbb` | `bbbbbb` | `jmjkl` | 1 | 5000 |  | 493 |
+| 13 | `ghituv` | `ssssss` | `dd` | 1 | 5000 |  | 1920 |
+| 14 | `ppp` | `pppppp` | `zefgh` | 1 | 5000 |  | 632 |
+| 15 | `ppp` | `pppppp` | `zefgh` | 1 | 3000 | `--intervene 1267:self-watching-off,2211:self-watching-on` | 632 |
+| 16 | `gkkk` | `ggkkkkkk` | `pqr` | 1 | 5000 |  | 612 |
+| 17 | `gkkk` | `ggkkkkkk` | `pqr` | 2 | 3000 | `--self-watching off` | 911 |
+| 18 | `jjjzzz` | `vvvvvv` | `qyde` | 1 | 5000 |  | 3121 |
+| 19 | `jjjzzz` | `vvvvvv` | `qyde` | 9 | 4000 | `--episode-runs 6` | 3446 |
+| 20 | `brrr` | `bbrrrrrr` | `zkzuu` | 1 | 5000 |  | 712 |
+| 21 | `eeeeee` | `eeeeef` | `eeeee` | 1 | 5000 |  | 1910 |
+| 22 | `jjjcy` | `jjjjjjccyy` | `qq` | 1 | 5000 |  | 693 |
+| 23 | `jklmno` | `jklmn` | `jklmno` | 1 | 5000 |  | 1754 |
+| 24 | `ttton` | `ttttttoonn` | `kl` | 1 | 5000 |  | 947 |
+| 25 | `gqgayxz` | `sssssss` | `hijk` | 1 | 5000 |  | 4832 |
+| 26 | `hgflkj` | `eeeeee` | `hgflkj` | 1 | 5000 |  | 3605 |
+| 27 | `hhhhhh` | `hhhhhi` | `ooohhh` | 1 | 5000 |  | 2656 |
+| 28 | `mfacaac` | `wwwwwww` | `ppay` | 1 | 5000 |  | 2594 |
+| 29 | `pwuuu` | `ppwwuuuuuu` | `giy` | 1 | 5000 |  | 1257 |
+| 30 | `tttbj` | `ttttttbbjj` | `eii` | 1 | 5000 |  | 969 |
+| 31 | `wwwwwww` | `wwwwwwx` | `wwww` | 1 | 5000 |  | 1570 |
+| 32 | `ddqqq` | `ddddqqqqqq` | `efgh` | 1 | 5000 |  | 735 |
+| 33 | `tatybyz` | `iiiiiii` | `cxazz` | 2 | 5000 |  | 1807 |
+| 34 | `tatybyz` | `iiiiiii` | `cxazz` | 3 | 5000 |  | 1412 |
+| 35 | `uuuuuuuu` | `uuuuuuuv` | `uuu` | 1 | 5000 |  | 956 |
+| 36 | `zziii` | `zzzziiiiii` | `jihw` | 1 | 5000 |  | 765 |
+| 37 | `zzzts` | `zzzzzzttss` | `ihee` | 1 | 5000 |  | 620 |
+| 38 | `bbbnnn` | `bbbbbbnnnnnn` | `yy` | 2 | 5000 |  | 729 |
+| 39 | `bbbnnn` | `bbbbbbnnnnnn` | `yy` | 3 | 5000 |  | 853 |
+| 40 | `nurrr` | `nnuurrrrrr` | `zxebb` | 1 | 5000 |  | 544 |
+| 41 | `rrreoe` | `rrrrrreeooee` | `fg` | 1 | 5000 |  | 564 |
+| 42 | `rrreoe` | `rrrrrreeooee` | `fg` | 3 | 3000 | `--self-watching off` | 898 |
+| 43 | `wvutsrqp` | `pqrstuvw` | `wvut` | 1 | 5000 |  | 1146 |
+| 44 | `ddddddd` | `dddddde` | `uuuuuuu` | 1 | 5000 |  | 1401 |
+| 45 | `klmkkk` | `kkllmmkkkkkk` | `ggg` | 1 | 5000 |  | 1426 |
+| 46 | `pqrstuv` | `pqrstuw` | `pqrstuv` | 1 | 5000 |  | 600 |
+| 47 | `pqwww` | `ppqqwwwwww` | `mnotit` | 1 | 5000 |  | 1105 |
+| 48 | `vulll` | `vvuullllll` | `hhhkgo` | 1 | 5000 |  | 964 |
+| 49 | `hmokobac` | `aaaaaaaa` | `ajanml` | 1 | 5000 |  | 2317 |
+| 50 | `iiiiiiiii` | `iiiiiiiij` | `yyyy` | 1 | 5000 |  | 737 |
+| 51 | `kkkgkl` | `kkkkkkggkkll` | `defg` | 1 | 5000 |  | 1008 |
+| 52 | `qqqqqqqq` | `qqqqqqqr` | `qqqqqq` | 1 | 5000 |  | 1516 |
+| 53 | `bmsmxwnopq` | `mmmmmmmmmm` | `pqr` | 1 | 5000 |  | 3109 |
+| 54 | `abcdefgh` | `abcdefgi` | `fghijklm` | 1 | 5000 |  | 827 |
+| 55 | `ghijklmn` | `ghijklmo` | `ghijklmn` | 1 | 5000 |  | 1097 |
+| 56 | `klmnopqr` | `klmnopqs` | `abcdefgh` | 1 | 5000 |  | 1152 |
+| 57 | `lkjbbb` | `llkkjjbbbbbb` | `lkjbbb` | 1 | 5000 |  | 974 |
+| 58 | `lmnopqrs` | `lmnopqrt` | `srqponml` | 1 | 5000 |  | 834 |
+| 59 | `opqrstuv` | `opqrstuw` | `opqrstuv` | 1 | 5000 |  | 1097 |
+| 60 | `qhqsss` | `qqhhqqssssss` | `qhqsss` | 1 | 5000 |  | 1493 |
+| 61 | `qhqsss` | `qqhhqqssssss` | `qhqsss` | 1 | 3000 | `--self-watching off` | 673 |
+| 62 | `zxbeee` | `zzxxbbeeeeee` | `zxbeee` | 1 | 5000 |  | 696 |
+| 63 | `hhhopqr` | `hhhhhhooppqqrr` | `ihgf` | 1 | 5000 |  | 1397 |
+| 64 | `ixjyyy` | `iixxjjyyyyyy` | `eeeopqr` | 1 | 5000 |  | 737 |
+| 65 | `lllllll` | `llllllm` | `lllllllllll` | 1 | 5000 |  | 525 |
+| 66 | `yyyyyyyyyy` | `yyyyyyyyyz` | `ddddd` | 1 | 5000 |  | 626 |
+| 67 | `kjihgfedcba` | `abcdefghijk` | `kjih` | 1 | 5000 |  | 1318 |
+| 68 | `qponmlkjihg` | `ghijklmnopq` | `qpon` | 1 | 5000 |  | 1772 |
+| 69 | `abcdefghi` | `abcdefghj` | `abcdefghi` | 1 | 5000 |  | 815 |
+| 70 | `bbbbbbbb` | `bbbbbbbc` | `bbbbbbbbbbb` | 1 | 5000 |  | 992 |
+| 71 | `ijklmnopq` | `ijklmnopr` | `qponmlkji` | 1 | 5000 |  | 1484 |
+| 72 | `abcdefghij` | `abcdefghik` | `fghijklmno` | 1 | 5000 |  | 1030 |
+| 73 | `hijklmnopq` | `hijklmnopr` | `qponmlkjih` | 1 | 5000 |  | 1742 |
+| 74 | `jihgfedcba` | `abcdefghij` | `jihgfedcba` | 1 | 5000 |  | 1187 |
+| 75 | `kkkkkkkkkk` | `kkkkkkkkkl` | `kkkkkkkkkk` | 1 | 5000 |  | 1260 |
+| 76 | `abcdefghijk` | `abcdefghijl` | `abcdefghijk` | 1 | 5000 |  | 3125 |
+| 77 | `abcdefghijk` | `abcdefghijl` | `kjihgfedcba` | 1 | 5000 |  | 1096 |
+| 78 | `hijklmnopqr` | `hijklmnopqs` | `rqponmlkjih` | 1 | 5000 |  | 1604 |
+| 79 | `mmmmmmmmmmm` | `mmmmmmmmmmn` | `kkkkkkkkkkk` | 1 | 5000 |  | 931 |
+| 80 | `xzxxaayzycxx` | `jjjjjjjjjjjj` | `axcxaxcac` | 1 | 5000 |  | 1975 |
+| 81 | `abcdefghijklm` | `mlkjihgfedcba` | `nopqrstuvwxyz` | 1 | 6000 |  | 2407 |
+| 82 | `abcdefghijklm` | `mlkjihgfedcba` | `nopqrstuvwxyz` | 2 | 6000 |  | 2453 |
+| 83 | `abcdefghijklm` | `mlkjihgfedcba` | `nopqrstuvwxyz` | 3 | 6000 |  | 1363 |
+
+- **Evidence in the repository:** the patched recording of the smallest case, `tests/lockstep/data/aaa-aaaaaa-aaa.seed1.metacat.jsonl.gz` (answer `aaaaaa`, 1,614 codelets, header ending `+known-failure-fixes`; recorded at cap 5,000), and the table above.
+
+### 0003: a letter outside a to z (`patches/fixes/0003-non-english-letter-invalid-input.patch`)
+
+Seen on: the reconstruction with fixes 0001 and 0002, manifest
+`718555f27b0ad97a01c5572c4b9526c6f8adcff324c800169a01c354f7ea8e81`. Input only; no run starts, so there is no seed, cap or
+memory state, and no codelet was run (stopped at 0 codelets). The letter is U+00E9, `é`. In a script file it is safest to write
+it as `\x00e9;`.
+
+| Case key | Input exactly as given | Exact error before the fix | Call chain (before the fix) |
+| --- | --- | --- | --- |
+| `fix3-command-line` | the control panel's command line (the Go button), text `abc abd xyé` | `Exception: variable plato-é is not bound` (uncaught, before the run began) | `go-button-action` (`gui.ss`) -> `tokenize-string` (`gui.ss:95`; lowers, takes punctuation as separators, lets any alphabetic character into a symbol, so tokens `(abc abd xyé)`) -> `valid-token-list?` (`syntactic-sugar.ss:51`; answered true) -> the control panel's `init-new-problem` -> `init-mcat` (`gui.ss:764-786`; `run.ss:185`) -> `init-workspace` (`run.ss:215`, `:240`) -> the string constructor (`workspace-strings.ss:23`) -> `symbol->letter-categories` (`utilities.ss:303-310`, evaluates `plato-é`) |
+| `fix3-mcat-form` | the form `(mcat abc abd xyé)` | none: the `(mcat ...)` macro passed it on (`syntactic-sugar.ss:43-46`, its fender is `valid-token-list?`), and `init-mcat` then stopped with the same `variable plato-é is not bound` | `mcat` -> the control panel's `run-new-problem` -> `init-mcat` -> `init-workspace` -> `workspace-strings.ss:23` -> `symbol->letter-categories` |
+
+- **Command:** the Docker command with `<case>` = `fix3-command-line` or `fix3-mcat-form`.
+- **Fixed path on the patched build:** `go-button-action`, read by name from `gui.ss` and run with a stand-in control panel, calls only `display-error` with `"Invalid input!"` (`tokenize-string` still gives `(abc abd xyé)`, `valid-token-list?` gives `#f`) and starts no problem; the control line `abc abd xyz` starts one. Evaluating `(mcat abc abd xyé)` raises `Exception in mcat: invalid syntax (mcat abc abd xyé)` and reaches the stand-in panel not at all; the control `(mcat abc abd xyz)` is accepted.
+- **Evidence in the repository:** `tests/lockstep/data/parser_metacat.json.gz`, written by `tests/lockstep/metacat/record_parser.py`, holds how the patched parser reads every Unicode scalar value (in three lines) and 200 whole lines; and the "A letter outside a to z" section below.
+
+### 0004: a rule that reverses all the groups of a string (`patches/fixes/0004-subobjects-group-category-reversal.patch`)
+
+Seen on: the reconstruction with fixes 0001, 0002 and 0003, manifest
+`237995b8e29873c166dd43909445aeaf4a558f8ad9dd06036a583f988c14dca7`, trace header `revision` ending `+known-failure-fixes`.
+Every run below: recorded with `python3 tests/lockstep/metacat/record.py --problem <initial> <modified> <target> --seeds <seed> --cap 6000 --no-snapshots --jobs 1 --out <dir>` (stage V; the recordings with snapshots gave the same stops), which is a fresh Episodic Memory, Self-watching on, no answer. The same inputs, seeds and cap run with the helper's plain `init-mcat` driver.
+
+First error, `Exception in cadr: incorrect list structure #f`, at `rules.ss:1351` (`apply-transforms`: `(2nd (assq plato-bond-facet transforms))` with no BondFacet transform). Call chain: the `rule-evaluator` codelet (`rules.ss:463`; shown for `pqcd` seed 1, where the 2,390th codelet is a `rule-evaluator`) -> `currently-works?` (`rules.ss:223-235`) -> `apply-rule` (no guard) -> `apply-transforms` (`rules.ss:1341-1353`), with the transform list `(GroupCtgy Opposite)` that `get-intrinsic-transforms` (`rules.ss:1528-1548`) gives each subobject group of a `(subobjects group-category opposite)` clause, which `rule-scout` builds on purpose (`rules.ss:607-641`); `2nd` is `cadr` (`utilities.ss:951`).
+
+| Case key | Input (initial, modified, target) | Seed | Stopped at (codelets) | Ended on the patched build |
+| --- | --- | ---: | ---: | --- |
+| `fix4-pqcd-1` | `pqcd` `cbpo` `tugh` | 1 | 2,389 | cap, 6,000 |
+| `fix4-pqcd-69` | `pqcd` `cbpo` `tugh` | 69 | 2,914 | cap, 6,000 |
+| `fix4-pqcd-238` | `pqcd` `cbpo` `tugh` | 238 | 4,217 (see below) | cap, 6,000 |
+| `fix4-defpqr-79` | `defpqr` `pondcb` `hijstu` | 79 | 4,961 | cap, 6,000 |
+| `fix4-defpqr-102` | `defpqr` `pondcb` `hijstu` | 102 | 2,521 (see below) | cap, 6,000 |
+| `fix4-defpqr-161` | `defpqr` `pondcb` `hijstu` | 161 | 3,749 (see below) | cap, 6,000 |
+| `fix4-abcxyz-35` | `abcxyz` `cbazyx` `ijkpqr` | 35 | 4,544 (the 4,545th was running) | cap, 6,000 |
+| `fix4-abcxyz-74` | `abcxyz` `cbazyx` `ijkpqr` | 74 | 5,106 | answer `kjirqp`, 5,168 codelets |
+| `fix4-ijkm-11` | `abcxyz` `cbazyx` `ijkm` | 11 | 4,653 | answer `kjim`, 5,901 codelets |
+| `fix4-ijkm-126` | `abcxyz` `cbazyx` `ijkm` | 126 | 3,253 | answer `kjim`, 3,268 codelets |
+| `fix4-ijkm-184` | `abcxyz` `cbazyx` `ijkm` | 184 | 3,824 | cap, 6,000 |
+| `fix4-tugx-105` | `pqcd` `cbpo` `tugx` | 105 | 3,792 | cap, 6,000 |
+
+"Stopped at" is the `codelets` field of the `end` record of the recording on the build before this fix for seeds 1, 69, 79, 35, 74 (`pqcd`, `defpqr`, `abcxyz` rows) and 11, 126, 184, 105 (stage V part 1). For seeds 238, 102 and 161 it is the codelet at which the stage V counting wrapper first met such a transform list on the fixed build; those three were not recorded on the build before this fix, so they are predicted to stop there, not observed to. The eight seeds of the three problems are the ones the stage V counting wrapper found, in 720 runs (seeds 1 to 240 of each of `pqcd cbpo tugh`, `defpqr pondcb hijstu` and `abcxyz cbazyx ijkpqr`, cap 6,000), to reach such a transform list inside the recorded run.
+
+- **Command:** the Docker command with `<case>` = a key of the table.
+- **Fixed path on the patched build:** for each row, `apply-transforms` is called with a transform list that has a group-category transform and no bond-facet transform at the codelet in "Stopped at", and returns; the run then ends as the last column says. For `fix4-ijkm-11` and `fix4-ijkm-126` the run also reaches `check-for-conflicts` with a letter that has a group-category transform (codelets 5,901 and 3,268, the last codelet of each run) and `check-for-conflicts` returns `done` (the letter is left unreversed, the group is reversed).
+- **Evidence in the repository:** the four golden cases `abcx-xwva-ijkr` s117, `pbcd-bpon-wfgh` s34, `abcxyz-cbazyx-ijkpqr` s35 and `pqcd-cbpo-tugh` s1 in `tests/lockstep/golden/extended_cases.json` (recorded on the patched build; the last two are the runs of the table), and the section "A rule that reverses all the groups of a string" below.
+
+**Second error: `bad message "get-bond-facet" sent to object of type letter`.** This one was **not** seen in a recorded run. It came from stage V's *directed trial*, which shows what the code does when a rule of this form is applied to a string of letters; none of 1,000 recorded runs of five problems of this shape (seeds 1 to 200, cap 6,000) stopped on it, because the first error came first. It was seen on the same build as the first error (fixes 0001, 0002 and 0003). Case key `fix4-letter-trial`:
+
+```scheme
+(define *metacat-directory* "/metacat/")
+(load "/metacat/metacat-headless.ss")
+(reset-handler (lambda () (exit 1)))
+(tell *memory* 'clear)
+(init-mcat 'bcdep 'ponmb 'fghiw #f 1)          ; problem bcdep -> ponmb; fghiw, seed 1, no answer
+(set! *break-time* 1)                          ; run one codelet only
+(call/cc (lambda (k) (set! suspend (lambda () (k 'suspended))) (set! break (lambda () (k 'capped))) (run-mcat)))
+(let* ((clause (list 'intrinsic (list (list 'string plato-string-position-category plato-whole))
+                     (list (list 'subobjects plato-group-category plato-opposite))))
+       (rule (make-rule 'top (list clause))))  ; English: "Reverse starting and ending points of all objects in string"
+  (apply-rule rule *initial-string* ignore-snag))
+```
+
+At that point the string `bcdep` has five letters and no groups (`(tell *initial-string* 'get-groups)` is empty, 5 constituent objects). Stopped at: after 1 codelet, inside `apply-rule`; exact error `Ooops: bad message "get-bond-facet" sent to object of type letter`; call chain `apply-rule` -> `check-for-conflicts` (`rules.ss:1218-1224`, `:1303`) -> `intrinsic-implies-intrinsic?` -> `same-dimension-as-GroupCtgy-medium?` (`rules.ss:1049`, `(tell (tell ic 'get-reference-object) 'get-bond-facet)` with a letter). The trial is a directed construction, not a run; it shows the code's reaction, not that a run reaches it.
+
+- **Command:** the Docker command with `<case>` = `fix4-letter-trial`.
+- **Fixed path on the patched build:** after one codelet, `check-for-conflicts` meets a letter with a group-category transform and returns `done`, `apply-rule` returns a list of five entries (the transforms of the five letters), and no error is raised. A real run reaches the same site: `fix4-ijkm-11` and `fix4-ijkm-126` above.
+- **Evidence in the repository:** the section "A rule that reverses all the groups of a string" below.
+
+---
 
 ## Exact Cases
 
@@ -42,42 +297,20 @@ independent observations in the 969,000-run campaign.
 
 ## Reproduce One Failure
 
-*Historical.* These commands reproduced the crash on the reference reconstruction, which the
-bundle no longer builds or verifies. On the patched tree each one ends with an answer (see
-below), and the helper exits with status 2.
+*Historical for the first three cases.* The commands in
+[How to reproduce the problem behind each fix](#how-to-reproduce-the-problem-behind-each-fix) run them. On the patched
+tree each of the three ends with an answer after the same number of codelets as the crash, and the helper exits with status
+0 (it used to exit with 255, on the reference reconstruction, after printing the case banner and the exception). Follow
+[README.md](README.md) to install the dependencies and reconstruct Metacat. Run the commands from the **Metacat folder
+containing this note**, not from `build/source`. Docker must be running. No full study or GPU is needed.
 
-Follow [README.md](README.md) to install the dependencies and reconstruct
-Metacat. Run the following from the **Metacat folder containing this note**,
-not from `build/source`. Docker must be running. No full study or GPU is needed.
-
-```sh
-python3 tools/reconstruct.py --verify build/source
-docker build --platform linux/amd64 -t metacat:1.2 build/source/docker
-docker run --rm --platform linux/amd64 --network none --read-only \
-  --cpus 1 --memory 2g \
-  --mount "type=bind,src=$PWD/build/source,dst=/metacat,readonly" \
-  --mount "type=bind,src=$PWD/tests,dst=/tests,readonly" \
-  --workdir /metacat --entrypoint env metacat:1.2 \
-  -u DISPLAY scheme -q --script /tests/reproduce-failures.ss misc1-20713988
-```
-
-To reproduce the other failures, repeat the Docker command, changing only its
-last argument to `misc1-20716342` or `misc3-20226148`. Each command starts with a
-new process and fresh memory. A nonzero exit with the expected exception is the
-reproduced bug, not successful application behavior. Exit status 2 from the
-helper means an invalid case key or an unexpected ordinary/capped return.
-
-The reproducer needed the **reference reconstruction**, which the bundle no
-longer builds or verifies (nothing takes the fixes off). On the patched tree the
-reproducer prints `REPRODUCER returned suspended at N codelets; expected an
-exception` and exits with status 2: each run now ends with an answer, after the
-same number of codelets as the crash. The three crashes are kept as recorded
-data (`tests/lockstep/traces-known-failures/reference/`) and in the study data
-named below.
+A nonzero exit now means that the run did not do what its record says: a crash of the patched build (the patch is then
+incomplete), a different codelet or a different end. Exit status 2 means an unknown case key. The unpatched build is
+never run by this project, and no tool in it takes a fix off a tree.
 
 The helper is [tests/reproduce-failures.ss](tests/reproduce-failures.ss). It
-contains only our small test driver, not upstream Metacat source. It leaves
-the Scheme exception unhandled so it can be inspected. For advanced diagnosis,
+contains only our small test driver, not upstream Metacat source. It runs one case per process and exits 0 only if
+the case does what its record says. For advanced diagnosis,
 Chez provides `--debug-on-exception` and continuation inspection; see the
 [Chez 9.5 debugging manual](https://cisco.github.io/ChezScheme/csug9.5/debug.html).
 An interactive Docker session is needed to use debugger prompts.
@@ -89,6 +322,10 @@ to overwrite the recorded data or assume the bug is fixed. Cross-platform and
 headed/GUI reproduction of these particular failures has not been established.
 
 ## Where the Evidence Lives
+
+The study was recorded on the build without the fixes, and it is kept as the record of the three study failures (it is
+used for nothing else unless the user asks; see the README of `tests/lockstep/`). The evidence for each fix, in the
+repository, is in "How to reproduce the problem behind each fix" above; nothing in that section points outside git.
 
 The [full public study data](../studies/support-v1a/data/README.md) contains the
 original observations, generated collector scripts, exception details, and
@@ -240,13 +477,11 @@ Verified on 2026-10-28:
 
 Any use of it still counts as a changed engine in the sense of item 4 above.
 
-**Petacat.** Petacat's lockstep harness once recorded both variants (two options of
-`tests/lockstep/metacat/record.py`, since removed: only the patched Metacat is ever run now). The recordings are
-stored data in `tests/lockstep/traces-known-failures/reference/` and `.../fixes/`. Petacat replays the
-reference recordings in lockstep up to each crash point; it does not crash, and it
-carries on as the fixed Metacat does. It replays the fixed recordings to the end with
-no differences. Investigating these seeds found two Petacat port bugs on the same path
-(`DISCREPANCIES5.md` G-Q1, G-Q2), which are fixed.
+**Petacat.** The patched recordings are stored data in `tests/lockstep/traces-known-failures/fixes/`, and Petacat replays
+them to the end with no differences. The recordings of the crashes themselves (`traces-known-failures/reference/`) and their
+registry entries were removed on 2026-11-08, at the user's ruling; "How to reproduce the problem behind each fix" is the
+record, and `tests/reproduce-failures.ss` proves on the patched build that each case takes the fixed path. Investigating
+these seeds found two Petacat port bugs on the same path (`DISCREPANCIES5.md` G-Q1, G-Q2), which are fixed.
 
 ## A fourth crash: a group of six or more
 

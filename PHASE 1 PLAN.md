@@ -171,7 +171,8 @@ Two consequences for the work below:
   (`xyd` at 22.2% against 37.1%, `xyz` at 24.7% against 15.8%) were closed by the
   lockstep pass: 37.5% against 36.6% and 18.0% against 16.7%, with no significant
   difference on any of the 19 problems
-  (`measurements/vs-metacat-support-v1a-lockstep.md`). That is the baseline a rate
+  (`measurements/vs-metacat-support-v1a-lockstep.md`; measured against the support-v1a study, which was recorded on the build
+  without the known-failure fixes, so it is kept and used only when the user asks). That was the baseline a rate
   is now measured against, and `scripts/lockstep_corpus.py --check-ratchet` is the
   sharper test: a change that is meant to leave cognition alone must leave every
   recorded Metacat decision paired.

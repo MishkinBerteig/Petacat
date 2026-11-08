@@ -262,27 +262,87 @@ def test_overrides_reach_the_provider_the_runs_are_built_from(harness, monkeypat
     assert harness._META.get_param("max_coderack_size") == 100
 
 
-def test_the_shipped_reference_sets_are_whole_and_consistent(harness):
-    """The default reference is the in-repository one, and it is complete.
-
-    ``measurements/reference/`` is derived from the support-v1a study data by
-    ``scripts/make_reference_sets.py``. A comparison against a set missing a problem,
-    or a p50 member outside its own set, would flag nothing for the wrong reason.
-    """
+def _reference_directory(tmp_path, source="a derivation from a recording of patched Metacat"):
+    """A small reference directory in the format ``make_reference_sets.py`` writes, built here."""
     import json
 
-    reference = harness.REFERENCE
-    assert os.path.relpath(reference, harness.ROOT) == os.path.join("measurements", "reference")
-    sets = harness.load(reference, "single-run-sets.json")
-    p50s = harness.load(reference, "single-run-p50.json")
-    with open(os.path.join(harness.SEED_DIR, "demo_problems.json")) as fh:
-        demos = {d["name"]: (d["initial"], d["modified"], d["target"]) for d in json.load(fh)}
+    sets = {"source": {"archive": source}, "results": [
+        {"name": "run4", "problem": ["run4", "abc", "abd", "xyz"], "n": 10, "f1_over_n": 0.1,
+         "set": {"wyz": {"count": 6}, "dyz": {"count": 4}}}]}
+    p50s = {"source": {"archive": source}, "results": [
+        {"name": "run4", "problem": ["run4", "abc", "abd", "xyz"], "p50": [{"member": "wyz"}]}]}
+    (tmp_path / "single-run-sets.json").write_text(json.dumps(sets))
+    (tmp_path / "single-run-p50.json").write_text(json.dumps(p50s))
+    return tmp_path
 
-    # The nineteen problems of the study, each one a demo problem with the same strings.
-    assert set(sets) == set(p50s) and len(sets) == 19 and set(sets) <= set(demos)
-    for name, entry in sets.items():
-        assert tuple(entry["problem"][1:]) == demos[name], name
-        assert sum(m["count"] for m in entry["set"].values()) == entry["n"] == 50_000
-        assert {e["member"] for e in p50s[name]["p50"]} <= set(entry["set"])
-    # The one finding DISCREPANCIES4 left open: Metacat does reach it.
-    assert "aac" in sets["copy5"]["set"]
+
+def test_the_reference_loader_reads_a_directory_in_the_derived_format(harness, tmp_path):
+    """``has`` and ``load`` are what the comparison reads its reference sets with. The directory
+    here is built for the test; no test reads ``measurements/reference/``, which is derived from
+    the support-v1a study (recorded on the build without the known-failure fixes) and used only when
+    the user asks for it."""
+    directory = str(_reference_directory(tmp_path))
+    assert harness.has(directory, "single-run-sets.json", "single-run-p50.json")
+    assert not harness.has(directory, "convergence-sets.json")
+    sets = harness.load(directory, "single-run-sets.json")
+    p50s = harness.load(directory, "single-run-p50.json")
+    assert set(sets) == set(p50s) == {"run4"}
+    assert tuple(sets["run4"]["problem"][1:]) == ("abc", "abd", "xyz")
+    assert {e["member"] for e in p50s["run4"]["p50"]} <= set(sets["run4"]["set"])
+    assert sum(m["count"] for m in sets["run4"]["set"].values()) == sets["run4"]["n"]
+    # The default reference is named, never opened, here.
+    assert os.path.relpath(harness.REFERENCE, harness.ROOT) == os.path.join("measurements", "reference")
+
+
+def _run_main(module, argv, monkeypatch):
+    import sys
+
+    monkeypatch.setattr(sys, "argv", [os.path.basename(module.__file__), *argv])
+    with pytest.raises(SystemExit) as stop:
+        module.main()
+    return stop.value.code
+
+
+def test_the_comparison_refuses_its_derived_default_reference_without_the_flag(harness, monkeypatch, capsys):
+    def read(*args, **kwargs):
+        raise AssertionError("a reference file was read")
+
+    monkeypatch.setattr(harness, "load", read)
+    monkeypatch.setattr(harness, "has", read)
+    assert _run_main(harness, ["--mode", "single"], monkeypatch) == 2
+    err = capsys.readouterr().err
+    assert "--user-asked-for-support-v1a" in err and "without the known-failure fixes" in err
+    assert "used only when the user specifically asks" in err
+
+
+def test_the_comparison_refuses_a_copy_of_the_derived_files_without_the_flag(harness, tmp_path, monkeypatch, capsys):
+    directory = _reference_directory(tmp_path, source="studies/support-v1a/data/main.tar.gz")
+    assert _run_main(harness, ["--mode", "single", "--reference", str(directory)], monkeypatch) == 2
+    assert "--user-asked-for-support-v1a" in capsys.readouterr().err
+
+
+def test_the_comparison_does_not_refuse_a_reference_that_is_not_derived_from_the_study(
+        harness, tmp_path, monkeypatch, capsys):
+    directory = _reference_directory(tmp_path)  # lacks the convergence sets, so "episodic" stops it
+    assert _run_main(harness, ["--mode", "episodic", "--reference", str(directory)], monkeypatch) == 2
+    err = capsys.readouterr().err
+    assert "no convergence sets" in err and "--user-asked-for-support-v1a" not in err.split("error:")[-1]
+
+
+def test_make_reference_sets_refuses_the_study_without_the_flag_and_opens_nothing(monkeypatch, capsys):
+    import tarfile
+
+    path = os.path.join(os.path.dirname(SCRIPT), "make_reference_sets.py")
+    spec = importlib.util.spec_from_file_location("make_reference_sets", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    def read(*args, **kwargs):
+        raise AssertionError("the study was opened")
+
+    monkeypatch.setattr(tarfile, "open", read)
+    monkeypatch.setattr("builtins.open", read)
+    assert _run_main(module, [], monkeypatch) == 2
+    monkeypatch.undo()
+    err = capsys.readouterr().err
+    assert "--user-asked-for-support-v1a" in err and "without the known-failure fixes" in err

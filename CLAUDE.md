@@ -63,6 +63,11 @@ Metacat means patched Metacat as opposed to Petacat.
 - **A crash in patched Metacat means the patch is incomplete.** Add a fix to
   `Metacat/patches/fixes/`, rebuild, and bring Metacat Mode into line with the result. Such a crash is
   never a deliberate difference. The patch keeps evolving as crashes are found.
+- **Every fix has an exact reproduction record** in `Metacat/KNOWN-FAILURES.md` ("How to reproduce the
+  problem behind each fix"): the input, seed, settings, the build it crashed on, the codelet, the error
+  and one command. A new fix adds its own entry and its cases to `Metacat/tests/reproduce-failures.ss`,
+  and `scripts/reproduce-metacat-fixes.sh` proves on the patched build that each case takes the fixed
+  path where it used to crash. No recording from a build without the fix is kept.
 - A trace recorded from patched Metacat has a `revision` header ending `+known-failure-fixes`.
 - Every agent brief that records from or compares against Metacat must state this rule.
 
@@ -101,6 +106,10 @@ ratchets and the golden baselines.
   problem counts. An agent is not a judge of the solution space for letter-analogy problems.
 - **Metacat's input parser is a reference too.** Metacat Mode's parser is measured against patched
   Metacat's, on every Unicode character.
+- **The `support-v1a` study is not a reference.** It was recorded on the build without the fixes. It is
+  kept unchanged in `studies/support-v1a/` and used only when the user specifically asks: the three tools
+  that read it, or files derived from it, refuse without `--user-asked-for-support-v1a`. The
+  answer-frequency comparison has no Metacat reference until one is recorded on patched Metacat.
 
 ## Modes and terminology — MANDATORY
 

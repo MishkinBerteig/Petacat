@@ -31,12 +31,6 @@ id = "DISC5:A-4"
 cause = "deliberate"
 match = { class = "p", petacat_codelet = "breaker" }
 effect = "complement"
-
-[[divergence]]
-id = "REF:crash"
-cause = "reference"
-effect = "skip"
-match = { class = "reference-crash", problem = ["abc", "abd", "xyz"], seed = 1 }
 """
 
 
@@ -309,32 +303,6 @@ def test_the_corpus_driver_and_faithful_mode_name_the_same_backend_variable():
     assert corpus.NUMERIC_BACKEND_ENV == faithful.NUMERIC_BACKEND_ENV
 
 
-def test_reference_crash_registers_what_follows_the_crashing_codelet():
-    # Metacat died inside codelet 5 (end reason "error"); Petacat carried on and answered.
-    m = [prob(0.5, c=4), prob(0.5, c=5)]
-    pets = pair_up(m) + [{**prob(0.5, c=5), "pair": None}, {**prob(0.5, c=6), "pair": None}]
-    rep = run(m, pets, meta_end={"t": "end", "c": 5, "reason": "error", "error": "boom", "codelets": 4},
-              pet_end=end(c=6))
-    assert rep.unregistered_error_count == 0
-    assert rep.registered_counts == {"REF:crash": 3}
-
-
-def test_reference_crash_does_not_hide_an_earlier_divergence():
-    m = [prob(0.5, c=4), prob(0.5, c=5)]
-    pets = pair_up(m, [prob(0.6, c=4), prob(0.5, c=5)])
-    rep = run(m, pets, meta_end={"t": "end", "c": 5, "reason": "error", "error": "boom", "codelets": 4},
-              pet_end=end(c=5))
-    assert rep.counts == {"p": 1}
-
-
-def test_reference_crash_needs_a_matching_trace():
-    m = [prob(0.5, c=5)]
-    meta = ct.Trace.from_records([{**HEADER, "seed": 2}, *m, {"t": "end", "c": 5, "reason": "error"}])
-    pet = ct.Trace.from_records([{**HEADER, "seed": 2}, *pair_up(m), end(c=5)])
-    rep = ct.compare_traces(meta, pet, REGISTRY)
-    assert rep.counts == {"end": 1}
-
-
 # -- Metacat's old crash on a group of six or more objects (DISCREPANCIES5.md R1) -----------------
 # Patched Metacat no longer crashes there (Metacat/patches/fixes/0002-length-group-of-six-or-more.patch),
 # so a crash of that shape is an error like any other and is registered by nothing.
@@ -370,6 +338,8 @@ def test_the_registry_no_longer_holds_the_group_of_six_crash():
     ids = {e.id for e in _SHIPPED.entries}
     assert "REF:crash-bridge-builder-group-of-6-or-more" not in ids
     assert not any("shape" in e.match for e in _SHIPPED.entries)
+    assert not any(e.match.get("class") == "reference-crash" for e in _SHIPPED.entries)
+    assert not any(e.id.startswith("REF:") for e in _SHIPPED.entries)
 
 
 def test_any_other_metacat_crash_is_still_an_error():

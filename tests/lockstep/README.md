@@ -20,16 +20,17 @@ are recorded in `DISCREPANCIES5.md`: the status lines on A-1…D-11 and section 
 | Corpus driver and ratchet | `scripts/lockstep_corpus.py`, `ratchet*.json` | Replays and compares a whole corpus in parallel, prints a table, and keeps per-trace reach, agreement, error count and differing state snapshots. A trace may not get worse. `--numeric-backend` replays with a backend on and checks against the same ratchet; `--extended` replays the extended golden baseline's cases against `ratchet-extended.json`. |
 | Verbose narration | `metacat/record_verbose.py`, `scripts/compare_verbose.py`, `verbose_metacat.txt.gz`, `test_verbose.py` | Logs what Metacat prints with `%verbose%` on (the per-codelet banner and every `say`, `vprintf`, `vprint`), replays the same run in Petacat with Verbose mode on, and compares the two line for line. `--verbose` on the corpus driver replays with the mode on and checks the same ratchet. |
 | Golden baselines | `golden/engine_baseline*`, `golden/extended_*`, `../support/golden_baseline.py`, `../support/golden_extended.py`, `../../scripts/capture_golden_baseline.py`, `../../scripts/golden_coverage.py` | Byte-for-byte records of what the engine does (answers, per-codelet RNG draws, trace and state hashes, English): the 188 common-case runs, and the extended baseline of rare paths whose every case was checked against Metacat (below). They guard engine refactors, not fidelity; fidelity is what the traces above measure. |
-| Patched-only and coverage guards | `test_patched_only.py`, `test_ratchet_covers_golden.py` | The first fails if a recorder can run anything but the patched build, or if a stored trace's header does not end in `+known-failure-fixes` (`traces-known-failures/reference/` aside). The second fails if a run of either golden baseline has no ratchet entry. |
-| Registry | `known_divergences.toml` | Divergences that were triaged and kept. Today it holds only Metacat's own crashes (`Metacat/KNOWN-FAILURES.md`); every port divergence found so far was fixed. |
+| Patched-only and coverage guards | `test_patched_only.py`, `test_ratchet_covers_golden.py` | The first fails if a recorder can run anything but the patched build, or if a stored trace's header does not end in `+known-failure-fixes` (with no exception). The second fails if a run of either golden baseline has no ratchet entry. |
+| Registry | `known_divergences.toml` | Divergences that were triaged and kept. Today it holds nothing: every port divergence found so far was fixed, and the entries for the crashes of the build without the fixes were removed on 2026-11-08. A crash of patched Metacat is never registered. |
 
 ## Corpora
 
 Every corpus below was recorded from the **patched Metacat**: `Metacat/build/source` with the bundle's second
 patch group, the known-failure fixes. The recorder refuses any other build (`metacat/record.py`,
 `require_patched`), and a trace's `revision` header ends in `+known-failure-fixes`; `test_patched_only.py` checks
-every stored header. The one folder that is not patched is `traces-known-failures/reference/`, stored data that
-nothing runs and that documents the crashes the fixes remove.
+every stored header, with no exception. (The recordings of the crashes of the build without the fixes,
+`traces-known-failures/reference/`, were removed on 2026-11-08 at the user's ruling; `Metacat/KNOWN-FAILURES.md`,
+"How to reproduce the problem behind each fix", is the record.)
 
 | Corpus | Location | Size | Committed? |
 | --- | --- | --- | --- |
@@ -37,14 +38,15 @@ nothing runs and that documents the crashes the fixes remove.
 | Episodes: 8 runs per episode, memory carried | `traces/episodes/<slug>/<S>.r<k>.metacat.jsonl.gz` | 67 episodes over all 19 problems (536 runs, 6.5 M codelets, ~1.6 GB) | No |
 | Justify mode: the demo answers × seeds 1–5 | `traces/justify/<i-m-t-a>/<seed>…` | 85 traces | No |
 | Extended golden baseline: every case of `golden/extended_cases.json`, recorded with the case's own cap, answer, memory clears, interventions and Self-watching setting | `traces-extended/<case id>/` (laid out like the corpora above) | 76 cases, 117 runs | No |
-| Metacat's known failures: with the bundle's known-failure fixes (the patched build), and as the unpatched reference reconstruction crashed | `traces-known-failures/{fixes,reference}/` | 6 traces | Yes |
+| Metacat's known failures, recorded with the bundle's known-failure fixes (the patched build) | `traces-known-failures/fixes/` | 3 traces | Yes |
 | Translation logs: the six runs behind `translation_log_metacat.tsv` | `traces-translation/<slug>/<seed>.metacat.jsonl.gz` | 6 traces | Yes |
 | Snag explanations: seven runs beyond the corpus that between them hit every shape of failure (CHANGE, SWAP, CONFLICT, group-category reversal), with Metacat's logged explanations and comment lines | `traces-snags/<slug>/<seed>.metacat.jsonl.gz`, `snag_explanations_metacat.tsv` | 7 traces, 1.5 MB | Yes |
 | Desync regressions: the shortest prefixes (caps of 260-480 codelets) of three runs beyond the corpus that used to desynchronise Petacat's replay (`a-b-xyz` 1, `abc-bcd-xyz` 1, `aaa-bbb-xyz` 3; `DISCREPANCIES5.md` G-Y2…G-Y4) | `traces-desync/<slug>/<seed>.metacat.jsonl.gz` | 3 traces, 0.3 MB | Yes |
 
-`traces-known-failures/reference/` was made once, in October 2026, by recording the three crash seeds on the
-reconstruction without the fixes, to show what the fixes remove (`metacat/README.md`, "Metacat's known failures").
-Nothing records on that build any more.
+The three recordings of the crash seeds on the reconstruction without the fixes were made once, in October 2026, and
+removed on 2026-11-08 at the user's ruling. Nothing records on that build any more. What remains is the written record of how
+to reproduce the problem behind each fix (`Metacat/KNOWN-FAILURES.md`) and a helper that proves on the patched build that each case
+takes the fixed path (`Metacat/tests/reproduce-failures.ss`).
 
 `tests/lockstep/data/parser_metacat.json.gz` is not a trace: it is how Metacat's own input parser (`tokenize-string`
 and `valid-token-list?`, the command line of the control panel) reads every Unicode scalar value and 200 whole lines, recorded
@@ -170,7 +172,8 @@ for the reference path, so this is the check that what Petacat actually runs mak
 Metacat's decisions too.
 
 As the spec's final confirmation, Petacat's own answer distributions were compared with the
-published support-v1a reference: 200 runs per problem against 20,000 Metacat runs per
+published support-v1a reference (a study recorded on the Metacat build without the known-failure fixes; it is kept and used
+only when the user asks, and the tools that read it refuse without `--user-asked-for-support-v1a`): 200 runs per problem against 20,000 Metacat runs per
 problem. No significant difference was found on any of the 19 problems
 (`measurements/vs-metacat-support-v1a-lockstep.md`).
 
@@ -462,15 +465,19 @@ forms are in `scripts/compare_frequencies.py` (Metacat side:
 # one problem, both engines on the same seeds (the 1,000-run wxyz study; ~10 min, Docker + 4 cores)
 .venv/bin/python scripts/compare_frequencies.py study wxyz vxyz abcd 101-1100 --jobs 4 --metacat-jobs 4
 .venv/bin/python scripts/compare_frequencies.py study wxyz vxyz abcd 101-1100 --workers 6 --jobs 3   # free-running Petacat (BACKEND=numpy)
-# Petacat against the published support-v1a observations of the 19 problems (~25 min, 10 cores, no Docker)
-.venv/bin/python scripts/compare_frequencies.py support-v1a --runs 200 --jobs 10 \
+# Petacat against the published support-v1a observations of the 19 problems (~25 min, 10 cores, no Docker).
+# NOT USED unless the user asks: the study was recorded on the build without the known-failure fixes, and the
+# tool refuses without the flag.
+.venv/bin/python scripts/compare_frequencies.py support-v1a --user-asked-for-support-v1a --runs 200 --jobs 10 \
     --json measurements/vs-metacat-support-v1a-lockstep.json
 ```
 
 `study` prints both frequency tables, mean codelets, the total-variation distance, a
 two-sample chi-square (rare answers pooled to expected count >= 5) and a z score per common
 answer; recordings land in `tests/lockstep/out/frequencies/` and can be re-compared with
-`--metacat FILE --petacat FILE`.  `support-v1a` reads the reference counts from
+`--metacat FILE --petacat FILE`.  `support-v1a` (which needs `--user-asked-for-support-v1a`; the same flag is needed by
+`scripts/compare_to_metacat.py`, whose default reference `measurements/reference/` is derived from the study, and by
+`scripts/make_reference_sets.py`) reads the reference counts from
 `studies/support-v1a/data/main.tar.gz` (reproduced exactly: the per-problem frequencies in
 `measurements/vs-metacat-support-v1a-lockstep.json` are equal to those computed now), runs
 Petacat on seeds 5000001.. and reports TV against its expected value under the reference,
@@ -479,7 +486,7 @@ statistically indistinguishable from Metacat's on every problem (see
 `measurements/vs-metacat-support-v1a-lockstep.md`); the Monte Carlo p-values vary a little with
 the random generator, the frequencies and TV do not.  Spot-checked: `--only copy1,copy4,misc2,run4`
 reproduces the committed Petacat frequencies and TV exactly (about 2.5 minutes with `--jobs 4`).
-No comparison is a pass/fail gate.  Tests without Docker: `test_frequencies.py`.
+No comparison is a pass/fail gate.  There is no Metacat reference for answer frequencies on patched Metacat until one is recorded.  Tests without Docker (none reads the study or a file derived from it): `test_frequencies.py`.
 
 ## Snag explanations, snag sweep and fidelity net
 

@@ -197,28 +197,6 @@ class Registry:
             info["function"] = best[1]
         return info
 
-    def lookup_reference_crash(self, header: dict, end: dict | None) -> Divergence | None:
-        """A registered Metacat crash (``match.class = "reference-crash"``).
-
-        Matches a trace whose Metacat ``end`` record is reason ``error`` and whose header has the
-        entry's ``problem`` (list of three strings) and ``seed``.  Patched Metacat does not crash on
-        any registered input: the entries are the three runs of ``Metacat/KNOWN-FAILURES.md``,
-        recorded on the reference reconstruction that the patch group fixes.  Any other crash of
-        patched Metacat is an error, and means the patch group must grow.
-
-        Everything the replay does from the crashing codelet on is then the consequence of the
-        reference bug."""
-        if not end or end.get("reason") != "error":
-            return None
-        for e in self.entries:
-            m = e.match
-            if m.get("class") != "reference-crash":
-                continue
-            if list(m.get("problem", [])) == list(header.get("problem", [])) \
-                    and m.get("seed") == header.get("seed"):
-                return e
-        return None
-
     def lookup(self, klass: str, site: str | None, complemented: bool = False) -> Divergence | None:
         info = self.resolve_site(site)
         for e in self.entries:
@@ -725,17 +703,6 @@ def compare_traces(meta: Trace, pet: Trace, registry: Registry, rel_tol: float =
                     rep.state_snapshots_differing += 1
                     if rep.state_snapshot_first_diff is None:
                         rep.state_snapshot_first_diff = s
-
-    # a registered reference crash: what the replay does from the crashing codelet on
-    # (the codelet's remaining decisions, later codelets, the end record) is not an error
-    crash = registry.lookup_reference_crash(meta.header, meta.end)
-    if crash is not None:
-        crash_c = (meta.end or {}).get("c")
-        for _, f in findings:
-            if f.severity == "error" and (f.klass == "end"
-                                          or (crash_c is not None and f.c is not None and f.c >= crash_c)):
-                f.registered = crash.id
-                f.severity = "registered"
 
     # sort findings by position and attach snapshot context for first fatal/error
     findings.sort(key=lambda t: t[0])

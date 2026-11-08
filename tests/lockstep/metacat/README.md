@@ -248,14 +248,12 @@ python3 tests/lockstep/metacat/record.py --problem abc cba mrrjjj \
 # and the same for abc aabbcc kkjjii, seed 20226148
 ```
 
-`traces-known-failures/reference/` is history: in October 2026, before the ruling that only the patched build is
-run, the same three seeds were recorded once on the reconstruction without the fixes, to keep what the fixes remove.
-Those three files are stored data that nothing runs, and no tool can record on that build any more.
+The recordings of the same three seeds on the reconstruction without the fixes (`traces-known-failures/reference/`) were made once,
+in October 2026, before the ruling that only the patched build is run. They were removed on 2026-11-08 at the user's ruling,
+together with their registry entries. The record of how to reproduce the problem behind each fix is in
+`Metacat/KNOWN-FAILURES.md` ("How to reproduce the problem behind each fix"), and `Metacat/tests/reproduce-failures.ss`
+(run by `scripts/reproduce-metacat-fixes.sh`) proves on the patched build that each case takes the fixed path.
 
-- **Reference (stored, historical).** Each trace ends with an `end` record of reason `error`.  The comparer
-  registers each one as a reference crash (`known_divergences.toml`,
-  `match.class = "reference-crash"`).  Petacat replays them in lockstep to each crash
-  point.
 - **Fixes.** The runs answer `rrjjjm`, `rrjjjm` and `kji`.  Petacat replays them to the end
   with no differences:
   `.venv/bin/python scripts/lockstep_corpus.py --traces tests/lockstep/traces-known-failures/fixes`.

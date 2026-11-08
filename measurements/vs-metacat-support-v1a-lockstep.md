@@ -6,6 +6,11 @@
 > database. The current description of the system is in [README.md](../README.md) and
 > [TESTING.md](../TESTING.md).
 
+> **Measured against the support-v1a study, which is not used unless the user asks (2026-11-08).** The
+> reference in this file is the support-v1a study, which was recorded on the Metacat build without the
+> known-failure fixes, not on patched Metacat. The study is kept, and this file with it, but nothing uses
+> either unless the user specifically asks for it (`--user-asked-for-support-v1a`).
+
 Final confirmation step of the lockstep pass (meta-peta-trace-idea.md section 1): do answer frequencies match now that decision traces match?
 
 ## Method and provenance

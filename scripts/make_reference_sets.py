@@ -47,8 +47,12 @@ import argparse
 import hashlib
 import json
 import os
+import sys
 import tarfile
 from collections import Counter
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import support_v1a_guard as guard  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ARCHIVE = os.path.join(ROOT, "studies", "support-v1a", "data", "main.tar.gz")
@@ -140,7 +144,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--archive", default=ARCHIVE)
     ap.add_argument("--quiet", action="store_true")
+    guard.add_flag(ap)
     args = ap.parse_args()
+    if guard.is_study_archive(args.archive):
+        guard.require(ap, args, "derive reference sets from the support-v1a study")
 
     with open(args.archive, "rb") as fh:
         archive_sha = hashlib.sha256(fh.read()).hexdigest()

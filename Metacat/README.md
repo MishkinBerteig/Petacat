@@ -57,8 +57,11 @@ reconstruction** do not fix them. A **second patch group** does (see
 [the known-failure fixes](#the-known-failure-fixes)); it is always applied, and it keeps
 growing whenever the patched Metacat is found to crash. See
 [KNOWN-FAILURES.md](KNOWN-FAILURES.md) for the exact inputs and seeds, recorded
-exceptions, the diagnosis, and a small standalone reproducer. The [full study data](../studies/support-v1a/data/README.md) is
-published separately from this source-reconstruction bundle.
+exceptions, the diagnosis, an exact record of how to reproduce the problem behind each fix, and a helper
+(`tests/reproduce-failures.ss`, run by `scripts/reproduce-metacat-fixes.sh`) that proves on the patched build that each case takes the fixed
+path. This project never runs a tree without a fix. The [full study data](../studies/support-v1a/data/README.md) is
+published separately from this source-reconstruction bundle; the study was recorded on the build without the fixes, so it is
+kept and used only when the user asks for it.
 
 ## 1. Install the Prerequisites
 

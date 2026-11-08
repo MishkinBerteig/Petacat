@@ -136,8 +136,10 @@ naming table in its `README.md`):
   with `--apply-fixes`; nothing takes the fixes off).  It
   is always applied.  Every other recorded run (655 across
   the development, seeds 11-30 and justify corpora, checked before the unfixed build was
-  removed from the tools) gave a byte-identical trace with and without it.  Petacat follows Metacat to each crash point and behaves as the fixed
-  Metacat past it.  The registry marks the three as reference crashes.  The group is not
+  removed from the tools) gave a byte-identical trace with and without it.  The recordings of the three crashes on the build without the fixes, and
+  the registry entries that marked them as reference crashes, were removed on 2026-11-08 at the user's ruling; what remains is
+  the written record of how to reproduce the problem behind each fix (`Metacat/KNOWN-FAILURES.md`) and a helper that proves on the
+  patched build that each case takes the fixed path (`Metacat/tests/reproduce-failures.ss`).  The group is not
   closed: a crash of patched Metacat means another file is added to it (ruling of 2026-11-06).
   The second, `0002-length-group-of-six-or-more.patch`, fixes the crash of a Length concept mapping
   for a group of six or more objects (`Metacat/KNOWN-FAILURES.md`, "A fourth crash"); nothing is

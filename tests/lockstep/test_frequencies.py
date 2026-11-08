@@ -4,15 +4,23 @@
 ``scripts/compare_frequencies.py`` (Petacat side and statistics) are checked on the parts
 that need neither the ``metacat:1.2`` container nor a long run: recording and seed
 parsing, the chi-square and total-variation code against hand-computed values, the
-reference counts read from ``studies/support-v1a`` against the numbers committed in
-``measurements/vs-metacat-support-v1a-lockstep.json``, and one tiny Petacat run.
+reference-count reader on a small archive built here, and one tiny Petacat run.
+
+No test here reads the support-v1a study, or a file derived from it (``measurements/reference/``,
+``measurements/vs-metacat-support-v1a-lockstep.json``). That study was recorded on the Metacat build
+without the known-failure fixes, so it is kept and used only when the user asks for it:
+``compare_frequencies.py support-v1a`` refuses without ``--user-asked-for-support-v1a``, and a test
+below shows the refusal without reading the study.
 """
 
 from __future__ import annotations
 
+import io
 import json
 import math
+import subprocess
 import sys
+import tarfile
 from pathlib import Path
 
 import pytest
@@ -104,7 +112,7 @@ def test_compare_samples_reports_common_answers_only():
 
 
 def test_compare_to_reference_reproduces_the_committed_pooled_chi_square():
-    # copy1, 200 Petacat runs, as committed in measurements/vs-metacat-support-v1a-lockstep.json
+    # copy1, 200 Petacat runs: fixed numbers written here, checked against the statistics code
     ref = {"c": 17269, "ab": 2731}
     got = cf.compare_to_reference(ref, ["c"] * 173 + ["ab"] * 27)
     assert got["tv"] == pytest.approx(0.00155, abs=1e-9)
@@ -124,21 +132,66 @@ def test_table_lists_the_most_common_answers_first():
     assert rows[1].startswith("a") and rows[2].startswith("b") and len(rows) == 3
 
 
-def test_problem_strings_are_the_nineteen_study_problems():
-    strings = cf.problem_strings()
-    assert len(strings) == 19 and strings["run4"] == ["abc", "abd", "xyz"]
+def test_problem_strings_reads_the_names_and_strings_of_a_reference_file(tmp_path):
+    path = tmp_path / "single-run-sets.json"
+    path.write_text(json.dumps({"results": [
+        {"name": "run4", "problem": ["run4", "abc", "abd", "xyz"]},
+        {"name": "copy1", "problem": ["copy1", "abc", "abc", "xyz"]}]}))
+    assert cf.problem_strings(path) == {"run4": ["abc", "abd", "xyz"], "copy1": ["abc", "abc", "xyz"]}
 
 
-@pytest.mark.skipif(not cf.SUPPORT_TAR.exists(), reason="studies/support-v1a data not present")
-def test_reference_counts_equal_the_committed_measurement():
-    committed = json.loads((ROOT / "measurements" / "vs-metacat-support-v1a-lockstep.json").read_text())
-    ref = cf.reference_counts()
-    assert set(ref) == set(committed["problems"])
-    for name, entry in committed["problems"].items():
-        total = sum(ref[name].values())
-        assert total == entry["reference"]["n"] == 20000
-        for answer, freq in entry["reference"]["freq"].items():
-            assert ref[name][answer] / total == pytest.approx(freq, abs=1e-12)
+def _small_archive(path):
+    """A tiny archive in the layout ``reference_counts`` reads: an admitted attempt per chunk
+    (its ``complete.json``), a second attempt that was not admitted, a capped run and a repeated seed."""
+    def add(tar, name, data):
+        raw = data.encode()
+        info = tarfile.TarInfo(name)
+        info.size = len(raw)
+        tar.addfile(info, io.BytesIO(raw))
+
+    def row(problem, seed, state, termination="answered"):
+        return json.dumps({"problem": problem, "seed": seed, "state": state, "termination": termination})
+
+    with tarfile.open(path, "w:gz") as tar:
+        base = "x/chunks/construction/p/000001"
+        add(tar, f"{base}/complete.json", json.dumps({"attempt": "attempt-002"}))
+        add(tar, f"{base}/attempt-001/runs.jsonl", row("p", 1, "NOT-ADMITTED") + "\n")
+        add(tar, f"{base}/attempt-002/runs.jsonl", "\n".join([
+            row("p", 1, "c"), row("p", 2, "c"), row("p", 3, "ab"), row("p", 3, "zz"),
+            row("p", 4, "ignored", "capped")]) + "\n")
+        add(tar, "x/chunks/validation/p/000001/complete.json", json.dumps({"attempt": "attempt-001"}))
+
+
+def test_reference_counts_reads_the_admitted_attempt_once_per_seed(tmp_path):
+    archive = tmp_path / "small.tar.gz"
+    _small_archive(archive)
+    assert cf.reference_counts(archive) == {"p": {"c": 2, "ab": 1, "*CAP*": 1}}
+
+
+def test_the_support_v1a_mode_refuses_without_the_flag_and_reads_nothing(monkeypatch, capsys):
+    def read(*args, **kwargs):
+        raise AssertionError("the study or a derived file was read")
+
+    monkeypatch.setattr(cf.tarfile, "open", read)
+    monkeypatch.setattr(cf, "reference_counts", read)
+    monkeypatch.setattr(cf, "problem_strings", read)
+    monkeypatch.setattr(sys, "argv", ["compare_frequencies.py", "support-v1a", "--runs", "1"])
+    with pytest.raises(SystemExit) as stop:
+        cf.main()
+    assert stop.value.code == 2
+    err = capsys.readouterr().err
+    assert "--user-asked-for-support-v1a" in err and "without the known-failure fixes" in err
+    assert "used only when the user specifically asks" in err
+
+
+def test_the_flag_has_the_same_name_in_all_three_tools():
+    flag = "--user-asked-for-support-v1a"
+    for command in (["compare_frequencies.py", "support-v1a", "--help"],
+                    ["compare_to_metacat.py", "--help"],
+                    ["make_reference_sets.py", "--help"]):
+        done = subprocess.run([sys.executable, str(ROOT / "scripts" / command[0]), *command[1:]],
+                              capture_output=True, text=True, cwd=ROOT)
+        assert done.returncode == 0 and flag in done.stdout, command
 
 
 def test_one_small_petacat_run_is_classified():
