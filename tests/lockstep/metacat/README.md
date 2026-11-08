@@ -283,8 +283,9 @@ which its image carries, and a letter, which has no medium, answers false to `sa
 Metacat Mode follows (`_group_category_medium` in `server/engine/rules.py`).  Nothing is registered for it.  The five runs recorded
 again are identical to their old recordings up to the old crash point, and run on (four to the cap of 6,000 codelets, `abcxyz`
 seed 74 to the answer `kjirqp`); 720 runs of the three problems (seeds 1 to 240) end without an error, and their replays
-reach the end of Metacat's recording with agreement 1.0.  Four of them are in the extended golden baseline (stage V2,
-`tests/lockstep/README.md`).
+reach the end of Metacat's recording with agreement 1.0.  Two of the crash runs, `pqcd` seed 1 and `abcxyz` seed 35, are
+cases of the extended golden baseline (stage V2), and so is `abcxyz` seed 23 (stage V3), the one whose own golden run takes
+the new reversal (`tests/lockstep/README.md`).
 
 ## Translation logs: `record_translation.py`
 

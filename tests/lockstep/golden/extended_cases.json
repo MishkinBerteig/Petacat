@@ -3432,6 +3432,46 @@
      }
     ]
    }
+  },
+  {
+   "id": "discovery/abcxyz-cbazyx-ijkpqr/s23-cap6000",
+   "kind": "discovery",
+   "problem": [
+    "abcxyz",
+    "cbazyx",
+    "ijkpqr"
+   ],
+   "seeds": [
+    23
+   ],
+   "cap": 6000,
+   "why": {
+    "engine_lines": 2,
+    "engine_arcs": 2,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [
+     "stage V3: the only golden run that reaches the fallback of _group_category_medium (rules.py:3326) and the English of a subobjects group-category change, 'Reverse starting and ending points of all objects in ...' (rule_english.py:244), measured by scripts/golden_coverage.py against both golden baselines without it",
+     "stage V3: Petacat's own run of seed 23 applies a group-category transform with no bond-facet transform in the same list, 8 times from codelet 3348, so that _group_category_medium falls back to the image's own medium, and answers kjirqp in 3382 codelets; Metacat's recording of seed 23 (made on the build with fix 0004) also answers kjirqp, at codelet 3196, and Metacat Mode replays it to its end with agreement 1.0"
+    ],
+    "most_new_in": [
+     "rules.py (1)",
+     "rule_english.py (1)"
+    ],
+    "note": "the one case whose own golden run takes the group-category reversal that stage V2 fixed at rules.ss:1351; the two stage V2 crash cases (pqcd seed 1, abcxyz seed 35) hold that fidelity only in their ratchet entries"
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 3197,
+      "run_length": 3197,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
   }
  ]
 }

@@ -250,7 +250,7 @@ runs the default configuration on NumPy. One caveat: the replay follows Metacat'
 runs Petacat's own random stream on the same inputs, so the check says that the situations Metacat reaches
 are handled as Metacat handles them, not that the baseline's own trajectory is Metacat's.
 
-**Every case is in a ratchet.** All 122 runs are in `ratchet-extended.json` (key `<case id>|<layout slug>/<seed>`, for
+**Every case is in a ratchet.** All 123 runs are in `ratchet-extended.json` (key `<case id>|<layout slug>/<seed>`, for
 example `episode/a-aa-b/s1x6-cap4000|episodes/a-aa-b/1.r1`), and all 188 runs of the original baseline are in
 `ratchet.json`, `ratchet-justify.json` and `ratchet-episodes.json`. `test_ratchet_covers_golden.py` fails for any run of
 either golden baseline that has no entry. The extended traces are recorded from the patched Metacat, one folder per
@@ -261,8 +261,8 @@ them `python`, is replayed with that backend whatever `--numeric-backend` says) 
 entry is full reach, agreement 1.0, 0 errors and 0 differing snapshots. The 8 episode answer reports stay checked
 by `scripts/compare_episode_answers.py`, which is not a ratchet.
 
-**What is in it** (81 cases, 122 runs, 8 episode answer reports; about 30 s in one process, the whole file
-recomputed in 6-12 s over a process pool): 54 discovery cases, 19 justify cases, 8 episodes; ten with a
+**What is in it** (82 cases, 123 runs, 8 episode answer reports; about 30 s in one process, the whole file
+recomputed in 6-12 s over a process pool): 55 discovery cases, 19 justify cases, 8 episodes; ten with a
 person's actions (the Options menu's group and rule codelet clamps, Clamp Themes with two themes, Undo last
 clamp, and the Self-watching check item: switched off in one case, off and on again in two), one episode with Clear Memory before run 4, 39 runs
 that the codelet cap ends in Petacat's own record, and the first appearance of `conflict` snags, `manual-clamp` events and cap-ended
@@ -329,8 +329,19 @@ They add no engine or database line or branch (measured with `scripts/golden_cov
 branches, 798 of 849 database lines and 648 of 722 database arcs, with and without them). Neither golden baseline moved when
 `_group_category_medium` replaced the old skip in `rules.py`: both were captured again on the new code and are byte-identical to the
 committed files (apart from the four new lines), because no golden run applies a transform list with a group category and no
-bond-facet transform. Metacat Mode replays 720 recordings (seeds 1 to 240 of `pqcd -> cbpo; tugh`, `defpqr -> pondcb; hijstu` and
+bond-facet transform (at the time of stage V2; stage V3, below, adds one that does). Metacat Mode replays 720 recordings (seeds 1 to 240 of `pqcd -> cbpo; tugh`, `defpqr -> pondcb; hijstu` and
 `abcxyz -> cbazyx; ijkpqr`, 8 of which reach such a list) to their ends with agreement 1.0, 0 errors and 0 differing snapshots.
+
+Stage V3 added one case, `discovery/abcxyz-cbazyx-ijkpqr/s23-cap6000` (`abcxyz -> cbazyx; ijkpqr`, seed 23, cap 6000), the one whose
+own golden run takes the new reversal: on the backend `off`, Petacat's own run applies a group-category transform with no
+bond-facet transform in the same list 8 times from codelet 3,348, so `_group_category_medium` falls back to the image's own medium,
+and answers `kjirqp` in 3,382 codelets (the code before the fix stopped at the cap). Metacat's recording of seed 23, made on the
+build with patch 0004, answers `kjirqp` at codelet 3,196 and replays with reach 3,197, agreement 1.0, 0 errors and 0 differing
+snapshots. Every earlier line of `extended_baseline.jsonl` is unchanged (only the header's case count and `cases_file_sha` moved),
+and `ratchet-extended.json` gained that one key. The number of runs the cap ends in Petacat's own record stays 39. It is the
+only golden run that reaches two engine lines, the fallback of `_group_category_medium` and the English of a subobjects
+group-category change, "Reverse starting and ending points of all objects in ..." (measured with `scripts/golden_coverage.py`:
+12,711 of 14,828 engine lines and 4,557 of 5,890 branches without it, 12,713 and 4,559 with it).
 
 | | Original baseline | Original + extended |
 | --- | --- | --- |

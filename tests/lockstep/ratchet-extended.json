@@ -77,6 +77,12 @@
   "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
+ "discovery/abcxyz-cbazyx-ijkpqr/s23-cap6000|abcxyz-cbazyx-ijkpqr/23": {
+  "agreement": 1.0,
+  "reach": 3197,
+  "state_snapshots_differing": 0,
+  "unregistered_errors": 0
+ },
  "discovery/abcxyz-cbazyx-ijkpqr/s35-cap6000|abcxyz-cbazyx-ijkpqr/35": {
   "agreement": 1.0,
   "reach": 6000,
