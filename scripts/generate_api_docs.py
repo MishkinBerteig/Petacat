@@ -152,7 +152,7 @@ def render() -> str:
         "",
         "Interactive documentation is served at `/docs` while the API is running.",
         "",
-        "Petacat has two modes: **Metacat Mode** (the v1.2 features, including Metacat's own "
+        "Petacat has two modes: **Metacat Mode** (as defined by v1.3, including Metacat's own "
         "Episodic Memory) and **Training Mode** (Training Mode Sessions and what follows). Nothing in "
         "Training Mode affects Metacat Mode. Run mode (single-threaded or multi-core) is "
         "independent of both and is not the persistence mode (Fast, Normal or Audit).",

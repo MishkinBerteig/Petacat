@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 //
 // Petacat has two modes, always written as proper names:
-//   Metacat Mode  -- the v1.2 features exactly as they are: the dashboard's runs, Run
+//   Metacat Mode  -- as defined by v1.3, a faithful port of patched Metacat: the dashboard's runs, Run
 //                    History, Review, the one-problem Swarm, the Admin view and
 //                    Configuration, and Metacat's own Episodic Memory.
 //   Training Mode -- every extension since v1.2: Training Mode Sessions, each with its own episode
@@ -32,7 +32,7 @@ export const MODE_LABELS: Record<AppMode, string> = {
 
 export const MODE_TOOLTIPS: Record<AppMode, string> = {
   metacat:
-    'Metacat Mode: Petacat exactly as v1.2 — runs, Run History, Review, the Swarm, Admin and '
+    'Metacat Mode: Petacat as a faithful port of patched Metacat, as defined by v1.3 — runs, Run History, Review, the Swarm, Admin and '
     + "Configuration, and Metacat's own Episodic Memory (Metacat-Mode learning).",
   'training-mode':
     'Training Mode: Training Mode Sessions — named episodes of many problems, each with its own episode '

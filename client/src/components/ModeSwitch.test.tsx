@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------------
 // Petacat -- the mode switch names the mode and moves between the two
 // ---------------------------------------------------------------------------
-// Metacat Mode is the v1.2 views; Training Mode is the Training Mode view. Run mode is
+// Metacat Mode is the views defined by v1.3; Training Mode is the Training Mode view. Run mode is
 // orthogonal and is not a third choice here.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'

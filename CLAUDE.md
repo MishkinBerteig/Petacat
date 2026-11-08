@@ -116,7 +116,7 @@ ratchets and the golden baselines.
 Petacat has two modes, always written as proper names: **Metacat Mode** and **Training Mode**.
 Every doc, UI string, help topic, plan and decision must keep the distinction perfectly clear.
 
-- **Metacat Mode** is the v1.2 features exactly as they are:
+- **Metacat Mode** is defined by v1.3: the v1.2 features, brought into line with patched Metacat (its fixes, its input parser and its initial clamp). It is:
   - ordinary runs, Run History, Review, the one-problem Swarm and the Admin view's global
     configuration;
   - Metacat's own **episodic runs**: each run inherits the Episodic Memory that the runs before

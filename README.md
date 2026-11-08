@@ -59,7 +59,7 @@ run mode, which is separate from both (below).
 
 ### Metacat Mode
 
-**Metacat Mode** is Petacat's v1.2 features, exactly as they are. Petacat is the
+**Metacat Mode** is defined by Petacat v1.3: the v1.2 features, brought into line with patched Metacat (its fixes, its input parser and its initial clamp). Petacat is the
 functional equivalent of Metacat here, permanently, and **nothing in Training Mode
 affects it in any way**. It comprises:
 
