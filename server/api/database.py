@@ -9,7 +9,9 @@ Every table is introspected from ``Base.metadata`` and put in one **class**:
   tables).  An edit is a batch through the change API.
 * ``content``: ``help_topics``.  Written directly.
 * ``runtime``: runs, Metacat Mode's Episodic Memory rows and the like.  An edit needs expert
-  mode and a typed confirmation (the table's name), and an active run's rows are refused.
+  mode and a typed confirmation (the table's name), and an active run's rows are refused.  An
+  edit to Metacat Mode's stored Episodic Memory leaves the memory the server holds alone, but
+  ``RunService.rehydrate_memory`` loads the edited rows at the next server start.
 * ``journal``: ``configurations``, ``configuration_journal`` and the other layer-owned tables.
   Read-only (409 ``journal_read_only``).
 * ``session_managed``: a Training Mode Session's tables.  Read-only (409 ``session_managed``).
@@ -104,8 +106,10 @@ BANNERS = {
     CONTENT: "Content (the in-app help). Written directly.",
     RUNTIME: (
         "Runtime data. Editing needs expert mode and a typed confirmation, and an active run's "
-        "rows are never edited. Metacat Mode's in-memory Episodic Memory is not changed by an "
-        "edit to these rows."
+        "rows are never edited. An edit to Metacat Mode's stored Episodic Memory "
+        "(answer_descriptions, snag_descriptions) does not change the memory the running server "
+        "holds, but the next server start loads the edited rows, so later runs are reminded of "
+        "the edited answers and snags."
     ),
     JOURNAL: (
         "The journal is the one record of changes and is read-only here: the journal layer "
