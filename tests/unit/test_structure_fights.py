@@ -11,7 +11,7 @@
 
 Both strengths are recomputed at fight time, the contest is temperature-adjusted
 (``formulas.ss:32-35``), and a weight of 0 is probability 0
-(``utilities.ss:443-448``) — no floors.
+(``utilities.ss:485-490``) — no floors.
 
 The *weights* are the builders' own and are not all 1-vs-1.  One test per fight
 the builders currently stage, each asserting the weight pair

@@ -1045,7 +1045,7 @@ def _same_signature_set(sigs1: list[Any], sigs2: list[Any]) -> bool:
 def _same_object_set(objects1: list[Any], objects2: list[Any]) -> bool:
     """Do two lists denote the same Workspace objects?
 
-    Scheme: ``sets-equal-pred?`` (``utilities.ss:806-818``) — mutual subset under a
+    Scheme: ``sets-equal-pred?`` (``utilities.ss:883-886``) — mutual subset under a
     pairwise predicate.  Nothing here is ordered, and nothing needs to be: an earlier
     port sorted derived keys instead, which both required a total order the objects
     cannot supply and dropped the type test that keeps the comparison meaningful.
@@ -1168,7 +1168,7 @@ def _collect_snag_descriptions(objects: list[Any]) -> list[Any]:
     mean taken in :func:`_average_description_depth` is over the deduplicated list, not
     the concatenated one.  ``remq`` is ``eq?``-based, so this is identity.
 
-    ``remove-duplicates-pred`` (``utilities.ss:914-926``) drops the *first* occurrence
+    ``remove-duplicates-pred`` (``utilities.ss:915-927``) drops the *first* occurrence
     when the element recurs later, so it keeps the **last** — the opposite of the obvious
     ``if seen: continue``.  The mean does not care, but ``DISCREPANCIES5.md`` C-2
     records four places that already read this backwards, and there is no reason to make

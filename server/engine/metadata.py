@@ -57,7 +57,7 @@ class SlipnodeSpec:
     short_name: str
     conceptual_depth: int
     # DSL expression over `obj` deciding whether this node validly describes a
-    # Workspace object.  Scheme: ``define-descriptor-predicate`` (slipnet.ss:508-610),
+    # Workspace object.  Scheme: ``define-descriptor-predicate`` (slipnet.ss:553-609),
     # where the predicate is a lambda attached to the node itself.  Keeping it in
     # the seed data means a new descriptor needs no code change, the same way a
     # new codelet type needs only its ``execute_body``.

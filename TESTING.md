@@ -403,7 +403,8 @@ changing what it records.
   case list is `tests/lockstep/golden/extended_cases.json`, and **every case in it was
   recorded in Metacat 1.2 and replayed in Petacat with no divergence**; a case that did not
   match is a fidelity defect and is not in the file. `scripts/golden_coverage.py` measures
-  what either baseline reaches. Recapture with
+  what either baseline reaches. The few deliberate differences between Metacat Mode and patched Metacat (none shows in
+  a ratchet) are in `METACAT-MODE-DIFFERENCES.md`. Recapture with
   `.venv/bin/python scripts/capture_golden_baseline.py --extended --jobs 8` (it writes only
   the two `extended_` files, so it cannot touch the original baseline) under the same rule as above.
   A case may carry its own `parameters` (the Self-watching-off cases do), and every case also runs on the

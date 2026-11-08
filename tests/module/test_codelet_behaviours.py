@@ -1028,7 +1028,7 @@ def _posted(ctx, codelet_type):
 def _only_salient(ctx, obj, key="average", value=100):
     """Make *obj* the sole candidate under *key*: every other object weighs 0.
 
-    ``stochastic-pick`` (``utilities.ss:443-448``) gives a weight-0 candidate
+    ``stochastic-pick`` (``utilities.ss:485-490``) gives a weight-0 candidate
     probability exactly 0 and falls back to a uniform pick only when *every*
     weight is 0, so a single non-zero weight makes the choice deterministic and
     the test independent of the seed.
@@ -1695,7 +1695,7 @@ class TestStructureFighting:
     def test_zero_strength_challenger_never_wins(
         self, ctx_abc_abd_xyz, monkeypatch
     ):
-        """``stochastic-pick`` (utilities.ss:443-448) gives weight 0 probability 0.
+        """``stochastic-pick`` (utilities.ss:485-490) gives weight 0 probability 0.
 
         The old linear form floored both sides at 1.0, so a structure worth nothing
         still took one fight in three.

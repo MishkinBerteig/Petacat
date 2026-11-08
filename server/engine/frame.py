@@ -241,7 +241,7 @@ class Frame:
             (vertical_bridges[0].from_attr, vertical_bridges[0].to_attr) if vertical_bridges else None
         )
 
-        # ``unmapped?`` (``workspace.ss:708-716``): which bridges an object needs to count as
+        # ``unmapped?`` (``workspace.ss:707-716``): which bridges an object needs to count as
         # mapped, as the token ``WorkspaceObject.mapped`` takes, without and with justifying.
         tokens: list[dict[str, str]] = [{}, {}]
         for justify in (0, 1):

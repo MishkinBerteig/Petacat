@@ -886,7 +886,7 @@ def _description_possible(dimension_name: str, obj: Any) -> bool:
     """Can *obj* be described along *dimension_name*?
 
     Scheme: ``description-possible?`` on a Slipnet category node
-    (slipnet.ss:200-201) — "is there a descriptor of this category that would
+    (slipnet.ss:201-202) — "is there a descriptor of this category that would
     apply", which is a question about the object, not about its description
     list.  The dimension node is reached through the object's string, since a
     theme names its dimension by name and holds no Slipnet handle.
@@ -1315,7 +1315,7 @@ def _top_down_codelet(
 ) -> Any:
     """A top-down scout.  *scope* is the workspace-string the scout is aimed at
     (bridges.ss:1124-1145); omitted, the scout ranges over the whole workspace
-    as the slipnet-posted ones do (slipnet.ss:210-222)."""
+    as the slipnet-posted ones do (slipnet.ss:212-222)."""
     from server.engine.coderack import Codelet
 
     arguments = {"slipnode": node}
@@ -1544,7 +1544,7 @@ def direction_incompatible_bridges(
             return pred2(p1b, p2b)
         return False
 
-    # ``partition`` (utilities.ss:...) is built tail-first: the list is
+    # ``partition`` (utilities.ss:811-825) is built tail-first: the list is
     # partitioned from the last element back, and each earlier element joins the
     # first block *all* of whose members it satisfies the predicate against,
     # otherwise starting a new block at the end.  ``select-longest-list`` then

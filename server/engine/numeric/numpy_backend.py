@@ -387,7 +387,7 @@ class NumpyBackend(Backend):
         a = np.asarray(values, dtype=np.float64)
         w = np.asarray(relative_importance, dtype=np.float64)
         total = float(w.sum())
-        # ``weighted-average`` (``utilities.ss:388-392``) is 0 on zero total weight.
+        # ``weighted-average`` (``utilities.ss:430-434``) is 0 on zero total weight.
         if total == 0.0:
             return 0
         return int(np.rint(float((a * w).sum()) / total))

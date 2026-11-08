@@ -151,7 +151,7 @@ def test_differing_dimensions_counts_one_per_matching_pair():
     assert cmp.differing_dimensions == [X, X]
 
 
-# ---- C-1: newest-first lists -------------------------------------------------------
+# ---- Newest-first lists -------------------------------------------------------
 
 
 def test_workspace_rules_and_bridges_are_consed_newest_first():
@@ -168,7 +168,7 @@ def test_workspace_rules_and_bridges_are_consed_newest_first():
     assert ws.top_rules == [r2, r1]
 
 
-# ---- C-1: the most recent clamp, first of a newest-first list (jootsing.ss:144, trace.ss:201) ---
+# ---- The most recent clamp, first of a newest-first list (jootsing.ss:144, trace.ss:201) ---
 
 
 def test_joots_from_justify_clamps_reads_the_most_recent_clamp():

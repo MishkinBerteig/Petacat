@@ -595,7 +595,7 @@ class MlxBackend(Backend):
             # round trips, not by summing twenty floats.  Reading ``total`` back to decide
             # which branch to take, then reading the branch's result, cost three syncs
             # where the whole decision can be expressed in the graph and read once.
-            # ``weighted-average`` (``utilities.ss:388-392``) is 0 on zero total
+            # ``weighted-average`` (``utilities.ss:430-434``) is 0 on zero total
             # weight, not an unweighted mean.  Kept in the graph so the branch
             # still costs one host sync rather than three.
             total = mx.sum(w)

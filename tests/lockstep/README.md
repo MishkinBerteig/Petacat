@@ -7,7 +7,9 @@ decisions inside Petacat, and checks at each one that Petacat had the same optio
 with the same weights or probabilities. Each mismatch is a located bug report. The
 design is in `meta-peta-trace-idea.md` (repository root). The decisions taken while
 building and running it are in [`DECISIONS.md`](DECISIONS.md). The port bugs it found
-that are still open are recorded in `DISCREPANCIES5.md`; the ones it fixed are in the git history.
+that are still open are recorded in `DISCREPANCIES5.md`; the ones it fixed are in the git history. The differences
+that Metacat Mode keeps on purpose are in [`METACAT-MODE-DIFFERENCES.md`](../../METACAT-MODE-DIFFERENCES.md); none shows in a
+ratchet, because the recorder logs no trivial decision and the replay matches a coderack choice by names and weights.
 
 ## Parts
 
@@ -203,7 +205,8 @@ ijkk --seeds 1-10 --cap 4000 --out /tmp/w` then `scripts/lockstep_corpus.py --tr
 difference that did not change a decision yet (one such difference was found by re-recording one run with
 snapshots).
 
-The individual fixes are in the git history; `DISCREPANCIES5.md` keeps only what is still open.
+The individual fixes are in the git history; `DISCREPANCIES5.md` keeps only what is still open, and
+`METACAT-MODE-DIFFERENCES.md` keeps the differences that are on purpose.
 
 ## The extended golden baseline
 

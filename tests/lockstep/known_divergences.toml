@@ -2,8 +2,9 @@
 # (meta-peta-trace-idea.md section 9.1).  The comparer (scripts/compare_traces.py)
 # reports a matching error separately and does not count it as an error.
 #
-# Ids are "<doc>:<id>" (DISC5:C-2 would be DISCREPANCIES5.md C-2).  Several entries may share
-# one id when one divergence shows up at several sites.
+# An id names the document and the entry that records the divergence.  Several entries may share
+# one id when one divergence shows up at several sites.  The differences Metacat Mode keeps on purpose
+# are in METACAT-MODE-DIFFERENCES.md and need no entry here, because no ratchet shows them.
 #
 # MATCHING RULE.  An entry applies to a Petacat decision when ALL of these hold:
 #   * match.class equals the error class (p, weights, options, ...);

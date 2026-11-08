@@ -603,7 +603,7 @@ class Coderack:
                 # was posted on this very tick, so every weight is 0.
                 # ``RNG.weighted_pick`` falls back to a uniform pick here — as does
                 # the Scheme, whose ``stochastic-pick`` defers to ``random-pick`` on a
-                # zero weight-sum (``utilities.ss:443-448``) — and this has to fall
+                # zero weight-sum (``utilities.ss:485-490``) — and this has to fall
                 # back the same way to consume the same random number.
                 flat = [c for b in self.bins for c in b.codelets]
                 if not flat:

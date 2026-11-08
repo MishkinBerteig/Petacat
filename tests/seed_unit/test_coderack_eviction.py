@@ -77,7 +77,7 @@ def flat_pick_to_remove(
 
     ``stochastic-pick-by-method`` over the whole codelet list (``coderack.ss:438``),
     which falls back to a uniform pick when the weights sum to zero
-    (``utilities.ss:443-448``) — exactly what ``RNG.weighted_pick`` does.
+    (``utilities.ss:485-490``) — exactly what ``RNG.weighted_pick`` does.
     """
     all_codelets = []
     for b in coderack.bins:
@@ -385,7 +385,7 @@ def test_a_rack_of_only_same_tick_codelets_falls_back_to_a_uniform_pick(meta):
     """Every weight 0 — which the floor used to make unreachable.
 
     The Scheme's ``stochastic-pick`` defers to ``random-pick`` on a zero weight-sum
-    (``utilities.ss:443-448``), so the rack still sheds a codelet rather than
+    (``utilities.ss:485-490``), so the rack still sheds a codelet rather than
     overflowing; it just has no reason to prefer one.
     """
     coderack = Coderack(meta)

@@ -50,7 +50,7 @@ def temp_adjusted_probability(
          (max 0.5 (1- (+ (1- prob)
                          (* (% (10- (sqrt (100- *temperature*)))) prob)))))
 
-    Note that Scheme's ``1-`` is *one minus x* (``utilities.ss:500``), not a
+    Note that Scheme's ``1-`` is *one minus x* (``utilities.ss:542``), not a
     decrement: the interpolation target is ``10^(1 - lpf)`` and the high branch
     is ``1 - ((1 - prob) + adjustment * prob)``.  There is no ``prob = 1.0``
     special case — 1.0 takes the high branch and comes back as
@@ -276,7 +276,7 @@ def weighted_average(values: list[float], weights: list[float]) -> float:
 def sigmoid(x: float, beta: float, midpoint: float, divisor: float) -> float:
     """General-purpose sigmoid on [0, 100] -> [0, 1].
 
-    Scheme: utilities.ss:488-491.  *divisor* is the coefficient ``sigmoid_divisor``.
+    Scheme: utilities.ss:556-559.  *divisor* is the coefficient ``sigmoid_divisor``.
     """
     return 1.0 / (1.0 + math.exp(beta * (midpoint - x) / divisor))
 

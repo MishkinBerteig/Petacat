@@ -194,7 +194,7 @@ def test_internal_coherence_tests_every_ordered_pair_of_mappings(meta):
         assert Bridge._is_internally_coherent(stub) is True
 
 
-# -- remove-duplicates keeps the last occurrence (utilities.ss:915-929) -----------------
+# -- remove-duplicates keeps the last occurrence (utilities.ss:915-930) -----------------
 
 
 def test_the_concept_pattern_of_a_theme_pattern_keeps_the_last_of_a_repeated_entry():

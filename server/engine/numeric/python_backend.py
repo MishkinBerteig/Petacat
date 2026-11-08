@@ -122,7 +122,7 @@ class PythonSlipnetSession(SlipnetSession):
     def _spread(self, threshold: float, scale: float) -> None:
         """Sparse traversal: for each destination, sum its incoming contributions.
 
-        The reference iterates sources and scatters (``slipnet.ss:201-214``); this
+        The reference iterates sources and scatters (``slipnet.ss:178-187``); this
         iterates destinations and gathers.  The set of contributions is identical
         — the edge list is the same edges, regrouped — but the *summation order*
         into ``buffer[d]`` is not.
@@ -464,7 +464,7 @@ class PythonBackend(Backend):
             return constants().average_unhappiness_empty
         total_weight = sum(relative_importance)
         if total_weight == 0:
-            # ``weighted-average`` (``utilities.ss:388-392``) returns 0 on zero
+            # ``weighted-average`` (``utilities.ss:430-434``) returns 0 on zero
             # total weight.  An unweighted mean here would report ~100 unhappiness
             # where the reference reports none.
             return 0

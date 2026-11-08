@@ -36,7 +36,7 @@ if TYPE_CHECKING:
 # Descriptor predicates
 #
 # Scheme: the ``(tell plato-x 'define-descriptor-predicate ...)`` block at
-# slipnet.ss:508-610, where each predicate is a lambda attached to the node.
+# slipnet.ss:553-609, where each predicate is a lambda attached to the node.
 #
 # In Petacat the predicate travels with the node in ``slipnet_nodes.json``, as a
 # small DSL expression over ``obj``, and is compiled once at startup — the same
@@ -270,8 +270,8 @@ class SlipnetNode:
 
         Scheme: ``reset`` (slipnet.ss:72-73) —
         ``(1- (expt (% conceptual-depth) (/ %update-cycle-length% 15)))``, where
-        ``1-`` is ``(- 1 x)`` (utilities.ss:500) and ``%`` is exact rational
-        division by 100 (utilities.ss:504).  With ``%update-cycle-length%`` 15 the
+        ``1-`` is ``(- 1 x)`` (utilities.ss:542) and ``%`` is exact rational
+        division by 100 (utilities.ss:546).  With ``%update-cycle-length%`` 15 the
         exponent is 1, so the reference's rate is the *exact rational*
         ``(100 - depth)/100`` — and every quantity derived from it stays exact,
         because Scheme never leaves the rationals here.
@@ -464,11 +464,11 @@ class SlipnetNode:
         )
 
     # ------------------------------------------------------------------
-    # Descriptor predicates  (Scheme: slipnet.ss:556-610)
+    # Descriptor predicates  (Scheme: slipnet.ss:557-609)
     # ------------------------------------------------------------------
 
     def description_possible(self, obj: Any) -> bool:
-        """Scheme: ``description-possible?`` (slipnet.ss:200-201).
+        """Scheme: ``description-possible?`` (slipnet.ss:201-202).
 
         Defers to ``get_possible_descriptors`` below — the faithful one.  A
         second, more permissive definition of that method once sat here and was
@@ -608,7 +608,7 @@ class SlipnetNode:
     def category(self) -> SlipnetNode | None:
         """Return the category node (to_node of the first category link), or None.
 
-        Scheme: slipnet.ss:95-98.
+        Scheme: slipnet.ss:96-99.
         """
         if self.category_links:
             return self.category_links[0].to_node
@@ -666,7 +666,7 @@ class SlipnetNode:
         #
         # Scheme (slipnet.ss:123-129) ends in ``(select (lambda (node) (eq?
         # (tell node 'get-category) (tell self 'get-category))) related-nodes)``,
-        # and ``select`` (utilities.ss:570-577) returns ``#f`` when nothing
+        # and ``select`` (utilities.ss:612-620) returns ``#f`` when nothing
         # satisfies the predicate.  Falling back to the first candidate instead
         # answers a question that was not asked: with several links carrying the
         # same label, "the related node" is only well defined when one of them

@@ -36,7 +36,7 @@ def test_chez_sort_agrees_with_chez_on_a_relation_that_is_not_a_strict_order(cas
     assert rules.chez_sort(less, list(range(len(relation)))) == case["chez"]
 
 
-# ---- C-1: the string's group list is newest first (workspace-strings.ss:266) ----------------------
+# ---- The string's group list is newest first (workspace-strings.ss:266) ----------------------
 
 
 class _Slipnet:
@@ -78,7 +78,7 @@ def test_a_rule_over_a_string_reads_the_bridges_of_its_top_level_objects_unsorte
     assert rules._get_subobject_bridges(string, "horizontal") == ["right", "left"]
 
 
-# ---- C-1: the coderack's bins are vectors and the deferred batch is consed -----------------------
+# ---- The coderack's bins are vectors and the deferred batch is consed -----------------------
 
 
 SEED_DIR = Path(__file__).resolve().parents[2] / "seed_data"

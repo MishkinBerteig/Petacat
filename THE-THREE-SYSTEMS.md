@@ -33,6 +33,10 @@ that we can "play with" scenarios on Metacat without changing code.
 - Under the Metacat Standard Configuration, Metacat Mode perceives and reasons as patched Metacat does.
 - Changing a value in the configuration is how a scenario is explored. Changing the program is not.
 - Nothing in Training Mode affects Metacat Mode in any way.
+- The few places where it differs on purpose (how many random numbers it draws where the result is certain,
+  and display and narration) were accepted by the user and are listed in
+  [`METACAT-MODE-DIFFERENCES.md`](METACAT-MODE-DIFFERENCES.md). None changes a decision or a probability.
+  Any other difference is a defect to fix.
 
 ## 3. Petacat (Training Mode)
 

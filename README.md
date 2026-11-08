@@ -61,7 +61,8 @@ run mode, which is separate from both (below).
 
 **Metacat Mode** is defined by Petacat v1.3: the v1.2 features, brought into line with patched Metacat (its fixes, its input parser and its initial clamp). Petacat is the
 functional equivalent of Metacat here, permanently, and **nothing in Training Mode
-affects it in any way**. It comprises:
+affects it in any way**. The few places where it deliberately differs from patched Metacat, each accepted by the user, are
+listed in [METACAT-MODE-DIFFERENCES.md](METACAT-MODE-DIFFERENCES.md). It comprises:
 
 - ordinary runs: the dashboard's Fast, Normal and Audit runs (the
   [persistence modes](#persistence-modes-and-episodic-runs)), with Run to answer

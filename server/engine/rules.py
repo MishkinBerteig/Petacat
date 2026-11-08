@@ -455,7 +455,7 @@ def _homogeneity(values: list[Any], meta: MetadataProvider) -> float:
 
 
 def _average(values: list[float]) -> float:
-    """Scheme's ``average`` (``utilities.ss:380-386``) — the empty list averages 0."""
+    """Scheme's ``average`` (``utilities.ss:422-428``) — the empty list averages 0."""
     if not values:
         return 0.0
     return sum(values) / len(values)
@@ -889,7 +889,7 @@ def _get_constituent_objects(obj: Any) -> list[Any]:
     For a group: its direct member objects.  For a string: its top-level
     letters/groups (not enclosed in another group).  For a letter: nothing.
 
-    Scheme: ``constituent-objects-of`` (``utilities.ss:110-114``), which exists
+    Scheme: ``constituent-objects-of`` (``utilities.ss:129-133``), which exists
     precisely because a reference object *can* be a letter — whenever a rule names a
     group the string it is being applied to does not actually have, ``middle`` or
     ``rightmost`` resolves to a letter instead.  The Scheme's two rule-application
@@ -2627,7 +2627,7 @@ def _instantiate_change_template(
     #
     # so the choice sharpens toward the deepest descriptor as the temperature
     # falls, and a depth-0 descriptor has probability 0 — no floor
-    # (``utilities.ss:443-448``).
+    # (``utilities.ss:485-490``).
     if len(possible_descriptors) == 1:
         chosen = possible_descriptors[0]
     else:
@@ -3438,7 +3438,7 @@ def _bridge_present(workspace: Workspace, bridge: Bridge) -> bool:
 def _get_equivalent_bridge(workspace: Workspace, bridge: Bridge) -> Any:
     """Find the Workspace bridge equivalent to *bridge*.
 
-    Scheme: ``get-equivalent-bridge`` (``workspace.ss:268-300``).  A bridge already in
+    Scheme: ``get-equivalent-bridge`` (``workspace.ss:268-301``).  A bridge already in
     the Workspace's own list is its own equivalent.  Otherwise — and this is the case
     that matters — the bridge's two objects are looked up against the two *real*
     strings its type spans, and the equivalent bridge is the one already built between
@@ -3588,7 +3588,7 @@ def _bounded_random_partition(
     rng: RNG,
     bound: int | None = None,
 ) -> list[list]:
-    """Scheme: ``bounded-random-partition`` (``utilities.ss:790-813``).
+    """Scheme: ``bounded-random-partition`` (``utilities.ss:832-855``).
 
     Two things distinguish it from the deterministic ``partition``, and this
     ignored both: elements are drawn in **random order**, and a class may not grow

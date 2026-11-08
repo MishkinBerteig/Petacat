@@ -962,7 +962,7 @@ def propose_description_based_on_theme(
         return None
     # No floor: ``stochastic-pick-by-method possible-descriptors 'get-activation``
     # (``themes.ss:962``) leaves a dormant descriptor unreachable
-    # (``utilities.ss:443-448``).
+    # (``utilities.ss:485-490``).
     descriptor = rng.weighted_pick(candidates, [c.activation for c in candidates])
     description = Description(obj, dimension, descriptor)
     from server.engine.run_binding import vocab

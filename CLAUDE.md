@@ -81,7 +81,9 @@ follows it. In short:
   broken because of a crash or a bug.
 - **Petacat (Metacat Mode)** is a 100% faithful port of patched Metacat, with a new GUI, a database and a
   Python engine. The Metacat Standard Configuration manages all the perceptual and cognitive parameters, so
-  that we can "play with" scenarios on Metacat without changing code.
+  that we can "play with" scenarios on Metacat without changing code. Its only deliberate differences,
+  accepted by the user, are in [`METACAT-MODE-DIFFERENCES.md`](METACAT-MODE-DIFFERENCES.md); any other
+  difference is a defect to fix.
 - **Petacat (Training Mode)** uses the general architecture of Metacat as a starting point. It is the
   foundation for a true machine learning system that can learn from, for example, LLM training text
   corpora, with analogy-making as the foundation of the generation and learning loop.

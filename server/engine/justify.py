@@ -139,7 +139,7 @@ def attempt_justification(
         )
 
     # No floor: ``stochastic-pick-by-method ... 'get-strength`` (justify.ss:26-27)
-    # leaves a worthless rule unchosen (``utilities.ss:443-448``).  A rule's strength
+    # leaves a worthless rule unchosen (``utilities.ss:485-490``).  A rule's strength
     # is its rank-relative quality as of the last update cycle (``rules.ss:286``,
     # ``workspace-structures.ss:40``), not its raw quality.
     weights = [r.strength for r in all_supported]
@@ -351,7 +351,7 @@ def attempt_justification(
     # Pick an other rule weighted by similarity of strength.  No floor:
     # ``(100- (abs (- strength ...)))`` (justify.ss:142-146) is used raw, so a
     # rule 100 away in quality is not a unification candidate at all
-    # (``utilities.ss:443-448``).
+    # (``utilities.ss:485-490``).
     # ``(tell r 'get-strength)``: the stored, rank-relative strength.
     strength = chosen_rule.strength
     other_weights = [100.0 - abs(strength - r.strength) for r in other_rules]

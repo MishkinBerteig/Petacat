@@ -113,7 +113,7 @@ def test_state_save_restore():
 def test_perturb_of_a_perfect_square_draws_an_integer_delta():
     """``(~ 4)``: ``(sqrt 4)`` is exact, so ``(random 3)`` yields an integer.
 
-    Scheme: ``utilities.ss:426-429``.  The reachable thresholds are therefore
+    Scheme: ``utilities.ss:468-471``.  The reachable thresholds are therefore
     exactly ``{2, 3, 4, 5, 6}``.
     """
     rng = RNG(7)

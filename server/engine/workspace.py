@@ -42,7 +42,7 @@ def _object_weight(obj: Any, weight_key: str) -> float:
     of the object's ``salience`` dict (``intra``, ``vertical_inter``,
     ``horizontal_inter``).
 
-    No floor.  ``stochastic-pick`` (``utilities.ss:443-448``) gives a weight-0
+    No floor.  ``stochastic-pick`` (``utilities.ss:485-490``) gives a weight-0
     item probability exactly 0, and falls back to a uniform pick only when
     *every* weight is 0.  A 0.1 floor kept wholly unsalient objects reachable,
     which is not what the parallel terraced scan does: it explores in proportion
@@ -983,7 +983,7 @@ class Workspace:
         intra-string reading opened the answer-finder gate, sharpened codelet
         selection and slowed the breakers long before the analogy existed.
 
-        ``weighted-average`` (``utilities.ss:388-392``) returns **0** on zero total
+        ``weighted-average`` (``utilities.ss:430-434``) returns **0** on zero total
         weight; it does not fall back to an unweighted mean.  That case is
         reachable only before the first ``update-workspace-values``, which
         ``init_mcat`` now runs, so it is a faithfulness detail rather than a
@@ -1038,7 +1038,7 @@ class Workspace:
         """Scheme: the ``weighted-average`` calls in ``update-average-unhappiness-values``
         (``workspace.ss:560-585``), over the objects of *both* strings.
 
-        ``weighted-average`` (``utilities.ss:388-392``) returns **0** when the weights
+        ``weighted-average`` (``utilities.ss:430-434``) returns **0** when the weights
         sum to zero — it does not fall back to an unweighted mean.  That matters: with
         every relative importance at 0 the reference reports no unhappiness at all,
         and so full mapping strength, where an unweighted mean would report ~100
@@ -1533,19 +1533,19 @@ class Workspace:
     # ------------------------------------------------------------------
 
     def get_rough_num_of_unrelated_objects(self, rng: RNG, meta: Any) -> str:
-        """Scheme: ``workspace.ss:683-684``."""
+        """Scheme: ``workspace.ss:625-626``."""
         return rough_num_of_objects(
             sum(1 for o in self.all_objects if unrelated(o)), rng, meta
         )
 
     def get_rough_num_of_ungrouped_objects(self, rng: RNG, meta: Any) -> str:
-        """Scheme: ``workspace.ss:685-686``."""
+        """Scheme: ``workspace.ss:627-628``."""
         return rough_num_of_objects(
             sum(1 for o in self.all_objects if ungrouped(o)), rng, meta
         )
 
     def get_rough_num_of_unmapped_objects(self, rng: RNG, meta: Any) -> str:
-        """Scheme: ``workspace.ss:687-688``."""
+        """Scheme: ``workspace.ss:629-630``."""
         return rough_num_of_objects(
             sum(1 for o in self.all_objects if unmapped(o, self.justify_mode)), rng, meta
         )
@@ -1650,7 +1650,7 @@ class Workspace:
                     if (d1 is not None and d2 is not None)
                     else None
                 )
-            # all-exist? then all-same? (utilities.ss:178-184); both hold vacuously
+            # all-exist? then all-same? (utilities.ss:220-226); both hold vacuously
             # for the empty list, so a single top-level object says yes.
             if all(r is not None for r in relations) and len(
                 {id(r) for r in relations}
@@ -1707,7 +1707,7 @@ class Workspace:
 
 
 # ======================================================================
-#  Scout-count aggregates  (Scheme: workspace.ss:683-716, utilities.ss:426-429)
+#  Scout-count aggregates  (Scheme: workspace.ss:683-716, utilities.ss:468-471)
 #
 #  Free functions, as in the reference, and over the *whole* workspace rather
 #  than per string: ``get-rough-num-of-*`` counts over ``(tell self 'get-objects)``,
@@ -1718,7 +1718,7 @@ class Workspace:
 def rough_num_of_objects(num_of_objects: int, rng: RNG, meta: Any) -> str:
     """``few`` / ``some`` / ``many`` from an *absolute* count.
 
-    Scheme: ``rough-num-of-objects`` (``workspace.ss:678-683``)::
+    Scheme: ``rough-num-of-objects`` (``workspace.ss:683-688``)::
 
         ((< num-of-objects (~ 2)) 'few)
         ((< num-of-objects (~ 4)) 'some)
@@ -1732,7 +1732,9 @@ def rough_num_of_objects(num_of_objects: int, rng: RNG, meta: Any) -> str:
     grows) and a noiseless one.
 
     Note the reference draws ``(~ 2)`` first and only draws ``(~ 4)`` if the
-    first test fails, so a large count costs two draws and a small one costs one.
+    first test fails.  Each ``~`` costs two draws (``delta``, then the sign from
+    ``prob?``; ``utilities.ss:468-471``), so a large count costs four draws and a
+    small one costs two.
     """
     meta = require_meta(meta, "rough_num_of_objects")
     if num_of_objects < rng.perturb(meta.get_param("rough_count_few_threshold")):
@@ -1743,7 +1745,7 @@ def rough_num_of_objects(num_of_objects: int, rng: RNG, meta: Any) -> str:
 
 
 def ungrouped(obj: Any) -> bool:
-    """Scheme: ``ungrouped?`` (``workspace.ss:700-704``).
+    """Scheme: ``ungrouped?`` (``workspace.ss:701-704``).
 
     A whole-string object is never ungrouped — there is nothing left to group it
     into — and neither is one already inside a group.
@@ -1752,7 +1754,7 @@ def ungrouped(obj: Any) -> bool:
 
 
 def unrelated(obj: Any) -> bool:
-    """Scheme: ``unrelated?`` (``workspace.ss:692-698``).
+    """Scheme: ``unrelated?`` (``workspace.ss:691-698``).
 
     Ungrouped *and* under-bonded, where "under-bonded" depends on position: an
     edge object has only one side to bond on, so it is unrelated only with no
@@ -1769,7 +1771,7 @@ def unrelated(obj: Any) -> bool:
 
 
 def unmapped(obj: Any, justify_mode: bool = False) -> bool:
-    """Scheme: ``unmapped?`` (``workspace.ss:708-716``).
+    """Scheme: ``unmapped?`` (``workspace.ss:707-716``).
 
     What counts as mapped depends on the object's *string role*, because the four
     strings sit at different corners of the analogy: an initial-string object

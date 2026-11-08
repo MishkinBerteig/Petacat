@@ -50,7 +50,7 @@ class _FakeMeta:
 #      (max 0.5 (1- (+ (1- prob) (* a prob))))))
 #
 # where a = (% (10- (sqrt (100- T)))) = (10 - sqrt(100 - T)) / 100, and Scheme's
-# `1-` is *one minus x* (utilities.ss:500), not a decrement.  So the low branch
+# `1-` is *one minus x* (utilities.ss:542), not a decrement.  So the low branch
 # interpolates toward 10^(1 - lpf) — one decade above prob — and the high branch
 # is 1 - ((1 - prob) + a*prob).
 #

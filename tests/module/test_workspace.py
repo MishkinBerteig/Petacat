@@ -82,7 +82,7 @@ def test_update_object_values(slipnet):
 
 # ======================================================================
 #  Workspace statistics feeding temperature and codelet posting
-#  (Scheme: workspace.ss:541-603, 678-716)
+#  (Scheme: workspace.ss:541-603, 683-716)
 # ======================================================================
 
 
@@ -160,7 +160,7 @@ def test_workspace_intra_average_is_importance_weighted_over_all_objects(slipnet
 
 
 def test_weighted_averages_are_zero_when_no_importance_is_assigned(slipnet):
-    """``weighted-average`` (``utilities.ss:388-392``) returns 0 on zero weight —
+    """``weighted-average`` (``utilities.ss:430-434``) returns 0 on zero weight —
     it does not fall back to an unweighted mean."""
     w = Workspace("abc", "abd", "xyz", None, slipnet)
     for o in w.all_objects:

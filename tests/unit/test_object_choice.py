@@ -8,7 +8,7 @@ Every object selection in MetaCat goes through ``choose-object``
 so two things are being tested here.  ``temp-adjusted-values``
 (``formulas.ss:32-35``) raises each weight to ``(100 - T)/30 + 0.5`` and rounds,
 which sharpens attention as the run cools.  And ``stochastic-pick``
-(``utilities.ss:443-448``) gives a weight-0 candidate probability exactly 0,
+(``utilities.ss:485-490``) gives a weight-0 candidate probability exactly 0,
 falling back to a uniform pick only when *every* weight is 0 — so no floor may
 be applied to a selection weight anywhere.
 
@@ -126,7 +126,7 @@ def test_low_temperature_is_greedier_than_high():
 
 
 # ---------------------------------------------------------------------------
-# No floors — utilities.ss:443-448
+# No floors — utilities.ss:485-490
 # ---------------------------------------------------------------------------
 
 def test_zero_salience_object_is_never_chosen():

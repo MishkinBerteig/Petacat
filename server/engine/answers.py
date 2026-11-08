@@ -250,7 +250,7 @@ def _important_answer_description_events(workspace: Workspace, trace: Any) -> li
             )
         return equivalent_workspace_objects(e1.group, e2.group)
 
-    # ``partition`` (``utilities.ss:792-806``) recurses to the end of the list first,
+    # ``partition`` (``utilities.ss:811-825``) recurses to the end of the list first,
     # so classes are created oldest-event-first — and Petacat's event list is already
     # oldest-first, so a straight left fold reproduces the reference's class order.
     classes: list[list[Any]] = []

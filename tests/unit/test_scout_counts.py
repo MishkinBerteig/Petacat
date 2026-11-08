@@ -1,4 +1,4 @@
-"""Unit tests for the scout-count aggregates (``workspace.ss:678-716``).
+"""Unit tests for the scout-count aggregates (``workspace.ss:683-716``).
 
 These are the four free functions that decide how many bond, group and bridge
 scouts enter the coderack on each update cycle: ``rough_num_of_objects`` and the
@@ -70,7 +70,7 @@ class _FakeObj:
         return self.horizontal_bridge is not None and self.vertical_bridge is not None
 
 
-# --- ungrouped? (workspace.ss:700-704) --------------------------------------
+# --- ungrouped? (workspace.ss:701-704) --------------------------------------
 
 def test_ungrouped_true_for_a_bare_object():
     assert ungrouped(_FakeObj()) is True
@@ -85,7 +85,7 @@ def test_ungrouped_false_for_a_whole_string_object():
     assert ungrouped(_FakeObj(spans=True)) is False
 
 
-# --- unrelated? (workspace.ss:692-698) --------------------------------------
+# --- unrelated? (workspace.ss:691-698) --------------------------------------
 
 def test_unrelated_edge_object_needs_only_one_bond():
     """An edge object has one side to bond on, so one bond satisfies it."""
@@ -105,7 +105,7 @@ def test_unrelated_false_once_grouped_however_few_bonds():
     assert unrelated(_FakeObj(bonds=0, enclosing_group=object())) is False
 
 
-# --- unmapped? (workspace.ss:708-716) ---------------------------------------
+# --- unmapped? (workspace.ss:707-716) ---------------------------------------
 
 def _obj(string_type, *, h=None, v=None):
     """``unmapped`` takes justify mode as an argument, as the Scheme reads the
@@ -141,7 +141,7 @@ def test_target_object_needs_both_bridges_when_justifying():
     assert unmapped(_obj("target", h=object(), v=object()), justify_mode=True) is False
 
 
-# --- rough-num-of-objects and the ~ blur (workspace.ss:678-683) -------------
+# --- rough-num-of-objects and the ~ blur (workspace.ss:683-688) -------------
 
 def test_zero_objects_is_always_few():
     """``(~ 2)`` stays strictly above 0, so a count of 0 is below it every time."""

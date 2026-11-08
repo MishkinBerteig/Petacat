@@ -281,7 +281,7 @@ class Backend(ABC):
         *values* are the objects' **average** unhappiness — the per-object blend of
         intra-string and inter-string unhappiness — not the intra-string term
         alone.  Zero total weight gives 0, per ``weighted-average``
-        (``utilities.ss:388-392``).
+        (``utilities.ss:430-434``).
         """
 
     @abstractmethod

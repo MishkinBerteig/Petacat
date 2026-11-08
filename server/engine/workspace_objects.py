@@ -158,7 +158,7 @@ class WorkspaceObject:
         Scheme: workspace-objects.ss:417-423 — a bare
         ``stochastic-pick-by-method``, so no temperature adjustment and no
         weight floor: a neighbour of salience 0 is not chosen
-        (``utilities.ss:443-448``).
+        (``utilities.ss:485-490``).
 
         The candidate set is *every* object edged at the adjacent position, at any
         nesting level — the adjacent letter even when it sits inside a group, plus
@@ -185,12 +185,16 @@ class WorkspaceObject:
         """``stochastic-pick-by-method neighbors 'get-intra-string-salience``.
 
         A sole candidate is returned without drawing: ``stochastic-pick``
-        (``utilities.ss:443-448``) over a one-element list returns that element
+        (``utilities.ss:485-490``) over a one-element list returns that element
         whatever the weight is — including via the ``random-pick`` fallback when
-        the weight is 0 — so the draw cannot change the answer.  It matters
-        because the density walk (``bonds.ss:136-160``) runs this at every
-        strength update, and in a string with no groups every position offers
-        exactly one candidate.
+        the weight is 0 — so the draw cannot change the element returned.  It
+        does change the random stream: Metacat draws here (one draw, in either
+        branch) and Petacat does not.  That is a deliberate difference, accepted
+        because no decision or probability depends on the skipped number; it is
+        documented in ``METACAT-MODE-DIFFERENCES.md`` ("A lone neighbour is returned without a draw").  The sole-candidate
+        case is common because the density walk (``bonds.ss:136-160``) runs this
+        at every strength update, and in a string with no groups every position
+        offers exactly one candidate.
 
         *rng* is always the caller's.  The Scheme's ``update-strength`` reaches
         the generator as a global; this port has no global to reach, so the

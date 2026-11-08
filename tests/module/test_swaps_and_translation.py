@@ -566,7 +566,7 @@ def ijkk_ctx(meta):
 
 
 def test_a_letter_reference_object_makes_the_clause_denote_nothing(ijkk_ctx):
-    """``constituent-objects-of`` (``utilities.ss:110-114``): a letter has none.
+    """``constituent-objects-of`` (``utilities.ss:129-133``): a letter has none.
 
     A reference object *is* a letter whenever the rule names an object the string
     resolves to a letter — "change all objects in the rightmost group to letters"

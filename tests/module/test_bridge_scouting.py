@@ -94,7 +94,7 @@ def _refusal_probability(ctx, object1, object2, bridge_type=BRIDGE_TOP):
 
     ``bridges.ss:928-937`` — ``(product (map 1- slippabilities))`` where each
     slippability has been through ``temp-adjusted-probability``, and ``1-`` is
-    ``(lambda (x) (- 1 x))`` (utilities.ss:500), *not* ``x - 1``.
+    ``(lambda (x) (- 1 x))`` (utilities.ss:542), *not* ``x - 1``.
     """
     from server.engine.formulas import temp_adjusted_probability
 

@@ -316,7 +316,7 @@ def choose_bond_facet(ctx: EngineContext, object1: Any, object2: Any) -> Any:
             for o in string_objects
             if any(d.description_type is facet for d in o.get_all_descriptions())
         )
-        # ``100*`` (utilities.ss:502) rounds, so the local-support term is a whole
+        # ``100*`` (utilities.ss:544) rounds, so the local-support term is a whole
         # number before it is averaged with the activation.
         local_support = round(100.0 * described / len(string_objects)) if string_objects else 0
         weights.append(
@@ -353,7 +353,7 @@ def choose_string(ctx: EngineContext, weight_fn: str = "unhappiness") -> Any:
     Scheme: ``group-scout:whole-string`` (groups.ss:547-556) — a bare
     ``stochastic-pick`` with no relevance term, no temperature adjustment and no
     floor, so a perfectly happy string is not chosen at all
-    (``utilities.ss:443-448``).
+    (``utilities.ss:485-490``).
 
     The range is ``*non-answer-strings*`` unless the run is justifying, exactly as
     in the top-down scouts' choice: ranging over ``all_strings`` let a discovery
@@ -2166,7 +2166,7 @@ def _wins_fight(
     T=100 (each adjusted value is *rounded*, as in the Scheme) and 0.826 at T=0:
     at low temperature MetaCat locks in a strong interpretation
     rather than overturning it at the linear rate.  And there is **no floor** —
-    ``stochastic-pick`` (``utilities.ss:443-448``) gives a strength-0 challenger
+    ``stochastic-pick`` (``utilities.ss:485-490``) gives a strength-0 challenger
     probability exactly 0, falling back to a coin flip only when *both* sides
     weigh 0.
     """
@@ -2483,7 +2483,7 @@ def possible_descriptor(
         return None
     # No floor: ``stochastic-pick-by-method ... 'get-activation``
     # (``descriptions.ss:138``, ``themes.ss:962``) leaves a dormant descriptor
-    # unreachable (``utilities.ss:443-448``).
+    # unreachable (``utilities.ss:485-490``).
     weights = [c.activation for c in candidates]
     return ctx.rng.weighted_pick(candidates, weights)
 
