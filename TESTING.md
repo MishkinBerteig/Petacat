@@ -152,7 +152,7 @@ outside the matrix take it too and the run is entirely what it says it is.
   integration    366 collected    366 run    366 passed      0 failed      0 skipped  complete
   parallel       304 collected    304 run    304 passed      0 failed      0 skipped  complete
   lockstep       266 collected    266 run    266 passed      0 failed      0 skipped  complete
-  e2e            690 collected    690 run    690 passed      0 failed      0 skipped  complete
+  e2e            691 collected    691 run    691 passed      0 failed      0 skipped  complete
 
   run complete in 13.9 min against a 60 min ceiling
 ```
@@ -231,7 +231,7 @@ that allowance.
 | **integration** | `tests/integration/` | Agreement between the repository's artifacts, and the harness's own rules | Real `seed_data/*.json`, the ORM declarations, the generated client files, the documentation, a real pytest session | 366 |
 | **parallel** | `tests/parallel/` | The detachable multi-core plugin (`server/parallel/`): each executor against the serial run it claims to equal | Real engine objects and `seed_data/*.json`, worker processes and threads; each test pins the backend it compares on | 304 |
 | **lockstep** | `tests/lockstep/` | Petacat's decision traces against Metacat's: naming, helper conformance, tracing/replay RNGs, determinism guards, the comparer | Real engine in faithful mode (numeric backend off, or a named backend); recorded Metacat traces | 266 |
-| **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 690 |
+| **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 691 |
 
 Those counts are cases, so they include the second pass the numeric matrix makes
 over the 1150 backend-sensitive tests.
@@ -267,7 +267,7 @@ first**, then move up toward the API and GUI.
 
 All eight layers run in one command — the
 [required command](#the-required-command) — and, since Petacat runs natively, all
-eight actually run: **6,603 cases**, every one of them executed. A layer that is
+eight actually run: **6,604 cases**, every one of them executed. A layer that is
 normally skipped is not a layer that is normally green, and none of these is.
 
 Wall-clock time depends heavily on the machine and on what else it is doing. The
@@ -707,7 +707,7 @@ changing what it records.
 | `test_persistence_modes.py` | 33 | The three persistence modes: Fast, Normal, Audit; a parallel Run is the same at any worker count |
 | `test_run_parameters.py` | 13 | Run parameters are settable per Run, stored, and readable back |
 | `test_run_to_answer.py` | 8 | The Run-to-Answer feature over HTTP |
-| `test_review_replay.py` | 18 | Review replays what the Run did (round 2, stage R): the Audit inspector's views equal the live Run's at every codelet, over HTTP, for each kind of action a person takes on a live Run (clamps of temperature, node, theme and codelet, Undo, Self-watching, the threshold, displaying a past event or answer, a reset, a pause with Run), several in one Run, each kind of configuration edit after the Run (coefficient, node, links, codelet body, posting rules, theme dimension, reset to standard, an Admin import that edited and restored a row), runs under different configurations and a server restart; an unrebuildable configuration is refused with 422, a replay that disagrees with the log says so, captures are projected under the Run's configuration, and only Audit records a person's actions |
+| `test_review_replay.py` | 19 | Review replays what the Run did (round 2, stage R): the Audit inspector's views equal the live Run's at every codelet, over HTTP, for each kind of action a person takes on a live Run (clamps of temperature, node, theme and codelet, Undo, Self-watching, the threshold, displaying a past event or answer, a reset, a pause with Run), several in one Run, each kind of configuration edit after the Run (coefficient, node, links, codelet body, posting rules, theme dimension, reset to standard, an Admin import that edited and restored a row), runs under different configurations and a server restart; an unrebuildable configuration is refused with 422, a replay that disagrees with the log says so, an answer another run added to the shared Episodic Memory while an Audit run was live is caught as a difference, captures are projected under the Run's configuration, and only Audit records a person's actions |
 | `test_two_runs_over_http.py` | 5 | Two live runs held by one server (round 2, stage 2): run A, driven as the client does (step batches, view polls between them), is codelet-for-codelet and view-for-view the run it is alone when run B is created before A is stepped, with the same configuration (normal and fast) or one edited in between through the Admin API, and when the two are stepped alternately; an open Audit inspector, stepped between A's batches, changes nothing; and no run is bound around an e2e test (the unit/module fixture's ambient run must not hide a server path that forgot its scope) |
 | `test_s5b_values_from_the_database.py` | 8 | Round 2, stage 5 (group B): the spreading-threshold clip is `max_activation`, a run made with no threshold takes the configuration's, a theme clamp that states no activation takes `max_theme_activation`, the run-parameter catalogue serves both ceilings, the Swarm and a Training Mode Session take `default_max_codelets` (and the Swarm's status serves it), and a slipnet link or posting rule that leaves out `fixed_length`, `posting_formula`, `count_formula` or `condition` is refused (422) |
 | `test_memory_order.py` | 2 | A restart puts stored answers back newest first by the memory's own identifier, both projections list them oldest first, and forgetting one keeps the rest in order |

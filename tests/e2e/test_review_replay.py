@@ -611,6 +611,49 @@ async def test_a_replay_that_disagrees_with_the_log_says_so(review_client, db_se
     assert "not-the-codelet-that-ran" in str(late["replay"]["first_difference"]["recorded"])
 
 
+@pytest.mark.asyncio
+async def test_an_answer_another_run_added_while_an_audit_run_was_live_is_caught(review_client):
+    """Another run adds an answer to the shared Episodic Memory while an Audit run is live.
+
+    The Audit run (``abc -> abd; ijk -> ?``, seed 5) would settle for ``ijl`` at codelet 326.
+    At codelet 300 a second run, same problem and seed, finishes and puts ``ijl`` in memory;
+    the Audit run then finds that answer already there and goes on instead of settling.  The
+    replay starts from the Run's start capture, where memory did not hold it, so it settles at
+    326 and so differs from the log.  The inspector must say so: faithful up to the moment the
+    answer was added, then ``faithful`` false with a first difference at or after that moment.
+    """
+    problem = {"initial": "abc", "modified": "abd", "target": "ijk"}
+    await review_client.delete("/api/memory")
+    created = await review_client.post("/api/runs", json={**problem, "seed": 5, "mode": "audit"})
+    run_id = created.json()["run_id"]
+    await review_client.post(f"/api/runs/{run_id}/step", json={"n": 300})
+
+    other = await review_client.post("/api/runs", json={**problem, "seed": 5, "mode": "fast"})
+    await review_client.post(f"/api/runs/{other.json()['run_id']}/run", json={"max_steps": 3000})
+    stored = (await review_client.get("/api/memory")).json()["answers"]
+    assert [a["problem"] for a in stored] == [["abc", "abd", "ijk", "ijl"]]
+
+    stepped = (await review_client.post(f"/api/runs/{run_id}/step", json={"n": 60})).json()
+    assert stepped[-1]["codelet_count"] == 360
+    assert not any(r["answer_found"] for r in stepped), "the live Run should not have settled"
+
+    opened = await review_client.post(f"/api/review/runs/{run_id}/inspector")
+    assert opened.status_code == 200, opened.text
+    before = (
+        await review_client.post(
+            f"/api/review/runs/{run_id}/inspector/advance", json={"to_codelet": 300}
+        )
+    ).json()
+    assert before["replay"]["faithful"] is True, before["replay"]
+    after = (
+        await review_client.post(
+            f"/api/review/runs/{run_id}/inspector/advance", json={"to_codelet": 360}
+        )
+    ).json()
+    assert after["replay"]["faithful"] is False
+    assert after["replay"]["first_difference"]["tick"] >= 300, after["replay"]
+
+
 # ─── the other review surfaces, and the other modes ─────────────────────────
 
 
