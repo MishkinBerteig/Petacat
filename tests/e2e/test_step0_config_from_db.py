@@ -82,7 +82,7 @@ PROBLEM_SEED = 42
 #: discriminating the moment the predicates were wired up — silently, which is the one
 #: way a guard test fails that nothing reports.
 CLAMP_PROBLEM = ("abc", "abd", "xyz")
-#: Seed 44: the list orders of G-Z4 moved seed 42 to a run the two clamp probes cannot
+#: Seed 44: the list orders of a string's groups moved seed 42 to a run the two clamp probes cannot
 #: tell apart (both end `xyd` at 587), and 44 separates them.
 CLAMP_SEED = 44
 
@@ -932,7 +932,7 @@ async def test_the_theme_activation_ceiling_comes_from_the_database(db_session):
         meta = await load_metadata_from_db(db_session)
         themespace = Themespace(meta)
         cluster = themespace.clusters[0]
-        # The Themespace holds only the themes something has touched (B-2), so the
+        # The Themespace holds only the themes something has touched, so the
         # first boost is what creates this one, at activation 0.
         relation = cluster.valid_relations[0]
         for _ in range(40):

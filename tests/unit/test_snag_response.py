@@ -109,7 +109,7 @@ class _FakeConceptMapping:
 
 
 # ---------------------------------------------------------------------------
-# CL-4 — a clamp activating during a snag period must release the temperature
+# a clamp activating during a snag period must release the temperature
 # ---------------------------------------------------------------------------
 
 
@@ -140,7 +140,7 @@ def test_clamp_activation_unclamps_the_temperature():
 
 
 # ---------------------------------------------------------------------------
-# SN-3 — snag activation
+# snag activation
 # ---------------------------------------------------------------------------
 
 
@@ -208,7 +208,7 @@ def test_the_snag_concept_pattern_is_the_snag_objects_descriptors():
 
 
 # ---------------------------------------------------------------------------
-# SN-4 — the snag theme pattern comes from the failed mapping's concept-mappings
+# the snag theme pattern comes from the failed mapping's concept-mappings
 # ---------------------------------------------------------------------------
 
 
@@ -240,7 +240,7 @@ def test_the_snag_theme_pattern_is_derived_from_concept_mappings():
 
 
 # ---------------------------------------------------------------------------
-# SN-5 — progress since a snag is measured over Workspace structures
+# progress since a snag is measured over Workspace structures
 # ---------------------------------------------------------------------------
 
 
@@ -310,7 +310,7 @@ def test_undo_snag_condition_records_the_progress_it_measured():
 
 
 # ---------------------------------------------------------------------------
-# CL-3 — the concept pattern a theme pattern drags into the Slipnet
+# the concept pattern a theme pattern drags into the Slipnet
 # ---------------------------------------------------------------------------
 
 

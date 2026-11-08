@@ -91,7 +91,7 @@ def ctx_abc_abd_xyz_with_group(meta, runner):
     lcat = slipnet.nodes["plato-letter-category"]
     for members in (letters[1:3], letters[3:6]):
         group = Group(target, samegrp, lcat, None, list(members), [])
-        # ``make-group`` attaches no Length description (GR-1); the reference's
+        # ``make-group`` attaches no Length description; the reference's
         # only route to one is ``propose-group``'s stochastic
         # ``attach-length-description`` (groups.ss:816-818), so a fixture that
         # wants length-described groups has to ask for them by name.
@@ -698,7 +698,7 @@ class TestGroupBuilder:
 
 
 # ═══════════════════════════════════════════════════════════════════════
-# Group hierarchies and the break cascade — GR-5 and GR-6
+# Group hierarchies and the break cascade
 # ═══════════════════════════════════════════════════════════════════════
 
 
@@ -770,7 +770,7 @@ def _sameness_group(ctx, string, members, *, facet="plato-letter-category"):
 
 
 class TestGroupHierarchy:
-    """GR-5: ``get-incompatible-groups`` (groups.ss:283-286) is the *enclosing
+    """``get-incompatible-groups`` (groups.ss:283-286) is the *enclosing
     groups of the constituents*, so a supergroup over built subgroups fights
     nothing and the subgroups become nested members (groups.ss:925-928)."""
 
@@ -831,7 +831,7 @@ class TestGroupHierarchy:
 
 
 class TestBreakGroupCascade:
-    """GR-6: ``break-group`` (groups.ss:954-1018) is not a single removal."""
+    """``break-group`` (groups.ss:954-1018) is not a single removal."""
 
     def test_breaking_a_group_takes_its_bonds_and_bridges_with_it(
         self, ctx_abc_abd_xyz_with_group, meta
@@ -1888,7 +1888,7 @@ def _get_test_builtins():
 
 
 # ═══════════════════════════════════════════════════════════════════════
-# Group scanning — GR-4 and GR-8
+# Group scanning
 # ═══════════════════════════════════════════════════════════════════════
 
 
@@ -1911,7 +1911,7 @@ class TestScanBonds:
     """``scan-bonds`` (groups.ss:879-907) — facet AND category AND direction."""
 
     def test_a_bond_of_a_different_direction_stops_the_scan(self, ctx_abc_abd_xyz, meta):
-        """GR-4: Petacat could chain a left- and a right-directed successor bond
+        """Petacat could chain a left- and a right-directed successor bond
         into one "group" whose recorded direction misdescribes its contents — a
         structure the reference cannot build."""
         from server.engine.codelet_dsl.builtins import scan_bonds
@@ -2020,7 +2020,7 @@ class TestNumBondsToScan:
 
 
 # ═══════════════════════════════════════════════════════════════════════
-# Group descriptions and proposal — GR-1 and GR-10
+# Group descriptions and proposal
 # ═══════════════════════════════════════════════════════════════════════
 
 
@@ -2028,7 +2028,7 @@ class TestGroupDescriptions:
     def test_a_group_carries_no_length_description_of_its_own(
         self, ctx_abc_abd_xyz_with_bonds, meta
     ):
-        """GR-1: ``make-group`` (groups.ss:20-54) attaches none.  Attaching one to
+        """``make-group`` (groups.ss:20-54) attaches none.  Attaching one to
         every group jolted ``plato-one/two/three`` — and through them
         ``plato-length`` — on every build, permanently inflating the length facet."""
         ctx = ctx_abc_abd_xyz_with_bonds
@@ -2083,7 +2083,7 @@ class TestGroupDescriptions:
     def test_a_singleton_carries_a_bond_category_description(
         self, ctx_abc_abd_xyz, meta
     ):
-        """GR-10: ``groups.ss:30-31`` attaches BondCtgy unconditionally, from the
+        """``groups.ss:30-31`` attaches BondCtgy unconditionally, from the
         category-derived bond category.  Gating it on the presence of constituent
         bonds left every singleton without one, so a bridge to a singleton lost
         its BondCtgy concept-mapping."""
@@ -2102,7 +2102,7 @@ class TestGroupDescriptions:
         assert ctx.slipnet.nodes["plato-sameness"] in descriptors
 
     def test_a_group_between_the_two_edges_is_described_middle(self, meta, runner):
-        """GR-10: ``make-group`` orders the cond whole -> leftmost -> **middle** ->
+        """``make-group`` orders the cond whole -> leftmost -> **middle** ->
         rightmost (groups.ss:34-42).  The middle branch was missing outright, so no
         group could ever be described ``middle``."""
         runner.init_mcat("abc", "abd", "abcde", seed=SEED)
@@ -2126,7 +2126,7 @@ class TestDuplicateGroup:
     def test_a_duplicate_proposal_hands_over_its_new_descriptions(
         self, ctx_abc_abd_xyz_with_group, meta
     ):
-        """GR-10: the duplicate branch (groups.ss:631-642) re-activates the
+        """The duplicate branch (groups.ss:631-642) re-activates the
         incumbent's descriptors and transfers any description the proposal has and
         it lacks — canonically the Length one, which is how a group usually
         acquires one at all."""

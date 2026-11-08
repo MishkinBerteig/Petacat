@@ -126,7 +126,7 @@ def test_perturb_of_a_non_square_still_draws_a_whole_number_delta():
     """``(~ 2)``: Metacat's ``round`` is exact (``utilities.ss:250-252``), so the
     bound is ``1 + 1 = 2`` and the delta is 0 or 1, never continuous.
 
-    The reachable thresholds are exactly ``{1, 2, 3}`` (``DISCREPANCIES5.md`` A-1).
+    The reachable thresholds are exactly ``{1, 2, 3}`` (Metacat's ``round`` is exact).
     """
     rng = RNG(7)
     values = {rng.perturb(2) for _ in range(400)}
@@ -145,7 +145,7 @@ def test_perturb_bound_is_one_plus_the_rounded_square_root():
 
 
 def test_the_blur_makes_two_objects_few_about_a_quarter_of_the_time():
-    """The consequence of the whole-number delta (``DISCREPANCIES5.md`` A-1).
+    """The consequence of the whole-number delta (Metacat's ``round`` is exact).
 
     ``rough-num-of-objects`` (``workspace.ss:683-688``) asks ``(< count (~ 2))``.
     A count of 2 is ``few`` only when the delta is 1 on the upward branch: a

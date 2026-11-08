@@ -7,7 +7,7 @@ decisions inside Petacat, and checks at each one that Petacat had the same optio
 with the same weights or probabilities. Each mismatch is a located bug report. The
 design is in `meta-peta-trace-idea.md` (repository root). The decisions taken while
 building and running it are in [`DECISIONS.md`](DECISIONS.md). The port bugs it found
-are recorded in `DISCREPANCIES5.md`: the status lines on A-1…D-11 and section **G**.
+that are still open are recorded in `DISCREPANCIES5.md`; the ones it fixed are in the git history.
 
 ## Parts
 
@@ -41,7 +41,7 @@ every stored header, with no exception. (The recordings of the crashes of the bu
 | Metacat's known failures, recorded with the bundle's known-failure fixes (the patched build) | `traces-known-failures/fixes/` | 3 traces | Yes |
 | Translation logs: the six runs behind `translation_log_metacat.tsv` | `traces-translation/<slug>/<seed>.metacat.jsonl.gz` | 6 traces | Yes |
 | Snag explanations: seven runs beyond the corpus that between them hit every shape of failure (CHANGE, SWAP, CONFLICT, group-category reversal), with Metacat's logged explanations and comment lines | `traces-snags/<slug>/<seed>.metacat.jsonl.gz`, `snag_explanations_metacat.tsv` | 7 traces, 1.5 MB | Yes |
-| Desync regressions: the shortest prefixes (caps of 260-480 codelets) of three runs beyond the corpus that used to desynchronise Petacat's replay (`a-b-xyz` 1, `abc-bcd-xyz` 1, `aaa-bbb-xyz` 3; `DISCREPANCIES5.md` G-Y2…G-Y4) | `traces-desync/<slug>/<seed>.metacat.jsonl.gz` | 3 traces, 0.3 MB | Yes |
+| Desync regressions: the shortest prefixes (caps of 260-480 codelets) of three runs beyond the corpus that used to desynchronise Petacat's replay (`a-b-xyz` 1, `abc-bcd-xyz` 1, `aaa-bbb-xyz` 3) | `traces-desync/<slug>/<seed>.metacat.jsonl.gz` | 3 traces, 0.3 MB | Yes |
 
 The three recordings of the crash seeds on the reconstruction without the fixes were made once, in October 2026, and
 removed on 2026-11-08 at the user's ruling. Nothing records on that build any more. What remains is the written record of how
@@ -147,7 +147,7 @@ leaving out proposed structures, which the two programs hold differently by desi
 The one harness gap these corpora had, two builders (or two evaluators) for the same description or rule that
 agree on everything the recorder logged, so replay could not tell which one Metacat ran, is closed: the recorder
 now logs the proposal's own time stamp for a description and a rule as it did for a bond, a group and a bridge
-(`DISCREPANCIES5.md` G-T3). The corpora were first recorded before that, and before the project ruled that
+(the proposal-stamp tie below). The corpora were first recorded before that, and before the project ruled that
 only the patched Metacat is ever run. In round 2, stages T and T2, **every stored trace was recorded again** from the
 patched Metacat with the fixed recorder: the 190 + 380 plain traces, the 536 episode runs, the 85 justify traces and
 the 6 translation-log traces, 1,197 in all. Each new trace is the old one record for record, apart from the
@@ -162,7 +162,7 @@ found two faults that the decisions had hidden:
   building it. That came to 8,682 snapshots across 40 justify traces. The API's rule
   list had the same filter, so the dashboard did not show that rule; both are fixed.
 - **The numeric backends**, which Petacat runs by default, still had the spreading
-  arithmetic that `DISCREPANCIES5.md` B-1 fixed in the engine's own loops.
+  arithmetic that had already been fixed in the engine's own loops (round after multiplying, not after dividing).
 
 **Through the GPU.** Replayed with `--numeric-backend mlx`, the MLX backend Petacat uses
 by default, every corpus gives exactly the backend-off results: all 570 plain,
@@ -194,18 +194,16 @@ differing in `self` / `subobjects` taken for equal (`abc → bcd; xyz`, `aaa →
 duplicate branch of `group-builder` pre-empted by Petacat's stale-premise guard
 (`aaa → bbb; xyz` 3), a bridge's internal coherence tried in one order only (`abbc → abcc;
 xyz` 4), and, in answer descriptions, `get-equivalent-bridge` taking any bridge over the same
-positions for the same bridge (the `ijll` themes of `aabc → aabd; ijkk`). `DISCREPANCIES5.md`
-G-Y1…G-Y7 has each, with the Scheme and the evidence; the three that show at a codelet are
+positions for the same bridge (the `ijll` themes of `aabc → aabd; ijkk`). The three that show at a codelet are
 pinned by `test_desync_fixes.py` on committed prefixes, the other two by
 `tests/module/test_lockstep_desync_fixes.py`. These sweeps are not committed (the traces are
 tens of megabytes); to repeat one: `python3 tests/lockstep/metacat/record.py --problem abc abd
 ijkk --seeds 1-10 --cap 4000 --out /tmp/w` then `scripts/lockstep_corpus.py --traces /tmp/w
 --out-dir /tmp/wr --jobs 12`. A trace recorded with `--no-snapshots` cannot show a state
-difference that did not change a decision yet (G-Y5 was found by re-recording one run with
+difference that did not change a decision yet (one such difference was found by re-recording one run with
 snapshots).
 
-The individual fixes are listed in `DISCREPANCIES5.md` section G (G-A1 … G-W1) and in the
-status lines of A-1 … D-11.
+The individual fixes are in the git history; `DISCREPANCIES5.md` keeps only what is still open.
 
 ## The extended golden baseline
 
@@ -392,7 +390,7 @@ python3 tests/lockstep/metacat/record.py --problem abc abd xyz --seeds 1 --cap 3
   1. All now round through `server/engine/formulas.py` (`round_exact`, `round_ratio`: whole-number arithmetic, no
   rational type), with exhaustive tests in `tests/unit/test_exact_rounding.py`. The other 60 sites are one correctly
   rounded division of whole numbers, a float in Metacat too, or display; each is a row of the audit.
-- **Stage W's wide check** (4,384 runs against Metacat, `DISCREPANCIES5.md` F-N1, F-N2, F-N4, F-C, R1): the order
+- **Stage W's wide check** (4,384 runs against Metacat): the order
   `check-for-conflicts` and `apply-transforms` take (Chez's `pairwise-map` and merge sort), a consolidated group built over
   a slot a stale bond holds (`build-bond` overwrites the pointers), and the recording limit behind stage W's "cluster C"
   and its long N3 run, which re-recorded replay with no difference. The one thing left was a crash of patched Metacat itself,
@@ -407,7 +405,7 @@ python3 tests/lockstep/metacat/record.py --problem abc abd xyz --seeds 1 --cap 3
   is replayed by `test_comparer.py`.
 - **A description's time stamp** was not an engine fault. `aazzz → azzza; aye`, seed 3: two top-down description scouts
   proposed `desc(m.2,alphabetic-position-category,alphabetic-last)` at 1670 and 1676, both builders agreed on every
-  field the recorder logged, and replay took the later one (`DISCREPANCIES5.md` G-T3). Fixed in the recorder
+  field the recorder logged, and replay took the later one. Fixed in the recorder
   (`decision-trace.ss`, `picked_arg_stamp` for a description and a rule); no engine change.
 - **Not Metacat's to run.** Problem strings with a capital letter or a digit (`abC`, `1234`) are accepted by
   Petacat and refused by Metacat's recorder (lowercase letters only), so they cannot be checked and are not in the baseline.

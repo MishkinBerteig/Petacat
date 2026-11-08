@@ -350,7 +350,7 @@ class ReplayRNG(LockstepBase):
         stamp = rec.get("picked_stamp")
         exact = [k for k in found if fields["stamps"][k] == stamp]
         candidates = exact or found
-        # Codelets alike in everything the record names (G-T3: two proposals of one
+        # Codelets alike in everything the record names (two proposals of one
         # structure, restamped by a clamp) are told apart by nothing Metacat logged, and
         # which of them its uniform index chose is not recorded.  They are tried in the
         # order they were made, not in the order a bin's vector happens to hold them

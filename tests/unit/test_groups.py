@@ -150,7 +150,7 @@ def test_internal_strength_rises_when_the_bond_category_is_fully_active():
 
 
 def test_bondless_singleton_sameness_group_does_not_collapse_to_five():
-    """GR-2: the bond factor exists for a singleton too.
+    """The bond factor exists for a singleton too.
 
     ``new-group`` derives the bond category from the group category, so a group
     of one has one even though it has no bonds.  Reading the factor off the

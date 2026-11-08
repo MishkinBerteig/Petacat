@@ -1,7 +1,6 @@
 """Ordering and gating details of the rule machinery that decide what Metacat computes.
 
-Each test names the Scheme site whose behaviour it pins (DISCREPANCIES5 items C-1 to C-4,
-D-1, D-2, D-5).  The objects are small fakes: only the structure each function reads.
+Each test names the Scheme site whose behaviour it pins (the cons-built list orders, `remq-duplicates`, `sort-templates`, the subobject gate, the common change schemas and `if*`).  The objects are small fakes: only the structure each function reads.
 """
 
 from types import SimpleNamespace as NS
@@ -17,7 +16,7 @@ def _obj(left, right, enclosing=None, string=None):
               enclosing_group=enclosing, string=string)
 
 
-# ---- C-3: sort-templates (rules.ss:816-826) -------------------------------------
+# ---- sort-templates (rules.ss:816-826) -------------------------------------
 
 
 def test_sort_templates_puts_the_contained_object_first():
@@ -39,7 +38,7 @@ def test_sort_templates_orders_disjoint_objects_by_position_and_intrinsic_first(
     assert rules.sort_templates([ext1, ext2, tb, ta]) == [ta, tb, ext2, ext1]
 
 
-# ---- D-2: get-common-change-schemas (rules.ss:702-706) --------------------------
+# ---- get-common-change-schemas (rules.ss:702-706) --------------------------
 
 
 def test_a_schema_with_no_common_relation_survives_the_identity_filter(monkeypatch):
@@ -51,7 +50,7 @@ def test_a_schema_with_no_common_relation_survives_the_identity_filter(monkeypat
     assert rules._get_common_change_schemas([]) == [schemas[0], schemas[2]]
 
 
-# ---- D-1: the four-way gate (rules.ss:619-634) ----------------------------------
+# ---- the four-way gate (rules.ss:619-634) ----------------------------------
 
 
 @pytest.mark.parametrize(
@@ -118,7 +117,7 @@ def test_unjustified_theme_for_a_repeated_dimension_takes_the_first_entry():
     assert _unjustified_themes([cm1], roles) != _unjustified_themes([cm2], roles)
 
 
-# ---- C-4: differing-dimensions is not deduplicated --------------------------------
+# ---- differing-dimensions is not deduplicated --------------------------------
 
 
 def test_differing_dimensions_counts_one_per_matching_pair():
@@ -194,7 +193,7 @@ def test_joots_from_justify_clamps_reads_the_most_recent_clamp():
     assert set(seen) == {"new"}
 
 
-# ---- D-5: if* is when (answers.ss:1082-1092) -----------------------------------------
+# ---- if* is when (answers.ss:1082-1092) -----------------------------------------
 
 
 def test_length_transform_attaches_to_source_and_instantiated_and_bond_facet_is_a_sibling(

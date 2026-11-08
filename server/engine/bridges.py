@@ -1514,7 +1514,7 @@ def direction_incompatible_bridges(
 
     Without this a spanning bridge could be built straight over a set of
     crossing sub-mappings and leave them all standing — the false-negative half
-    of BR-8.
+    of the incompatibility refinements.
     """
     relation = getattr(direction_cm.label, "relation", None) if direction_cm.label else None
     v = constants().vocab

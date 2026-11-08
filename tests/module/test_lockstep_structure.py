@@ -1,6 +1,6 @@
 """Lockstep-pass fixes: scouts' scope, bond-builder order, aggregates, events.
 
-Each test cites the Scheme it pins (DISCREPANCIES5.md D-6 to D-9, C-5, D-10).
+Each test cites the Scheme it pins (bond-builder break order, answer string outside justify mode, concept-activation sampling, the jootser).
 """
 
 import os
@@ -55,7 +55,7 @@ def _posted(ctx, codelet_type):
     ]
 
 
-# --- D-8: the scope a bridge hands its top-down scouts -------------------------
+# --- the scope a bridge hands its top-down scouts -------------------------
 
 
 def test_bridge_recruits_scouts_scoped_to_the_objects_strings(ctx_mrrjjj):
@@ -119,7 +119,7 @@ def test_description_scout_with_a_string_scope_picks_within_that_string(ctx_mrrj
     assert seen == [(initial, "average")]
 
 
-# --- D-6: the bond builder's break order and guard -----------------------------
+# --- the bond builder's break order and guard -----------------------------
 
 
 def test_bond_builder_breaks_groups_first_and_skips_vanished_groups(
@@ -154,7 +154,7 @@ def test_bond_builder_breaks_groups_first_and_skips_vanished_groups(
     assert broken == [live_group, existing]
 
 
-# --- D-7: aggregates and the answer string --------------------------------------
+# --- aggregates and the answer string --------------------------------------
 
 
 def test_aggregates_exclude_a_found_answer_string_outside_justify_mode(runner):
@@ -171,7 +171,7 @@ def test_aggregates_exclude_a_found_answer_string_outside_justify_mode(runner):
     assert len(ws.all_objects) == n + 3
 
 
-# --- D-9: flush and jump are monitored separately -------------------------------
+# --- flush and jump are monitored separately -------------------------------
 
 
 def test_concept_activation_events_are_tested_per_change(runner):
@@ -192,7 +192,7 @@ def test_concept_activation_events_are_tested_per_change(runner):
     assert [e for e in events if e.slipnode is node]
 
 
-# --- C-5: the answer-description dimension order --------------------------------
+# --- the answer-description dimension order --------------------------------
 
 
 def test_answer_description_dimensions_follow_answers_ss_order():

@@ -188,7 +188,7 @@ class SlipnetTopology:
     #: (``slipnet.ss:181-186``), and only multiplying before dividing keeps its
     #: halfway cases (association 70 at activation 45 is exactly 31.5) exact in
     #: float64 and float32.  Pre-dividing gave 0.7 * 45 = 31.499..., rounding to 31
-    #: where Metacat gets 32 (DISCREPANCIES5 B-1).
+    #: where Metacat gets 32 (Metacat rounds after multiplying, not after dividing).
     in_weight: tuple[float, ...]
 
     #: Destination node index of each edge, in the same order as ``in_source``.

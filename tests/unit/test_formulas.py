@@ -220,7 +220,7 @@ def test_group_evaluation_probability_matches_the_stated_closed_form(
 
 
 def test_a_weak_group_at_high_temperature_is_boosted_far_above_the_generic_curve():
-    """GR-3: the whole reason the author wrote a separate curve.
+    """The whole reason the author wrote a separate curve.
 
     Strength 20 at T=100 survives group evaluation with p = 0.96, where the
     generic acceptance the port was using gives 0.28 — a suppression of early

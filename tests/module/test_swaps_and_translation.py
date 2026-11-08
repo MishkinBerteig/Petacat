@@ -86,7 +86,7 @@ def _od(ctx, object_type, attribute, descriptor):
     )
 
 
-# ── RU-1: an extrinsic clause is only a swap if it carries its dimensions ───
+# ── an extrinsic clause is only a swap if it carries its dimensions ───
 
 
 def test_a_swap_rule_abstracted_from_bridges_actually_swaps(ctx):
@@ -99,7 +99,7 @@ def test_a_swap_rule_abstracted_from_bridges_actually_swaps(ctx):
     ``eqe`` has to give back ``qeq``: that is ``currently-works?``, and a rule that
     fails it is discarded by the evaluator (``rules.ss:463-465``).
 
-    Before RU-1 the clause was built with ``changes=[]`` and its dimensions thrown
+    Before extrinsic clauses carried their dimensions the clause was built with ``changes=[]`` and its dimensions thrown
     away, so this application was the identity and no swap rule was ever built.
     """
     ws = ctx.workspace
@@ -225,7 +225,7 @@ def test_a_swap_over_overlapping_objects_is_a_swap_snag(ctx):
     assert [f.kind for f in failures] == [standard_names.FAILURE_SWAP]
 
 
-# ── RU-4: the conflict check is the implication battery, not one identity ───
+# ── the conflict check is the implication battery, not one identity ───
 
 
 def test_a_length_change_on_a_group_conflicts_with_a_letter_change_inside_it(ctx):
@@ -336,7 +336,7 @@ def test_two_changes_on_unrelated_objects_do_not_conflict(ctx):
     assert _letters(ctx, ws.target_string) == "bbbbz"
 
 
-# ── RU-3: the p = 0.4 per-dimension drop is a source of answer variety ──────
+# ── the p = 0.4 per-dimension drop is a source of answer variety ──────
 
 
 def _vertical_mapping(ctx):
@@ -485,7 +485,7 @@ def test_the_drop_probability_is_configurable_and_off_at_zero(ctx, meta, monkeyp
     assert seen == {"plato-b"}
 
 
-# ── RU-11: a translation can fail, and failure is not an unchanged target ───
+# ── a translation can fail, and failure is not an unchanged target ───
 
 
 def test_a_clause_naming_a_missing_object_fails_the_translation(ctx, meta):

@@ -141,7 +141,7 @@ def attempt_justification(
     # No floor: ``stochastic-pick-by-method ... 'get-strength`` (justify.ss:26-27)
     # leaves a worthless rule unchosen (``utilities.ss:443-448``).  A rule's strength
     # is its rank-relative quality as of the last update cycle (``rules.ss:286``,
-    # ``workspace-structures.ss:40``), not its raw quality (G-J1).
+    # ``workspace-structures.ss:40``), not its raw quality.
     weights = [r.strength for r in all_supported]
     chosen_rule: Rule = rng.weighted_pick(all_supported, weights)
     if vlog is not None:
@@ -352,7 +352,7 @@ def attempt_justification(
     # ``(100- (abs (- strength ...)))`` (justify.ss:142-146) is used raw, so a
     # rule 100 away in quality is not a unification candidate at all
     # (``utilities.ss:443-448``).
-    # ``(tell r 'get-strength)``: the stored, rank-relative strength (G-J1).
+    # ``(tell r 'get-strength)``: the stored, rank-relative strength.
     strength = chosen_rule.strength
     other_weights = [100.0 - abs(strength - r.strength) for r in other_rules]
     other_rule: Rule = rng.weighted_pick(other_rules, other_weights)
@@ -447,7 +447,7 @@ def clamp_rules(
     elif themespace is not None:
         # justify.ss:163-170 clamps the vertical pattern whatever it holds: a bare
         # ``(vertical-bridge)`` still clamps the vertical theme type and switches
-        # its thematic pressure on (trace.ss:1530-1536) (G-J2).
+        # its thematic pressure on (trace.ss:1530-1536).
         vtp = themespace.get_dominant_theme_pattern(vocab().theme_type_vertical_bridge)
         if vtp:
             tp_dict = _theme_pattern_list_to_dict(vtp, meta)
@@ -693,7 +693,7 @@ def get_vertical_theme_pattern_to_clamp(
     theme_type = unifying_pattern[0]
     # A Themespace relation is the bare name (``identity``, ``opposite``); the entries a
     # unification yields carry the label *node*, which names no theme, so the clamp
-    # silently created none of them (G-J3).
+    # silently created none of them.
     pattern_entries = [
         (e[0], _relation_name(e[1])) + tuple(e[2:]) if isinstance(e, tuple) and len(e) >= 2 else e
         for e in unifying_pattern[1:]

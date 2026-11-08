@@ -711,7 +711,7 @@ class TestMemory:
         """
         memory = EpisodicMemory()
         rule = "Swap letter-categories of all objects in string"
-        # TM-3: a snag is matched to an answer by the rule's *clause list*, not by
+        # A snag is matched to an answer by the rule's *clause list*, not by
         # its English prose (``memory.ss:78-89``).  The transcription ignores
         # ``object_description``, so a leftmost rule and a rightmost rule read
         # alike; both answers and the snag therefore carry the signature that

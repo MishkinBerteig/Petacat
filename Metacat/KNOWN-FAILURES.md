@@ -481,7 +481,7 @@ Any use of it still counts as a changed engine in the sense of item 4 above.
 them to the end with no differences. The recordings of the crashes themselves (`traces-known-failures/reference/`) and their
 registry entries were removed on 2026-11-08, at the user's ruling; "How to reproduce the problem behind each fix" is the
 record, and `tests/reproduce-failures.ss` proves on the patched build that each case takes the fixed path. Investigating
-these seeds found two Petacat port bugs on the same path (`DISCREPANCIES5.md` G-Q1, G-Q2), which are fixed.
+these seeds found two Petacat port bugs on the same path, which are fixed.
 
 ## A fourth crash: a group of six or more
 

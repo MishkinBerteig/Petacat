@@ -1,6 +1,6 @@
 """List orders that Metacat's ``cons`` and ``vector`` fix, and that Petacat once got the other way round.
 
-Each test names the Scheme site it pins (DISCREPANCIES5 C-1, G-Z4, I-4, I-5).  The orders are not
+Each test names the Scheme site it pins (cons-built lists, string group lists, the jootser's event order).  The orders are not
 cosmetic: they are the orders of weighted walks, of coin flips and of first-match searches.
 """
 
@@ -19,7 +19,7 @@ from server.engine.run_binding import vocab
 from server.engine.workspace import WorkspaceString
 
 
-# ---- G-Z4: Chez Scheme's ``sort`` (the merge steps of sort-templates) --------------------------
+# ---- Chez Scheme's ``sort`` (the merge steps of sort-templates) --------------------------
 
 _CHEZ = json.loads((Path(__file__).parent / "chez_sort_cases.json").read_text())["cases"]
 
@@ -66,7 +66,7 @@ def test_a_rule_over_a_string_reads_the_bridges_of_its_top_level_objects_unsorte
     """``get-subobject-bridges`` of a string (``workspace-strings.ss:468-471``) is over
     ``get-top-level-objects`` -- letters, then groups newest first -- not the sorted
     ``get-constituent-objects``; it is the order of a rule's supporting bridges and so of the
-    supporting groups an answer lists (G-Z4)."""
+    supporting groups an answer lists."""
     string = WorkspaceString("aabb", _Slipnet())
     left, right = _group(0, 1), _group(2, 3)
     for g, name in ((left, "left"), (right, "right")):
@@ -130,7 +130,7 @@ def test_a_batch_over_capacity_drops_by_a_pick_over_the_newest_first_list():
     assert [c for b in rack.bins for c in b.codelets] == [batch[1], batch[0]]
 
 
-# ---- I-4: the jootser's event set is newest first (jootsing.ss:154-168, trace.ss:201) --------------
+# ---- the jootser's event set is newest first (jootsing.ss:154-168, trace.ss:201) --------------
 
 
 def _snag(count, tag):
@@ -155,7 +155,7 @@ def test_partition_puts_each_event_at_the_front_of_its_class_from_the_oldest_end
     assert [[e.tag for e in cls] for cls in classes] == [["c1", "a1"], ["b2"]]
 
 
-# ---- I-3: the display-time prints of an answer and of a rule event (trace.ss:452, 988) -------------
+# ---- the display-time prints of an answer and of a rule event (trace.ss:452, 988) -------------
 
 
 def test_an_empty_slippage_log_prints_as_metacat_prints_it():

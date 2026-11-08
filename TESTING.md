@@ -436,7 +436,7 @@ changing what it records.
 
 | File | Fns | Covers |
 |------|----:|--------|
-| `test_arithmetic_fidelity.py` | 10 | Metacat's exact roundings and orders: spreading, urgencies and bins, jootser, descriptor support, single-letter groups (DISCREPANCIES5 B-1…B-5, D-4, D-11) |
+| `test_arithmetic_fidelity.py` | 10 | Metacat's exact roundings and orders: spreading, urgencies and bins, jootser, descriptor support, single-letter groups |
 | `test_rationals.py` | 13 | The rational value kind: `n/m` parsed exactly, refused unless it is two integers over a positive denominator, and stored in lowest terms; the configuration hash follows it. The Metacat Standard Configuration holds `enclosed_group_importance_factor`, `edge_object_bond_factor` and `interior_object_bond_factor` as `2/3`, `1/3` and `1/6`, on the declared read list; under them importance and intra-string unhappiness are the old arithmetic, and a non-standard rational changes them as it implies |
 | `test_config_document.py` | 26 | S0: the pure `ConfigDocument` (`server/services/config_document.py`): identity with the files' provider and the engine's `config_hash`, order, structure sharing between versions, errors, codecs (int, float and rational typing), replay against a naive reference model, the incremental hash against the whole hash, and `diff` followed by `apply_resolved` |
 | `test_config_registry.py` | 5 | C6: the configuration table registry (`server/services/config_registry.py`): natural keys, order columns, code and JSON columns, the 18 enum tables (the first 13 and the string kinds, rule scopes, failure kinds, clamp types and progress focuses), a NULL link label read as `''`, the frozen spec |
@@ -479,14 +479,14 @@ changing what it records.
 | `test_en6_perception.py` | 12 | EN6: bonds, groups, bridges, concept mappings and images read roles, relations and the alphabet; the bridge recruitment post sequence is unchanged; identity absent never raises; every dimension, position, direction, object and recruit role unbound or its node removed, and each relation node removed, on the demo and justify problems; and whole runs (discovery, justify, Episodic Memory carried) on a configuration whose role-bound, relation, letter and number nodes are all renamed give the same answers, codelet counts, RNG draws and English |
 | `test_en10b_scalars.py` | 9 | EN10: the rules, justify and perception scalars read from the configuration with today's values and types (the two rule abstraction probabilities, the justify identity retention, the bridge-recruit urgency level, description local support, concept-mapping and bridge coefficients); a configuration lacking one stops the run at its start naming it |
 | `test_en11a_engine_closeout.py` | 5 | EN11: the rule-signature token comes from the `object.group` role (exactly the old token under the Metacat Standard Configuration, following a rename, defined when the role is absent); the remaining scalars (`sigmoid_divisor`, the theme flip probabilities, the reminding threshold, the rough-count thresholds) are read from the configuration and a configuration lacking one stops at the run's start |
-| `test_order_fidelity.py` | 10 | The list orders `cons` and vectors fix: Chez Scheme's `sort` (80 cases from the Metacat image), a string's groups, the rule's subobject bridges, the coderack bin and deferred batch, the jootser's event set, and the display-time prints (DISCREPANCIES5 C-1, G-Z4, G-Z5, I-3…I-5) |
+| `test_order_fidelity.py` | 10 | The list orders `cons` and vectors fix: Chez Scheme's `sort` (80 cases from the Metacat image), a string's groups, the rule's subobject bridges, the coderack bin and deferred batch, the jootser's event set, and the display-time prints |
 | `test_exact_rounding.py` | 9 | Exact rounding where Metacat is exact: `round_ratio` and `round_exact` against `fractions.Fraction` over every whole input, the degree of support for every pair of strengths, concept-mapping strength and slippability for every association and depth, rule quality for every uniformity, abstractness and reachable succinctness, the Slipnet's spread at any update cycle length and its decay at a whole-number exponent |
 | `test_rule_order_fidelity.py` | 4 | The orders Chez Scheme decides in rule application: `check-for-conflicts` visits pairs in `pairwise-map`'s order, `apply-transforms` sorts with Chez's merge sort and `apply-before?`, and `build-bond` overwrites a held slot's pointers |
 | `test_fidelity_fixes.py` | 6 | Stage F's fixes: a rule's degree of support is an exact product, a Themespace adds no theme while Self-watching is off, the context keeps the two in step, and `permission_to_clamp` has no default for the flag |
 | `test_rng.py` | 17 | The deterministic RNG wrapper |
-| `test_rule_bond_facet_change.py` | 1 | A GroupCtgy self change's BondFacet change is found wherever it sits (KNOWN-FAILURES, G-Q1) |
+| `test_rule_bond_facet_change.py` | 1 | A GroupCtgy self change's BondFacet change is found wherever it sits (KNOWN-FAILURES) |
 | `test_rule_types.py` | 9 | `Rule` and `RuleClause` predicates and translation |
-| `test_rules_lockstep_ordering.py` | 12 | Rule construction in Metacat's order: subobject gate, common change schemas, `sort-templates`, swaps, list order (DISCREPANCIES5 C-1…C-4, D-1…D-5) |
+| `test_rules_lockstep_ordering.py` | 12 | Rule construction in Metacat's order: subobject gate, common change schemas, `sort-templates`, swaps, list order |
 | `test_run_service_ids.py` | 2 | A clamp or Undo on a live run takes its trace-event number from the run's own id allocator |
 | `test_runner_status.py` | 1 | The runner's status constants |
 | `test_scout_counts.py` | 14 | The scout-count aggregates that decide how many codelets a cycle posts |
@@ -563,7 +563,7 @@ changing what it records.
 | File | Fns | Covers |
 |------|----:|--------|
 | `test_access_sets.py` | 19 | Read-set / write-set discipline and commit-time validation |
-| `test_lockstep_desync_fixes.py` | 5 | Fixes found by replaying runs beyond the lockstep corpus, as small hand-built states: `get-equivalent-bridge`, rule clauses `self` vs `subobjects`, any-descriptor reference objects, both-order internal coherence, `remove-duplicates` keeping the last entry (G-Y1…G-Y3, G-Y5, G-Y8) |
+| `test_lockstep_desync_fixes.py` | 5 | Fixes found by replaying runs beyond the lockstep corpus, as small hand-built states: `get-equivalent-bridge`, rule clauses `self` vs `subobjects`, any-descriptor reference objects, both-order internal coherence, `remove-duplicates` keeping the last entry |
 | `test_answer_description_pattern.py` | 13 | The vertical theme-pattern an answer description is indexed by |
 | `test_wired_numbers.py` | 11 | Stage W: each number the engine used to repeat as a literal or ignore (`probabilistic_activation_exponent`, the four `*_string_salience_*_weight` coefficients, `max_raw_importance`, `max_activation`, `max_theme_activation`, `concept_activation_importance_threshold`, `jootsing_count_scale`) is changed in a configuration built in the test and a real run moves, on every backend in the matrix; and each site is pinned alone (clamp default, label flush, length-description exponent, theme-conjunction admission, theme patterns, derived concept patterns, snag branch of the jootser) |
 | `test_bridge_scouting.py` | 25 | The bridge scouts' probabilistic gates, the build-time mapping augmentation, the incompatibility refinements, and the deferred posting batch |
@@ -578,7 +578,7 @@ changing what it records.
 | `test_image_relations.py` | 4 | The relations a group's image is built with, and what happens when they are wrong |
 | `test_initial_clamp.py` | 5 | The initial Slipnet clamp is Metacat's in every run mode: released at the fixed codelet count, re-applied off an update boundary serially, free-running and speculatively with the exact release codelet, and across a capture and a restore |
 | `test_justify_and_jootsing.py` | 14 | Justify mode's verdicts and the jootser's justify outcomes |
-| `test_lockstep_structure.py` | 7 | Structure-building fidelity: bridge-proposal scout scope, bond-builder break order, answer string outside justify mode, concept-activation sampling (DISCREPANCIES5 C-5, D-6…D-10) |
+| `test_lockstep_structure.py` | 7 | Structure-building fidelity: bridge-proposal scout scope, bond-builder break order, answer string outside justify mode, concept-activation sampling |
 | `test_numeric_engine.py` | 7 | The engine computes the same thing with the substrate engaged |
 | `test_no_seed_reads_at_run_time.py` | 8 | EN1: the engine takes its configuration from the run's `MetadataProvider` and never reads the Metacat Standard Configuration files at run time. A `sys.addaudithook` fixture (local to the module) fails any `open` under `seed_data/` during a Verbose-mode run, a swarm call, an episode with Episodic Memory carried and the comparison and explanation of its answers; and the former fallbacks (rule English parameters, the Verbose catalogue, commentary templates, conceptual depths, reminding and distance) raise when no provider is given |
 | `test_run_binding.py` | 16 | A run is bound to its own configuration, constants, Themespace and clock (round 2, stage 2): every run is identical to the same run alone (codelets, answers, status, every draw, every Trace event, the final state graph) when a second run with the same or another configuration is created before it finishes, when two runs are stepped alternately or one inside the other's step, beside a restored review inspector, on parallel threads running different problems, and under two speculative engines in one process; with no run bound, `current`, `constants`, `next_id` and a structure's construction raise `NoRunBound`; nothing run-wide is left on `WorkspaceStructure`; a run holds the `RunConstants` of its own provider, resolved once, and a changed configuration reaches the next run and not the running one |
@@ -651,7 +651,7 @@ changing what it records.
 | `test_commentary.py` | 1 | Every comment-window paragraph (both voices) of 28 Metacat runs -- snags, all four clamps and their undoing, "I'm getting frustrated", answers, "Okay, I'm stumped" -- replayed in Petacat and compared as Metacat 1.2 logged them |
 | `test_comparer.py` | 30 | The trace comparer (a crash of patched Metacat on a group of six or more objects is an error, registered by nothing; the smallest such run, which patched Metacat now answers, replayed from a recorded trace): hand-made trace pairs with known faults give the expected classes; the shipped registry holds no reference-crash entry; proposed structures counted apart from state snapshots, and the ratchet on both |
 | `test_input_parser.py` | 5 | Metacat Mode's input parser equals Metacat's own (`tests/lockstep/data/parser_metacat.json.gz`, recorded from the patched Metacat's Chez Scheme by `record_parser.py`): lowering and the two character classes on every Unicode scalar value, the tokens and validity of the three one-character lines for every scalar value, and about 200 whole lines; a lone surrogate is refused |
-| `test_desync_fixes.py` | 1 | Prefixes of three Metacat runs beyond the corpus that used to desynchronise the replay (`traces-desync/`) replay to their end with no error and no differing state (DISCREPANCIES5 G-Y2…G-Y4) |
+| `test_desync_fixes.py` | 1 | Prefixes of three Metacat runs beyond the corpus that used to desynchronise the replay (`traces-desync/`) replay to their end with no error and no differing state |
 | `test_episodes.py` | 8 | Episodes and justify mode: recorder driver text, corpus globs, an episode's self-replay with memory carried, a forced fatal, justify self-replay |
 | `test_golden_baseline.py` | 5 | The EN0 golden baseline gate (G3): `tests/lockstep/golden/engine_baseline.jsonl` and `engine_baseline_rng.json.gz`, captured from the Metacat Standard Configuration on the CPU numeric backend (float64), hold for the 19 demo problems and the justify problems at seeds 1-5 and one 8-run episode the answer, codelet count, final temperature, per-codelet RNG call counts, trace and final-state hashes and the English corpus. A quick consistency check and a four-run sample run always; the slow test recomputes everything in a fresh interpreter and compares byte for byte, naming the first differing run and codelet. Outside the numeric matrix (it pins its backend) |
 | `test_extended_tools.py` | 7 | The tools behind the extended golden baseline, without Docker: the recorder's driver text for a person's clamps, Undo, Self-watching mode and Clear Memory, the interventions calling the product's own `RunService` methods, bare, a description or rule proposal's own time stamp told apart on replay, a cleared-memory header honoured by the answer check, and `scripts/golden_coverage.py` attributing the database's code (codelet bodies, descriptor predicates, posting formulas) to its units |
@@ -783,8 +783,7 @@ and the reason is worth keeping because it is easy to rebuild the same mistake.
 That baseline was 410,000 runs *of Petacat*, so it could detect drift but never
 divergence: an engine that disagreed with MetaCat from the outset agreed with
 itself perfectly, and every one of the reference's own answers arriving for the
-first time was read as an anomaly. The decision and the evidence are in
-`DISCREPANCIES3.md`.
+first time was read as an anomaly. The decision is recorded here and in git history.
 
 **The comparison pointed at Metacat's measured behaviour instead, and now has no reference until one is
 recorded on patched Metacat.** `scripts/compare_to_metacat.py` runs 100 tries per problem from a fresh Episodic
@@ -824,8 +823,9 @@ Its own decision logic *is* under test, in
 stops flagging, and a cycle comes back clean because nothing looked.
 
 The protocol is Metacat's `ORACLE-USAGE.md` (reconstructed into
-`Metacat/build/source/`); the root causes of every variation found against the
-earlier reference are in `DISCREPANCIES4.md`.
+`Metacat/build/source/`); every variation found against the
+earlier reference was traced to a cause and closed, and the answer-frequency comparison now
+shows none (`measurements/vs-metacat-support-v1a-lockstep.md`).
 
 ### The oracle's environment
 

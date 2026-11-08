@@ -2,7 +2,7 @@
 # (meta-peta-trace-idea.md section 9.1).  The comparer (scripts/compare_traces.py)
 # reports a matching error separately and does not count it as an error.
 #
-# Ids are "<doc>:<id>" (DISC5:A-4 = DISCREPANCIES5.md A-4).  Several entries may share
+# Ids are "<doc>:<id>" (DISC5:C-2 would be DISCREPANCIES5.md C-2).  Several entries may share
 # one id when one divergence shows up at several sites.
 #
 # MATCHING RULE.  An entry applies to a Petacat decision when ALL of these hold:
@@ -18,7 +18,7 @@
 #   * effect = "complement": only a `p` error where petacat p == 1 - metacat p;
 #     effect = "skip": any error of that class at the site.
 #
-# DISC5:A-4 (complemented survival coins) is no longer registered: the lockstep pass
+# Complemented survival coins (a survival test asking the opposite side of the coin) are no longer registered: the lockstep pass
 # changed every such Petacat site to ask the reference's side of the coin, so the
 # replay pairs them directly.
 #

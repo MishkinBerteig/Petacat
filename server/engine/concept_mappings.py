@@ -283,7 +283,7 @@ class ConceptMapping:
         the constructor* with the descriptors swapped, so its label is
         recomputed: ``a =(succ)=> b`` reverses to ``b =(pred)=> a``, not to
         ``b =(succ)=> a``.  Carrying the forward label across was harmless only
-        while symmetric slippages went nowhere; BR-5 stores them on the bridge
+        while symmetric slippages went nowhere; the build-time augmentation stores them on the bridge
         and the thematic scout reads them, and a mislabelled one would drag the
         wrong coattail slippage after it.
 

@@ -259,10 +259,11 @@ identical. Stating it that narrowly is deliberate — it makes Normal cheap (two
 captures, not 148) and it makes the mode-equivalence test meaningful, because there is
 nothing else that could differ.
 
-**Why complete state, and not the problem plus the seed.** Because of the Training
-Session invariant: a Run inherits Slipnet activation, Themespace activation, and the
-Temporal Trace from whatever preceded it. `(problem, seed)` does not determine a Run's
-behaviour; `(complete starting state, problem, seed)` does. This is also what makes
+**Why complete state, and not the problem plus the seed.** Because a Run inherits
+Episodic Memory from whatever preceded it. That is the only thing that crosses a Run
+boundary: `init-mcat` resets the Slipnet, the Themespace and the Temporal Trace
+(`run.ss:185-231`). `(problem, seed)` does not determine a Run's behaviour;
+`(complete starting state, problem, seed)` does. This is also what makes
 Normal *reproducible by re-execution*: reload the recorded start state, re-run, and
 the recorded end state must follow.
 

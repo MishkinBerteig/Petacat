@@ -462,7 +462,7 @@ class Group(WorkspaceObject, WorkspaceStructure):
         flipped.id = self.id
         flipped.id_num = self.id_num  # groups.ss:343
         # groups.ss:344-345 — a Length description is carried across the flip.
-        # Now that ``make-group`` no longer attaches one unconditionally (GR-1),
+        # Now that ``make-group`` no longer attaches one unconditionally,
         # this is the only way the reversed reading keeps it.
         slipnet = _slipnet_of(self)
         length_node = slipnet.roles.dimension_length if slipnet is not None else None

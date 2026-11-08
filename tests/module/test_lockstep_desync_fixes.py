@@ -4,7 +4,7 @@ Each test pins one behaviour that differed from the Scheme and made a replay des
 (or an answer description's themes differ); the traces that found them are in
 ``tests/lockstep/traces-desync/`` and are replayed by ``tests/lockstep/test_desync_fixes.py``.
 These are the same faults as small, hand-built Workspace states, with the Scheme cited.
-DISCREPANCIES5 G-Y1 ... G-Y5.
+the five differences found by replaying runs beyond the corpus.
 """
 
 from __future__ import annotations
@@ -48,7 +48,7 @@ def _engine(meta, initial="abc", modified="abd", target="xyz"):
     return runner.ctx
 
 
-# -- G-Y1  Workspace.get-equivalent-bridge (workspace.ss:266-301) ----------------------
+# -- Workspace.get-equivalent-bridge (workspace.ss:266-301) ----------------------
 
 
 def _group(ctx, string, category, direction):
@@ -99,7 +99,7 @@ def test_a_bridge_on_a_group_read_the_other_way_is_not_equivalent_to_the_built_o
     assert not ctx.workspace.bridge_present(_bridge(ctx, pred_i, pred_t))
 
 
-# -- G-Y2  rule clauses differing only in self / subobjects (rules.ss:375-382) --------------
+# -- rule clauses differing only in self / subobjects (rules.ss:375-382) --------------
 
 
 def _rule(ctx, referent):
@@ -138,7 +138,7 @@ def test_changing_the_whole_group_and_changing_its_letters_are_different_rules(m
     assert all(len(c) == 4 for c in rule_signature(whole)[0][2])
 
 
-# -- G-Y3  a letter that is both ``single`` and ``rightmost`` (workspace-strings.ss:456-458) -----
+# -- a letter that is both ``single`` and ``rightmost`` (workspace-strings.ss:456-458) -----
 
 
 def test_a_reference_object_matches_any_of_its_descriptions_of_that_type(meta):
@@ -164,7 +164,7 @@ def test_a_reference_object_matches_any_of_its_descriptions_of_that_type(meta):
         assert found == [letter], name
 
 
-# -- G-Y5  internally-coherent? tries both orders (bridges.ss:365-370) -------------------------
+# -- internally-coherent? tries both orders (bridges.ss:365-370) -------------------------
 
 
 def _cm(label, d1, d2):
@@ -194,7 +194,7 @@ def test_internal_coherence_tests_every_ordered_pair_of_mappings(meta):
         assert Bridge._is_internally_coherent(stub) is True
 
 
-# -- G-Y8  remove-duplicates keeps the last occurrence (utilities.ss:915-929) -----------------
+# -- remove-duplicates keeps the last occurrence (utilities.ss:915-929) -----------------
 
 
 def test_the_concept_pattern_of_a_theme_pattern_keeps_the_last_of_a_repeated_entry():

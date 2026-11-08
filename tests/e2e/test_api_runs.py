@@ -257,7 +257,7 @@ async def test_answer_appears_in_workspace(app_client):
     # up. The ``pytest.skip`` below is meant to be the rare safety net for a run that
     # happens not to converge, not the branch every run takes — a test that always skips
     # asserts nothing, and this one had gone quiet.  It went quiet again after the
-    # lockstep pass (``DISCREPANCIES5.md`` section G): 12346 no longer answers within 3000
+    # lockstep pass: 12346 no longer answers within 3000
     # codelets, and 12347 answers at codelet 333.
     resp = await app_client.post("/api/runs", json={
         "initial": "abc", "modified": "abd", "target": "xyz", "seed": 12347,
@@ -488,7 +488,7 @@ async def test_a_fast_run_contributes_its_answer_to_episodic_memory(app_client):
 
     # Its own seed, not the module's.  What this test needs is a run that *found* an
     # answer, and the shared ``SEED`` no longer produces one on this problem: correcting
-    # the snag-jootser's inclusion weight (D-10 in ``DISCREPANCIES5.md``) shifted the
+    # the snag-jootser's inclusion weight (the snag-theme pipeline fix) shifted the
     # random stream, and ``xyz``/12345 now gives up at 3790 codelets.  Giving up is a
     # legitimate outcome, so the seed moves rather than the assertion.
     created = await app_client.post("/api/runs", json={

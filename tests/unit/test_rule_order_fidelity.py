@@ -1,4 +1,4 @@
-"""Two orders in rule application that Chez Scheme decides (stage W, ``DISCREPANCIES5.md``).
+"""Two orders in rule application that Chez Scheme decides (stage W).
 
 * ``check-for-conflicts`` (``rules.ss:1321-1338``) walks the pairs with ``pairwise-map``
   (``utilities.ss:758-768``), so the conflict reported is the first one in Chez's evaluation

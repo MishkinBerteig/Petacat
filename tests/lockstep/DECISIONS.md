@@ -107,11 +107,11 @@ naming table in its `README.md`):
 
 ## Decisions taken during the lockstep pass (2026-10-27/28)
 
-* **Survival coins ask Metacat's question.** Rather than registering DISC5 A-4's
+* **Survival coins ask Metacat's question.** Rather than registering
   complemented coins, every Petacat site that tested the opposite half of a
   `(stochastic-if* (1- p) (fizzle))` coin now asks `prob(1 - p)` and fizzles on true. The
   distribution is unchanged and replay pairs the coin directly. The registry keeps no
-  A-4 entries.
+  such entries.
 * **Composite codelet choices carry more than name and stamp.** A clamp restamps the
   codelets it moves to another bin, and an unclamp restores each codelet's original
   urgency, so name and stamp alone don't identify a codelet. Both recorders log
@@ -167,12 +167,12 @@ naming table in its `README.md`):
   in errors. Ratchet entries written before the count existed are not held to it.
 * **A tie replay cannot break is recorded, not registered.** One development trace
   differed in a description's time stamp because two builders for the same description
-  were indistinguishable in everything the recorder logged (`DISCREPANCIES5.md` G-T3).
+  were indistinguishable in everything the recorder logged.
   Registering it would hide the next one, so it stayed visible in the count. The recorder
   now logs the stamp, the trace was re-recorded and its ratchet count is 0.
 * **The numeric backends are replayed too.** Faithful mode keeps the backend off, which
   left the arithmetic Petacat runs by default (MLX) outside the comparison, and the
-  spreading fix of DISCREPANCIES5 B-1 had not reached it. `PETACAT_LOCKSTEP_NUMERIC_BACKEND`
+  spreading fix (round after multiplying, not after dividing) had not reached it. `PETACAT_LOCKSTEP_NUMERIC_BACKEND`
   (`--numeric-backend` on `run_trace` and `lockstep_corpus.py`) runs faithful mode with a
   named backend. Such a run is checked against the same ratchet, because the backend is
   meant to change nothing, and it never writes one.

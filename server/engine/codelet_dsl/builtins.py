@@ -539,7 +539,7 @@ def evaluate_group(ctx: EngineContext, group: Group) -> bool:
         say_("group-strength", group.strength)
         say_("group-survival-probability", f"{round(100 * survival)}%")
     # groups.ss:593 ``(stochastic-if* (1- evaluation-prob) (fizzle))`` -- the
-    # reference's side of the coin (DISCREPANCIES5 A-4).
+    # reference's side of the coin (``stochastic-if*`` survives iff ``coin >= 1 - p``).
     if ctx.rng.prob(1.0 - survival):
         if ctx.verbose:
             ctx.verbose_log.say("group-not-strong-enough")
@@ -806,7 +806,7 @@ def evaluate_structure(
     _read(ctx, structure)
     # ``(stochastic-if* (1- p) (fizzle))`` (bonds.ss:343, descriptions.ss:149,
     # bridges.ss:1166, rules.ss:468): the coin is asked the reference's question,
-    # so a replayed trajectory takes Metacat's branch (DISCREPANCIES5 A-4).
+    # so a replayed trajectory takes Metacat's branch (``stochastic-if*`` survives iff ``coin >= 1 - p``).
     if ctx.rng.prob(1.0 - accept_prob):
         if ctx.verbose:
             ctx.verbose_log.say(_NOT_STRONG_ENOUGH.get(type(structure).__name__, "not-strong-enough"))
@@ -2692,7 +2692,7 @@ def record_snag(ctx: EngineContext, top_rule: Any, translated_rule: Any) -> None
     # Workspace.  This is what the failed interpretation actually rested on, and it
     # is what the theme pattern is derived from.  Petacat read the Themespace's
     # dominant vertical pattern instead, which needs a >90-point cluster lead and is
-    # routinely empty (SN-4).
+    # routinely empty.
     snag_bridges = [
         b
         for b in (getattr(o, "vertical_bridge", None) for o in snag_objects)

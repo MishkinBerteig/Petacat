@@ -93,7 +93,7 @@ def _justify_clamp(rules, codelet_count):
     )
 
 
-# --- JO-4: clamp equivalence is set equality over the rules -----------------
+# --- clamp equivalence is set equality over the rules -----------------
 
 
 def test_two_justify_clamps_over_the_same_rule_pair_are_the_same_clamp():
@@ -121,7 +121,7 @@ def test_justify_clamps_over_different_rules_are_different_clamps():
     assert len(get_most_recent_event_set(trace, vocab().event_type_clamp_start)) == 1
 
 
-# --- JO-3: the justify clamp-type factor ------------------------------------
+# --- the justify clamp-type factor ------------------------------------
 
 
 def test_jootsing_from_a_justify_clamp_is_barred_while_the_clamp_is_producing_events():
@@ -149,7 +149,7 @@ def test_jootsing_from_a_justify_clamp_is_allowed_when_nothing_followed_it():
     assert get_clamp_jootsing_probability(clamps, 400, trace, meta=_FakeMeta()) > 0.0
 
 
-# --- JO-2: failing to choose pattern entries is a fizzle, not a give-up -----
+# --- failing to choose pattern entries is a fizzle, not a give-up -----
 
 
 def test_choosing_no_pattern_entries_fizzles_however_many_snags_there_were():
@@ -190,7 +190,7 @@ def test_choosing_no_pattern_entries_fizzles_however_many_snags_there_were():
     assert result.pattern_detected is False
 
 
-# --- JO-5: the progress-watcher's quiescent branch --------------------------
+# --- the progress-watcher's quiescent branch --------------------------
 
 
 def test_decent_rules_in_a_quiet_workspace_post_nothing():

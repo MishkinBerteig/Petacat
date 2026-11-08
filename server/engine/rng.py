@@ -145,7 +145,7 @@ class RNG(TraceSeam):
         ``1 + round(sqrt n)`` is therefore always an exact integer, ``random`` of an
         exact integer returns an exact integer, and the delta is always a whole
         number drawn from ``0 .. round(sqrt n)``.  This used to draw a continuous
-        delta whenever ``n`` was not a perfect square (``DISCREPANCIES5.md`` A-1),
+        delta whenever ``n`` was not a perfect square (it reasoned from Chez's unshadowed ``round``),
         reasoning from Chez's unshadowed ``round`` — which is not the ``round`` the
         reference's ``~`` calls.
 

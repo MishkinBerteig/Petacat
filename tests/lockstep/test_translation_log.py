@@ -17,7 +17,7 @@ and an answer whose supporting groups are nested.
 The comparison over the whole corpus (plain seeds 1-30 and justify mode: 1,044 answers
 and snags in 570 + 85 runs) was run with scripts in the task's scratchpad: the corpus is
 too large to commit.  The one thing it does not match is the *order* of the supporting
-groups of some answers (``DISCREPANCIES5.md`` G-Z1); none of the six runs here is one.
+groups of some answers (the slippage log, supporting vertical bridges and supporting groups now follow Metacat's `translate`); none of the six runs here is one.
 """
 
 from __future__ import annotations

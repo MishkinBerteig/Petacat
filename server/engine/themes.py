@@ -200,7 +200,7 @@ class ThemeCluster:
         self.valid_relations: list[str] = list(valid_relations)
         #: ``themes`` (``themes.ss:462``): only the themes something has touched,
         #: newest first (``add-theme`` conses, ``themes.ss:553``).  Starts empty --
-        #: the Themespace is not populated with every possible theme (B-2).
+        #: the Themespace is not populated with every possible theme.
         self.themes: list[Theme] = []
         self.frozen: bool = False
 

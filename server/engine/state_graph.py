@@ -644,7 +644,7 @@ def _restore_run_state(runner: Any, state: dict) -> None:
         state["themespace"]["active_theme_types"]
     )
     # Only the themes that existed are captured, newest first within a cluster and
-    # in ``all-themes`` order across them (B-2); restoring rebuilds exactly that set.
+    # in ``all-themes`` order across them; restoring rebuilds exactly that set.
     ctx.themespace.delete_everything()
     by_key = {(c.theme_type, c.dimension): c for c in ctx.themespace.clusters}
     restored: list[tuple[int, Any]] = []

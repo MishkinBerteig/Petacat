@@ -160,7 +160,7 @@ stopping states is a different engine, not a refactor.
 *how often* each is reached. Petacat gave up on `abc→abd;xyz` at 22.5% against Metacat's
 10.9% — a 2× skew, decisive at n=1000 — and the oracle reported "0 missing, 0 novel" the
 whole time, because `gave_up` is in both sets. The root cause was three arithmetic
-divergences inside one function (D-10 in `DISCREPANCIES5.md`), since fixed.
+divergences inside one function (the snag-theme pipeline of the jootser), since fixed.
 
 Two consequences for the work below:
 
@@ -200,7 +200,7 @@ rather than by working from §0.2's list, and it is larger than §0.2 was.
 **Re-audit before starting.** The counts below predate the lockstep pass of
 2026-10-27/28, which deleted `formulas.py`'s dead `current_translation_temperature_threshold`
 (dead in the Scheme too: `formulas.ss:38` defines only the distribution) and its dead
-`single_letter_group_probability` (`DISCREPANCIES5.md` D-3). The four
+`single_letter_group_probability`. The four
 `translation_temp_bond_density_*` coefficients therefore have no reader at all now, and
 `get_formula_coeff` call sites over `server/` and the codelet bodies in
 `seed_data/codelet_types.json` name **29** keys, not 32.
@@ -225,7 +225,7 @@ read it" — in a table §0.2 did not look at.
 invisible: the default policy runs the MLX backend at every Slipnet size
 (`numeric/backend.py`, `select_backend`), so it changes every default run, while
 faithful mode and much of the suite run with the backend off and never see it. That is
-how the spreading arithmetic of `DISCREPANCIES5.md` B-1 stayed wrong in all three
+how the spreading arithmetic (round after multiplying, not after dividing) stayed wrong in all three
 backends after the engine's own loop was fixed. Every slice that touches a backend copy
 must be re-run once per forced backend, and the lockstep corpora replayed with
 `scripts/lockstep_corpus.py --numeric-backend mlx --check-ratchet`. The one mercy: the
@@ -283,7 +283,7 @@ why they are last and alone.
 | 6 | D-8 — one coefficient, four copies | yes |
 | 7 | D-7 salience — the four weights, twelve sites. Re-run per backend **and** with the vectorise threshold lowered | yes, only if every backend copy moves |
 | 8 | D-7 importance and unhappiness — per the slice-0 decision | only if slice 0 chose exact rationals |
-| 9 | The three single-letter-group exponents — see `DISCREPANCIES5.md` | expected to move |
+| 9 | The three single-letter-group exponents | expected to move |
 
 #### Adjacent, tracked here so it is not lost
 

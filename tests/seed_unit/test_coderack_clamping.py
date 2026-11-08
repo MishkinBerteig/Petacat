@@ -153,7 +153,7 @@ def test_a_clamped_type_posts_at_its_clamped_urgency(coderack):
 
 
 # ---------------------------------------------------------------------------
-# CL-2 — ``against-background`` and the named patterns
+# ``against-background`` and the named patterns
 # ---------------------------------------------------------------------------
 
 

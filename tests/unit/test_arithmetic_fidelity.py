@@ -2,7 +2,7 @@
 
 Metacat computes in exact rationals and shadows ``round`` with a half-to-even exact
 integer (utilities.ss:238-252); each test pins a value where a float shortcut lands on
-the other side.  See DISCREPANCIES5.md B-1, B-3, B-4, B-5, D-4.
+the other side.  Spreading, the jootser's two ``100*`` roundings, descriptor support, posting-urgency bins and the single-letter-group exponent.
 """
 
 import json

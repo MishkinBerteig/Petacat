@@ -285,7 +285,7 @@ def test_every_backend_rounds_spreading_halfway_cases_to_even(backend_name: str)
 
     ``slipnet.ss:181-186`` rounds the exact rational, so the amounts are 32 and 60.
     Dividing the association by 100 first gives 0.7 * 45 = 31.499..., which rounded
-    to 31 (DISCREPANCIES5 B-1); the engine's own loop was fixed and the backends
+    to 31 (Metacat rounds after multiplying, not after dividing); the engine's own loop was fixed and the backends
     were not, until this test.
     """
     topology = SlipnetTopology(

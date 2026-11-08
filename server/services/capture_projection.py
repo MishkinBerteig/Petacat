@@ -421,7 +421,7 @@ def project_themespace(state: dict, meta: Any) -> dict:
 
     clusters = []
     for c in state["themespace"]["clusters"]:
-        # Only existing themes are captured (B-2); the view lists every possible
+        # Only existing themes are captured; the view lists every possible
         # theme, an absent one at activation 0, as the live serialization does.
         existing = {
             row[0]: {

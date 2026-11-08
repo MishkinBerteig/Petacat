@@ -1,9 +1,9 @@
 """The engine seam changes nothing for an ordinary run (spec §6.5).
 
 When the seam was added these numbers were measured on the engine *before* it (with
-the whole-number ``~`` of A-1 already in place) and matched exactly after it.  The
+the whole-number ``~`` already in place) and matched exactly after it.  The
 lockstep pass's port fixes then changed the stream on purpose (the last time by the list
-orders of G-Z4: groups, bonds and descriptions newest first, the coderack's bins as
+orders of a string's groups: groups, bonds and descriptions newest first, the coderack's bins as
 vectors), so they were re-measured on the fixed engine; they now pin an ordinary run's draws against any
 later change to the seam.  ``test_replay.py`` separately checks that a tracing RNG
 draws exactly what a plain one does.

@@ -68,7 +68,7 @@ def serialize_themespace_state(ctx: EngineContext) -> dict:
     clusters = []
     for cluster in ctx.themespace.clusters:
         dominant = cluster.get_dominant_theme(margin)
-        # The engine holds only the themes that exist (B-2).  The API keeps its
+        # The engine holds only the themes that exist.  The API keeps its
         # shape -- every possible theme listed -- by reporting an absent one as
         # activation 0, which is also how the dissertation puts it (section 4.2).
         existing = {t.relation: t for t in cluster.themes}

@@ -436,7 +436,7 @@ def attempt_jootsing(
         vlog.say("snag-jootsing-probability", round_to_100ths(jootsing_probability))
 
     # jootsing.ss:77 ``(stochastic-if* (1- jootsing-probability) (fizzle))`` --
-    # the reference's side of the coin (DISCREPANCIES5 A-4).
+    # the reference's side of the coin (``stochastic-if*`` survives iff ``coin >= 1 - p``).
     if rng.prob(1.0 - jootsing_probability):
         if vlog is not None:
             vlog.say("jootsing-from-snags-failed")
@@ -1170,7 +1170,7 @@ def _collect_snag_descriptions(objects: list[Any]) -> list[Any]:
 
     ``remove-duplicates-pred`` (``utilities.ss:914-926``) drops the *first* occurrence
     when the element recurs later, so it keeps the **last** — the opposite of the obvious
-    ``if seen: continue``.  The mean does not care, but C-2 of ``DISCREPANCIES5.md``
+    ``if seen: continue``.  The mean does not care, but ``DISCREPANCIES5.md`` C-2
     records four places that already read this backwards, and there is no reason to make
     a fifth.
     """

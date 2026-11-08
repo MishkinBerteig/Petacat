@@ -86,7 +86,7 @@ def _all_active(slipnet):
         node.activation = 100.0
 
 
-# --- BR-1: the slippage-admissibility gate ---------------------------------
+# --- the slippage-admissibility gate ---------------------------------
 
 
 def _refusal_probability(ctx, object1, object2, bridge_type=BRIDGE_TOP):
@@ -182,7 +182,7 @@ def test_the_bottom_up_scout_consults_the_slippage_gate(meta):
     assert all(0.0 <= p <= 1.0 for p in ctx.rng.prob_calls)
 
 
-# --- BR-2: the distinguishing identity/opposite requirement ----------------
+# --- the distinguishing identity/opposite requirement ----------------
 
 
 def test_a_slippage_only_bridge_has_no_distinguishing_identity_or_opposite(meta):
@@ -269,7 +269,7 @@ def test_the_thematic_scout_can_still_reach_a_slippage_only_bridge(meta):
     )
 
 
-# --- BR-3: the flipped-bridge proposal -------------------------------------
+# --- the flipped-bridge proposal -------------------------------------
 
 
 def _spanning_group(ctx, string, category: str, direction: str) -> Group:
@@ -332,7 +332,7 @@ def test_reverse_direction_orientation_holds_only_while_opposite_is_cold(meta):
 def test_a_spanning_pair_is_proposed_flipped_when_opposite_is_not_saturated(meta):
     """The ordinary scouts route through ``propose_bridge`` with the flip flag.
 
-    Before BR-3 both scouts constructed a ``Bridge`` directly and
+    Before the flipped-bridge proposal both scouts constructed a ``Bridge`` directly and
     ``make_flipped_version`` was reachable only from the thematic path, so
     re-perceiving a spanning group backwards was unavailable to bottom-up
     processing entirely.
@@ -370,7 +370,7 @@ def test_a_spanning_pair_is_proposed_flipped_when_opposite_is_not_saturated(meta
     assert directions and all(cm.is_identity for cm in directions)
 
 
-# --- BR-5: the build-time concept-mapping augmentation ---------------------
+# --- the build-time concept-mapping augmentation ---------------------
 
 
 def _proposed_bridge(ctx, object1, object2, bridge_type=BRIDGE_TOP) -> Bridge:
@@ -515,7 +515,7 @@ def test_bond_concept_mappings_stay_out_of_the_main_list(meta):
     assert not any(cm.bond_concept_mapping for cm in bridge.concept_mappings)
 
 
-# --- BR-8: the incompatibility refinements ---------------------------------
+# --- the incompatibility refinements ---------------------------------
 
 
 def test_a_spanning_bridge_is_not_incompatible_with_c_to_cc_in_abc_abcc(meta):
@@ -615,7 +615,7 @@ def test_a_direction_mapping_is_ignored_unless_the_bridge_encloses_the_other(met
     assert _incompatible_bridges(b1, b2, "horizontal") is False
 
 
-# --- BR-6: the builder's bond and enclosing-group fights -------------------
+# --- the builder's bond and enclosing-group fights -------------------
 
 
 def test_a_crosswise_bridge_finds_the_directed_bond_it_contradicts(meta):
@@ -719,7 +719,7 @@ def test_the_bridge_builder_fights_that_bond_at_three_to_two(meta):
     assert weights[id(enclosing)] == (1.0, 1.0)
 
 
-# --- CR-3: the rule build's answer codelet ---------------------------------
+# --- the rule build's answer codelet ---------------------------------
 
 
 def test_building_a_rule_posts_the_answer_finder_at_urgency_91(meta):
@@ -778,7 +778,7 @@ def test_a_justify_mode_rule_build_posts_the_answer_justifier_instead(meta):
     assert not [c for c in _posted(ctx) if c.codelet_type == "answer-finder"]
 
 
-# --- BR-9: the duplicate-bridge merge --------------------------------------
+# --- the duplicate-bridge merge --------------------------------------
 
 
 def test_proposing_an_existing_bridge_gives_it_the_mappings_it_lacks(meta):
@@ -824,7 +824,7 @@ def test_proposing_an_existing_bridge_gives_it_the_mappings_it_lacks(meta):
     assert richer not in ctx.workspace.top_bridges
 
 
-# --- CR-4/CR-5: the deferred batch ------------------------------------------
+# --- the deferred batch ------------------------------------------
 
 
 def test_the_opening_population_is_four_codelets_per_object(meta):
@@ -875,7 +875,7 @@ def test_a_batch_at_or_over_capacity_flushes_the_rack(meta):
     assert all(c.codelet_type == "rule-scout" for c in survivors)
 
 
-# --- TH-1: the Themespace boost at build time ------------------------------
+# --- the Themespace boost at build time ------------------------------
 
 
 def test_building_a_bridge_boosts_its_themes_at_once(meta):

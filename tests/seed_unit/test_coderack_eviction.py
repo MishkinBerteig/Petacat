@@ -1,4 +1,4 @@
-"""Coderack eviction: the Scheme's weight, found incrementally (WP1.1, CR-1).
+"""Coderack eviction: the Scheme's weight, found incrementally (WP1.1).
 
 Two things are being held here at once.
 
@@ -13,7 +13,7 @@ is::
 table.  So a codelet posted on the current tick weighs 0 and cannot be evicted, and a
 high-urgency codelet in a cold run is a million times safer than a low-urgency one.
 Petacat used to floor the age at 1 and use a flat ``num_bins - bin`` at every
-temperature (DISCREPANCIES2 CR-1); the oracle below writes the Scheme expression out
+temperature; the oracle below writes the Scheme expression out
 directly, from the exponential rather than from ``UrgencyValueTable``, so agreement
 means the implementation matches the *reference* and not merely its own table.
 
@@ -122,7 +122,7 @@ def _fill(coderack: Coderack, spec: list[tuple[int, int]]) -> None:
     ],
 )
 def test_the_urgency_table_is_the_rounded_scheme_table(meta, temperature, expected):
-    """``%urgency-value-table%`` is rounded to integers (CR-2).
+    """``%urgency-value-table%`` is rounded to integers.
 
     The port used the same exponential unrounded, which at T=100 gives
     ``[1, 1.587, 2.080, ...]`` — bin 1 weighted 26% lighter than the reference, and
@@ -140,7 +140,7 @@ def test_the_urgency_table_is_the_rounded_scheme_table(meta, temperature, expect
     ],
 )
 def test_the_removal_penalty_is_scaled_by_temperature(meta, temperature, expected):
-    """``1 + highest-bin-urgency - bin-urgency`` (CR-1).
+    """``1 + highest-bin-urgency - bin-urgency``.
 
     Petacat used a flat ``[7,6,5,4,3,2,1]`` at every temperature.  The reference's
     spread grows enormously as the run cools, which is the mechanism by which a cold
@@ -195,7 +195,7 @@ def test_age_sum_is_nonnegative_when_a_stamp_is_ahead_of_the_clock(meta):
 
     A negative contribution would make a bin's weight negative and corrupt the draw,
     so the guard floors the individual age at 0 — not at 1, which would resurrect the
-    behaviour CR-1 removes.
+    behaviour the temperature-scaled term removes.
     """
     coderack = Coderack(meta)
     _fill(coderack, [(35, 50), (35, 10)])
@@ -350,7 +350,7 @@ def test_the_eviction_distribution_matches_the_enumerated_weights(meta, temperat
         )
 
 
-# --- the unfloored age, which is the behaviour CR-1 restores ---------------
+# --- the unfloored age, which is the behaviour the unfloored age restores ---------------
 
 
 @pytest.mark.parametrize("temperature", TEMPERATURES)
@@ -431,7 +431,7 @@ def test_eviction_uses_the_temperature_the_rack_was_last_drawn_at(meta):
 
 
 def test_selection_and_eviction_read_the_same_table(meta):
-    """CR-1 and CR-2 are one table, as they are one table in the Scheme."""
+    """The eviction weight and the urgency table are one table, as they are one table in the Scheme."""
     coderack = Coderack(meta)
     table = coderack.urgency_table
     for temperature in TEMPERATURES:

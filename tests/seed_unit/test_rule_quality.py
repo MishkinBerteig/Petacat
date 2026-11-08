@@ -260,7 +260,7 @@ def rule_uniformity(rule, meta):
     return rule.uniformity
 
 
-# ── extrinsic clauses: dead until RU-1, and measured differently ────────────
+# ── extrinsic clauses: dead until extrinsic clauses carried their dimensions, and measured differently ────────────
 
 
 def test_a_one_object_swap_clause(nodes, meta):
@@ -373,7 +373,7 @@ def test_the_swap_dimension_is_an_abstractness_category_of_its_own(nodes, meta):
     Swapping on Length (depth 60) rather than Letter-Category (depth 30) makes the
     same clause more abstract: ``mean(70, 60) = 65`` and
     ``sigmoid(3,40)(65) = 1/(1+e^-3.0) = 0.95257`` → **95**, against the 77 the
-    Letter-Category form scores.  This factor was dead code before RU-1 restored
+    Letter-Category form scores.  This factor was dead code before extrinsic clauses carried their dimensions restored
     the clause's dimensions.
     """
     clause = RuleClause(

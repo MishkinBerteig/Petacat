@@ -21,13 +21,13 @@ pytestmark = pytest.mark.lockstep
 #: divergences are fixed, and these tests exercise the matching machinery itself.
 _FIXTURE_TOML = """
 [[divergence]]
-id = "DISC5:A-4"
+id = "TEST:complemented-coin"
 cause = "deliberate"
 match = { class = "p", petacat_file = "server/engine/codelet_dsl/builtins.py", petacat_function = "evaluate_group" }
 effect = "complement"
 
 [[divergence]]
-id = "DISC5:A-4"
+id = "TEST:complemented-coin"
 cause = "deliberate"
 match = { class = "p", petacat_codelet = "breaker" }
 effect = "complement"
@@ -136,13 +136,13 @@ def test_complemented_coin_at_registered_site():
     m = [prob(0.9)]
     rep = run(m, pair_up(m, [prob(0.1, site=SITE_REG)]))
     assert rep.unregistered_error_count == 0
-    assert rep.registered_counts == {"DISC5:A-4": 1}
+    assert rep.registered_counts == {"TEST:complemented-coin": 1}
 
 
 def test_complemented_coin_at_registered_codelet_site():
     m = [prob(0.3)]
     rep = run(m, pair_up(m, [prob(0.7, site="<codelet:breaker>:3")]))
-    assert rep.unregistered_error_count == 0 and rep.registered_counts == {"DISC5:A-4": 1}
+    assert rep.unregistered_error_count == 0 and rep.registered_counts == {"TEST:complemented-coin": 1}
 
 
 def test_complemented_coin_at_unregistered_site():
@@ -303,7 +303,7 @@ def test_the_corpus_driver_and_faithful_mode_name_the_same_backend_variable():
     assert corpus.NUMERIC_BACKEND_ENV == faithful.NUMERIC_BACKEND_ENV
 
 
-# -- Metacat's old crash on a group of six or more objects (DISCREPANCIES5.md R1) -----------------
+# -- Metacat's old crash on a group of six or more objects (a Length concept mapping for a group of six or more objects) -----------------
 # Patched Metacat no longer crashes there (Metacat/patches/fixes/0002-length-group-of-six-or-more.patch),
 # so a crash of that shape is an error like any other and is registered by nothing.
 

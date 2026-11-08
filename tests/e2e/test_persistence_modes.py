@@ -248,7 +248,7 @@ async def test_a_reset_normal_run_starts_before_the_answer_it_found(app_client, 
     """
     # Its own seed, not the module's.  This test needs a run that *found* an answer, and
     # the shared ``SEED`` no longer produces one on this problem: correcting the
-    # snag-jootser's inclusion weight (D-10 in ``DISCREPANCIES5.md``) shifted the random
+    # snag-jootser's inclusion weight (the snag-theme pipeline fix) shifted the random
     # stream, and ``xyz``/12345 now gives up at 3790 codelets.  Giving up is a legitimate
     # outcome, so the seed moves rather than the assertion.  The lockstep pass (section G)
     # shifted it again: 12346 finds nothing in 2000 codelets, and 12347 answers ``xyz``,

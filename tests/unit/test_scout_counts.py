@@ -174,7 +174,7 @@ def test_blur_stays_within_the_reachable_band():
 
     Metacat redefines ``round`` to return exact integers (``utilities.ss:250-252``),
     so every ``~`` draws a *whole-number* delta from ``0 .. round(sqrt n)``: for 2
-    that is 0 or 1 (``DISCREPANCIES5.md`` A-1; ``RNG.perturb``).  A count of 3 is
+    that is 0 or 1 (``RNG.perturb``).  A count of 3 is
     therefore never ``few`` (it would need a threshold above 3), where the
     continuous reading this port once had made it ``few`` a quarter of the time.
     """

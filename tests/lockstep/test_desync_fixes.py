@@ -1,7 +1,7 @@
 """Metacat runs beyond the lockstep corpus that used to desynchronise Petacat's replay.
 
 Three real engine differences were found by replaying 336 Metacat runs on 28 problems
-outside the corpus (DISCREPANCIES5 G-Y1 ... G-Y5).  Each trace here is the shortest
+outside the corpus (five differences found by replaying runs beyond the corpus).  Each trace here is the shortest
 prefix of one such run that reaches the first divergence (a codelet cap, recorded with
 ``metacat/record.py --cap``); at HEAD before the fixes each replays with errors, now each
 replays to its end with none, and with no differing state snapshot.

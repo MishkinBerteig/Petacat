@@ -986,7 +986,7 @@ class Workspace:
         ``weighted-average`` (``utilities.ss:388-392``) returns **0** on zero total
         weight; it does not fall back to an unweighted mean.  That case is
         reachable only before the first ``update-workspace-values``, which
-        ``init_mcat`` now runs (ML-1), so it is a faithfulness detail rather than a
+        ``init_mcat`` now runs, so it is a faithfulness detail rather than a
         live path.
 
         **Cached until the next object-value update.**  The runner asks for this from
@@ -1690,7 +1690,7 @@ class Workspace:
 
         Scheme: rules.ss:364-368 (rules-equal?).
         """
-        # G-C2: this used to compare only the changes, so two rules that differ in
+        # This used to compare only the changes, so two rules that differ in
         # which object they describe (``[single]->b`` vs ``[a]->b``) were "equal" and
         # the rule-builder dropped the newcomer.  ``rules-equal?`` compares the
         # object-descriptions too (rules.ss:375-391); the faithful port is in rules.py.

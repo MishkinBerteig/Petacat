@@ -454,7 +454,7 @@ class Coderack:
         2. Pick a codelet uniformly within it                 (``coderack.ss:307-308``)
 
         The bin weight uses the **rounded** urgency table.  The port evaluated the
-        same exponential and left it unrounded (DISCREPANCIES2 CR-2), which at T=100
+        same exponential and left it unrounded (a bin urgency left unrounded), which at T=100
         weighted bin 1 at 1.587 where the reference weights it 2 — 26% light — and
         ordered bins the reference ties.
         """
@@ -545,7 +545,7 @@ class Coderack:
         off the temperature-indexed rounded table, so it ranges from ``[4,3,3,2,2,2,1]``
         when hot to ``[1575381, ..., 1]`` when cold.  Cold, a high-urgency codelet is
         effectively unevictable.  Petacat previously used a flat ``num_bins - bin``
-        at every temperature and floored the age at 1 (DISCREPANCIES2 CR-1).
+        at every temperature and floored the age at 1 (the temperature-scaled bin-urgency term).
 
         The *search* for that distribution is not the Scheme's, and deliberately.  A
         flat rebuild of a weight per codelet per eviction was 35.8% of the whole run

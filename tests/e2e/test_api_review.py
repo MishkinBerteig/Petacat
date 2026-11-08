@@ -480,7 +480,7 @@ async def test_the_end_capture_of_a_run_that_answered_still_renders(review_clien
     what keeps this working, and this is the test that would notice if the review
     surface ever started restoring.
     """
-    # The list orders of G-Z4 (``DISCREPANCIES5.md``) changed the random stream, and the
+    # The list orders of a string's groups (newest first, as the Scheme conses them) changed the random stream, and the
     # shared seed 12345 stopped answering within the budget, so this test skipped every
     # time. 12347 answers at codelet 534.
     run_id = await _run(review_client, MODE_NORMAL, max_steps=2500, seed=12347)
