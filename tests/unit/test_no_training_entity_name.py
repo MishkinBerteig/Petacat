@@ -11,7 +11,7 @@ corpus-mode training), "training population" (a Fast population of runs) and "LL
 (the corpora Training Mode is meant to learn from, in the project's own definition).
 
 Not scanned, because they record the past or quote the old names: ``PHASE * PLAN.md``,
-``DISCREPANCIES*.md``, ``FUTURE_DIRECTION*.md``, ``SELF_WATCHING_AUDIT.md``, ``CLAUDE.md``
+``FUTURE_DIRECTION*.md``, ``SELF_WATCHING_AUDIT.md``, ``CLAUDE.md``
 (which quotes the old name when it defines the new one), ``academic/``,
 ``Metacat/`` and ``agents-workspace/`` (except the
 API contract), ``node_modules`` and this file.

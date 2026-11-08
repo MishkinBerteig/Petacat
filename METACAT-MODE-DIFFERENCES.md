@@ -39,8 +39,6 @@ numbers are independent. A decision that is certain is a probability of exactly 
 
 ## 1. The posting coin is not drawn when the probability is 0 or 1
 
-*Formerly DISCREPANCIES5 A-2.*
-
 **Patched Metacat.** `stochastic-if*` binds its coin before it looks at the probability
 (`syntactic-sugar.ss:137-142`: `(let ((coin-flip (random 1.0))) (if (< coin-flip (prob-thunk)) ...))`), so it
 draws every time, whatever the probability. Codelet posting uses it at every type
@@ -70,8 +68,6 @@ random-number reasoning at the top of this file applies.
 
 ## 2. A lone neighbour is returned without a draw
 
-*Formerly DISCREPANCIES5 A-3.*
-
 **Patched Metacat.** `stochastic-pick` draws in both of its branches: `(random (exact->inexact weight-sum))` when the
 weight is not 0, and `random-pick`'s `(random (length l))` when it is 0 (`utilities.ss:485-490` and `:475-479`). A
 one-element list still costs one draw. The local-density walk calls it through `choose-neighbor`,
@@ -88,8 +84,6 @@ candidate has one possible result.
 stream is not shared with Metacat. The lockstep recorder does not log a choice with fewer than two options.
 
 ## 3. Three smaller skipped or reordered draws
-
-*Formerly DISCREPANCIES5 A-5, three rows.*
 
 **An empty list of concept mappings in the bridge scouts.**
 - *Patched Metacat:* the bottom-up and the important-object bridge scouts compute
@@ -125,8 +119,6 @@ Petacat skips has one possible result. In the third the order of two independent
 
 ## 4. The eviction walk and the re-filing walk go bin by bin
 
-*Formerly DISCREPANCIES5 G-Z8.*
-
 **Patched Metacat.** `delete-codelets` is `(stochastic-pick-by-method codelet-list 'get-removal-weight)`
 (`coderack.ss:435-445`), and `set-urgencies` and `reset-urgencies` walk the same list (`:447-456`).
 `codelet-list` is built with `cons` (`:405` and `:414`), so the newest posted codelet is first.
@@ -148,8 +140,6 @@ comment at `coderack.py:551` records that the scan was 35.8% of a run on `abc ->
 reasoning at the top of this file applies.
 
 ## 5. Link buckets are appended; the Scheme builds them with `cons`
-
-*Formerly DISCREPANCIES5 C-1.*
 
 **Patched Metacat.** `add-to-outgoing-links` and `add-to-incoming-links` put each new link on the front of its
 node's list (`slipnet.ss:225-237`), so a node's `category-links`, `instance-links`, `property-links`,
@@ -174,8 +164,6 @@ only the Metacat Standard Configuration unless someone edits the global one.
 
 ## 6. `RNG.pick` on an empty list raises
 
-*Formerly DISCREPANCIES5 D-11, the `RNG.pick` row.*
-
 **Patched Metacat.** `random-pick` returns `#f` for an empty list (`utilities.ss:475-479`).
 
 **Metacat Mode.** `RNG.pick` raises `ValueError("Cannot pick from empty sequence")`
@@ -197,8 +185,6 @@ callers. Returning `#f` would hide one.
 
 ## 7. Theme-edit mode: the first click claims the window and selects the theme
 
-*Formerly DISCREPANCIES5 H-6.*
-
 **Patched Metacat.** In theme-edit mode the first click in a theme window only claims the theme type, which zeroes
 the window. The next click selects a theme (`theme-graphics.ss:35-63`, with `ready-to-edit?` and `edit-theme-type` at
 `gui.ss:837-843`).
@@ -213,8 +199,6 @@ finally sent.
 
 ## 8. Theme-edit mode is a view in the browser
 
-*Formerly DISCREPANCIES5 H-7.*
-
 **Patched Metacat.** `theme-edit-mode-on` saves the three Themespace states and deletes the themes while the dialog
 is open (`gui.ss:850-870`), and `theme-edit-mode-off` restores the types that were not edited (`gui.ss:906-920`).
 
@@ -228,8 +212,6 @@ run that keeps going while the dialog is open is not disturbed.
 **Why it is accepted.** The state is kept in the browser, which is safer when a run is also being driven elsewhere.
 
 ## 9. Petacat explains a single answer; Metacat's `explain` is never called
-
-*Formerly DISCREPANCIES5 H-8.*
 
 **Patched Metacat.** `explain` (`answers.ss:310-333`) would write one answer's explanation into the commentary
 window. Nothing calls it: `explain` occurs nowhere else in the Scheme source. What Metacat does reach from its
@@ -254,8 +236,6 @@ what is printed.
 
 ### 10a. The headless forms
 
-*Formerly DISCREPANCIES5 I-1.*
-
 Patched Metacat prints a structure's level as `(~a, not drawn)` when `%workspace-graphics%` is on and the structure
 has not been drawn (`bridges.ss:87`, `:106`, `:465`, `:486`; `descriptions.ss:40`; `workspace-objects.ss:108`), and a
 vertical bridge gets a `(#n)` label when graphics are on (`bridges.ss:471-472`). The recorded Metacat runs with
@@ -264,16 +244,12 @@ Metacat Mode has no drawn state and prints the same headless forms (`server/engi
 
 ### 10b. Step mode
 
-*Formerly DISCREPANCIES5 I-2.*
-
 Patched Metacat leaves step mode on until Go and forces `%verbose%` on while the step interval is 10 or less
 (`run.ss:44-47`, `set-verbose-step-mode` at `gui.ss:793-795`). Requests to Petacat are stateless, so
 `POST /step` with `step_mode: true` (the Step button) and `n <= 10` is narrated for that batch only
 (`server/services/run_service.py:512-533`, `VERBOSE_STEP_LIMIT` at `server/engine/verbose.py:62`).
 
 ### 10c. Exact against inexact numbers
-
-*Formerly DISCREPANCIES5 I-6.*
 
 Metacat holds many rounded quantities as exact integers because it redefines `round` (`utilities.ss:250-252`), and
 prints `100` for an exact integer and `100.0` for a flonum. Petacat holds the same quantities as floats.
@@ -283,15 +259,11 @@ prints as `100/3` would differ. The earlier audit found none in the recorded run
 
 ### 10d. A translated rule prints zeros in the justifier
 
-*Formerly DISCREPANCIES5 I-7.*
-
 Metacat prints a translated rule in justify mode before it calls `set-quality-values` on it (`justify.ss:104`).
 Petacat scores it at translation, so the print is made with the figures as 0 (`server/engine/justify.py:172`,
 `server/engine/verbose.py:348-359`).
 
 ### 10e. "(new)" after a structure is built again
-
-*Formerly DISCREPANCIES5 I-8.*
 
 Petacat's structures have no new state, and `_retire` (`server/engine/codelet_dsl/builtins.py:2227`) resets a broken
 structure's level, where Metacat's `break-bond` leaves it built (`bonds.ss:425-433`). `VerboseLog`
@@ -301,15 +273,11 @@ from the start it matches.
 
 ### 10f. Free-running workers and a bounded buffer
 
-*Formerly DISCREPANCIES5 I-9.*
-
 Free-running workers interleave their narration. The buffer holds the last 5,000 lines (`DEFAULT_CAPACITY`,
 `server/engine/verbose.py:56`); Metacat's console is unbounded. Metacat's `try-to-propose-singleton-group` message
 (`bridges.ss:1431`) is dead code, never called anywhere in the Scheme source, and is not ported.
 
 ### 10g. `Codelets run: N`
-
-*Formerly DISCREPANCIES5 I-11.*
 
 Patched Metacat's `run` prints `Codelets run: N` when it reaches `*break-time*` or is interrupted
 (`run.ss:157-165`). The recorder sets the break time to its codelet cap, and Petacat never says it. A run that ends on
