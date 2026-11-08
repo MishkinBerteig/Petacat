@@ -67,7 +67,7 @@ def _answer(
         temperature=30.0,
         themes=dict(themes),
         unjustified_slippages=[],
-        unjustified_themes=dict(unjustified or {}),
+        unjustified_themes=list((unjustified or {}).items()),
         top_rule_abstractness=rule_abstractness,
         theme_abstractness=theme_abstractness,
         top_rule_signature=signature,

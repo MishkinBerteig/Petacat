@@ -254,7 +254,7 @@ runs the default configuration on NumPy. One caveat: the replay follows Metacat'
 runs Petacat's own random stream on the same inputs, so the check says that the situations Metacat reaches
 are handled as Metacat handles them, not that the baseline's own trajectory is Metacat's.
 
-**Every case is in a ratchet.** All 123 runs are in `ratchet-extended.json` (key `<case id>|<layout slug>/<seed>`, for
+**Every case is in a ratchet.** All 125 runs are in `ratchet-extended.json` (key `<case id>|<layout slug>/<seed>`, for
 example `episode/a-aa-b/s1x6-cap4000|episodes/a-aa-b/1.r1`), and all 188 runs of the original baseline are in
 `ratchet.json`, `ratchet-justify.json` and `ratchet-episodes.json`. `test_ratchet_covers_golden.py` fails for any run of
 either golden baseline that has no entry. The extended traces are recorded from the patched Metacat, one folder per
@@ -265,8 +265,8 @@ them `python`, is replayed with that backend whatever `--numeric-backend` says) 
 entry is full reach, agreement 1.0, 0 errors and 0 differing snapshots. The 8 episode answer reports stay checked
 by `scripts/compare_episode_answers.py`, which is not a ratchet.
 
-**What is in it** (82 cases, 123 runs, 8 episode answer reports; about 30 s in one process, the whole file
-recomputed in 6-12 s over a process pool): 55 discovery cases, 19 justify cases, 8 episodes; ten with a
+**What is in it** (84 cases, 125 runs, 8 episode answer reports; about 30 s in one process, the whole file
+recomputed in 6-12 s over a process pool): 56 discovery cases, 20 justify cases, 8 episodes; ten with a
 person's actions (the Options menu's group and rule codelet clamps, Clamp Themes with two themes, Undo last
 clamp, and the Self-watching check item: switched off in one case, off and on again in two), one episode with Clear Memory before run 4, 39 runs
 that the codelet cap ends in Petacat's own record, and the first appearance of `conflict` snags, `manual-clamp` events and cap-ended
@@ -298,6 +298,18 @@ golden run also reaches 3,000 codelets. The replay against the recording has rea
 snapshots. Every earlier line of `extended_baseline.jsonl` is unchanged (only the header's case count and `cases_file_sha`
 moved), and `ratchet-extended.json` gained that one key. It adds no engine or database line or branch (measured with
 `scripts/golden_coverage.py`: 12,715 of 14,831 lines and 4,559 of 5,894 branches with and without it).
+
+Stage FX added two cases, whose Metacat recordings reach the two paths it changed in Metacat Mode.
+`discovery/a-b-xyz/s37-cap4000` (`a -> b; xyz`, seed 37): in Metacat's recording the answer-finder at codelet 3011 translates the
+rule when no vertical bridge is built (`answers.ss:1436-1448` translates each description unchanged) and the run answers `b` at
+codelet 3012. Metacat Mode used to refuse that translation, and replayed on the code before the change (`ab34af4`) it ended fatally
+at codelet 3013, past Metacat's answer; now the replay has reach 3012, agreement 1.0, 0 errors and 0 differing snapshots.
+`justify/zzzy-yzzz-lll-llm/s35-cap11000` (justify mode, seed 35): Metacat settles at codelet 10832 with an unjustified theme
+pattern that holds `(plato-object-category #f)` twice (`answers.ss:239-246` keeps a list); Metacat Mode now holds the same list.
+Petacat's own golden runs of both seeds do not reach those paths (the baseline runs Petacat's stream, not Metacat's);
+the original baseline's `discovery/a-b-z/2` does reach the translation, from codelet 282. Stage FX re-captured both golden baselines because
+the unjustified theme pattern is now a list and an answer's `state` hash holds it (171 of the 188 original runs and 85 of the
+extended ones change in `state` only), and `discovery/a-b-z/2` changed in its whole record, as the translation fix says it must.
 
 Stage T4 added three cases that run past a group of six objects, which patched Metacat reaches only since patch 0002
 (`build-bridge` is guarded the way `attach-length-description` already is): `aaa -> aaaaaa; aaa` seed 1 (answers

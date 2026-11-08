@@ -3472,6 +3472,77 @@
      }
     ]
    }
+  },
+  {
+   "id": "discovery/a-b-xyz/s37-cap4000",
+   "kind": "discovery",
+   "problem": [
+    "a",
+    "b",
+    "xyz"
+   ],
+   "seeds": [
+    37
+   ],
+   "cap": 4000,
+   "why": {
+    "engine_lines": 0,
+    "engine_arcs": 0,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [
+     "stage FX: Metacat's own run (patched build) reaches a translation with no vertical bridge built: the answer-finder at codelet 3011 translates rule 'a -> b' with no vertical bridge (answers.ss:1436-1448 translates each description unchanged) and answers b at 3012; Metacat Mode used to refuse the translation (translate_rule returned None) and, replayed on ab34af4, ends fatally at codelet 3013, past Metacat's answer; Petacat's own run of seed 37 answers xyz in 2431 codelets and does not reach it (the original golden run discovery/a-b-z/2 does, at codelet 282)"
+    ],
+    "most_new_in": []
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 3012,
+      "run_length": 3012,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "justify/zzzy-yzzz-lll-llm/s35-cap11000",
+   "kind": "justify",
+   "problem": [
+    "zzzy",
+    "yzzz",
+    "lll"
+   ],
+   "seeds": [
+    35
+   ],
+   "answer": "llm",
+   "cap": 11000,
+   "why": {
+    "engine_lines": 0,
+    "engine_arcs": 0,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [
+     "stage FX: Metacat's own run (patched build) in justify mode settles at codelet 10832 with an unjustified theme pattern that holds the entry (plato-object-category #f) twice (get-unjustified-theme-pattern, answers.ss:239-246, keeps a list); Metacat Mode holds the same list. Petacat's own run of seed 35 does not answer within the cap, and none of its own seeds 1-48 holds a repeated entry"
+    ],
+    "most_new_in": []
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 10833,
+      "run_length": 10833,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
   }
  ]
 }

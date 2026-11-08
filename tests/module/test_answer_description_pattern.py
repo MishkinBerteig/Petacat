@@ -465,11 +465,11 @@ def test_an_unjustified_bond_facet_brings_group_and_direction_with_it(meta):
         ctx.workspace.slipnet.roles,
     )
 
-    assert themes == {
-        GROUP_CATEGORY: "identity",
-        DIRECTION: "identity",
-        BOND_FACET: "diff",
-    }
+    assert themes == [
+        (GROUP_CATEGORY, "identity"),
+        (DIRECTION, "identity"),
+        (BOND_FACET, "diff"),
+    ]
 
 
 def test_the_augmentation_does_not_overwrite_a_slippage_that_is_already_there(meta):
@@ -485,8 +485,13 @@ def test_the_augmentation_does_not_overwrite_a_slippage_that_is_already_there(me
         ctx.workspace.slipnet.roles,
     )
 
-    assert themes[DIRECTION] == "opposite"
-    assert themes[GROUP_CATEGORY] == "identity"
+    # The slippages' own Direction entry stays where the slippages put it (remove-duplicates
+    # keeps the last occurrence), and the Group-Category default sits in front.
+    assert themes == [
+        (GROUP_CATEGORY, "identity"),
+        (BOND_FACET, "diff"),
+        (DIRECTION, "opposite"),
+    ]
 
 
 def test_without_a_bond_facet_slippage_nothing_is_added(meta):
@@ -499,4 +504,71 @@ def test_without_a_bond_facet_slippage_nothing_is_added(meta):
         ctx.workspace.slipnet.roles,
     )
 
-    assert themes == {STRING_POSITION: "opposite"}
+    assert themes == [(STRING_POSITION, "opposite")]
+
+
+def test_two_slippages_of_one_dimension_stay_two_entries_in_order(meta):
+    """``answers.ss:239-246``: the pattern is a list, one entry per slippage.
+
+    A dimension with two slippages of different relations holds both, in the slippages'
+    order, and two identical slippages hold the same entry twice, because without a
+    Bond-Facet entry nothing is removed.
+    """
+    from server.engine.answers import _unjustified_themes
+
+    ctx = _engine(meta)
+    roles = ctx.workspace.slipnet.roles
+    opposite = _slippage(ctx, STRING_POSITION, "plato-leftmost", "plato-rightmost")
+    identity = _slippage(ctx, STRING_POSITION, "plato-leftmost", "plato-leftmost")
+
+    assert _unjustified_themes([opposite, identity], roles) == [
+        (STRING_POSITION, "opposite"),
+        (STRING_POSITION, "identity"),
+    ]
+    assert _unjustified_themes([identity, opposite, identity], roles) == [
+        (STRING_POSITION, "identity"),
+        (STRING_POSITION, "opposite"),
+        (STRING_POSITION, "identity"),
+    ]
+
+
+def test_the_bond_facet_augmentation_keeps_the_last_occurrence_of_a_repeated_entry(meta):
+    """``answers.ss:261``: ``remove-duplicates`` (``equal?``, ``utilities.ss:915-930``)
+    drops an entry when it recurs later, so the two consed-on companions give way to the
+    slippages' own copies and each repeated entry sits where it occurs last.
+    """
+    from server.engine.answers import _unjustified_themes
+
+    ctx = _engine(meta)
+    roles = ctx.workspace.slipnet.roles
+    group = _slippage(ctx, GROUP_CATEGORY, "plato-samegrp", "plato-succgrp")
+    bond_facet = _slippage(ctx, BOND_FACET, "plato-letter-category", "plato-length")
+    group_entry = _unjustified_themes([group], roles)[0]
+
+    themes = _unjustified_themes([group, bond_facet, group], roles)
+
+    # consed: [(group, g), (direction, identity), (group, g), (bond-facet, diff), (group, g)];
+    # the first and third (group, g) are dropped for the last.
+    assert themes == [(DIRECTION, "identity"), (BOND_FACET, "diff"), group_entry]
+
+
+def test_the_unifying_slippages_of_a_justified_answer_are_read_as_the_mappings_they_are(meta):
+    """An answer-justifier's unjustified slippages come from ``get_unifying_slippages`` as
+    mappings (``cm_type`` is the dimension's name, ``label`` the label node or ``None``),
+    not as concept-mapping objects, and they must give their entries too: before, they gave
+    none, so the unjustified theme pattern of every such answer was empty.
+
+    The shape is Metacat's own run of ``zzzy -> yzzz; lll`` answering ``llm`` (justify mode,
+    seed 35, 10,832 codelets): two object-category slippages with no label, so
+    ``(plato-object-category #f)`` twice, which ``answers.ss:244-246`` keeps as it is.
+    """
+    from server.engine.answers import _unjustified_themes
+
+    ctx = _engine(meta)
+    roles = ctx.workspace.slipnet.roles
+    slippage = {"cm_type": "plato-object-category", "label": None, "is_slippage": True}
+
+    assert _unjustified_themes([dict(slippage), dict(slippage)], roles) == [
+        ("plato-object-category", "diff"),
+        ("plato-object-category", "diff"),
+    ]

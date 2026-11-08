@@ -94,7 +94,7 @@ def test_common_right_enclosing_object_counts_no_group_as_a_value():
     assert not rules._common_right_enclosing_object(mixed)
 
 
-# ---- C-2: remq-duplicates keeps the last occurrence ------------------------------
+# ---- remq-duplicates keeps the last occurrence ------------------------------
 
 
 def test_remq_duplicates_keeps_the_last_occurrence():
@@ -102,10 +102,10 @@ def test_remq_duplicates_keeps_the_last_occurrence():
     assert rules._remq_duplicates([a, b, a, c, b]) == [a, c, b]
 
 
-# ---- C-2: unjustified themes read with assq (first entry wins) -------------------
+# ---- the unjustified theme pattern is Metacat's list ------------------------------
 
 
-def test_unjustified_theme_for_a_repeated_dimension_takes_the_first_entry():
+def test_unjustified_theme_for_a_repeated_dimension_keeps_both_entries_in_order():
     from server.engine.answers import _unjustified_themes
     from server.engine.roles import Roles
 
@@ -113,8 +113,16 @@ def test_unjustified_theme_for_a_repeated_dimension_takes_the_first_entry():
     dim = NS(name="plato-letter-category")
     cm1 = NS(description_type1=dim, label=NS(name="plato-successor", relation="successor"))
     cm2 = NS(description_type1=dim, label=NS(name="plato-identity", relation="identity"))
-    assert _unjustified_themes([cm1, cm2], roles) == _unjustified_themes([cm1], roles)
-    assert _unjustified_themes([cm1], roles) != _unjustified_themes([cm2], roles)
+    # ``get-unjustified-theme-pattern`` (answers.ss:239-246) maps every slippage to an entry
+    # and, with no Bond-Facet entry, returns that list: nothing is merged or dropped.
+    assert _unjustified_themes([cm1, cm2], roles) == [
+        ("plato-letter-category", "successor"),
+        ("plato-letter-category", "identity"),
+    ]
+    assert _unjustified_themes([cm1, cm1], roles) == [
+        ("plato-letter-category", "successor"),
+        ("plato-letter-category", "successor"),
+    ]
 
 
 # ---- differing-dimensions is not deduplicated --------------------------------
@@ -143,12 +151,56 @@ def test_differing_dimensions_counts_one_per_matching_pair():
         )
 
     # Answer 1 states X twice (justified identity, unjustified opposite); answer 2 once.
-    a = answer({X: "identity", Y: "identity"}, {X: "opposite"})
-    b = answer({X: "successor", Y: "identity"}, {})
+    a = answer({X: "identity", Y: "identity"}, [(X, "opposite")])
+    b = answer({X: "successor", Y: "identity"}, [])
     cmp = AnswerComparison(
         a, b, EpisodicMemory(), meta.commentary_templates, meta=meta
     )
     assert cmp.differing_dimensions == [X, X]
+
+
+# ---- the unjustified list is read as the list it is ----------------------------
+
+
+def _answer_with(themes, unjustified):
+    from server.engine.memory import AnswerDescription
+
+    return AnswerDescription(
+        problem=("abc", "abd", "xyz", "p"), top_rule_description="r",
+        bottom_rule_description="", top_rule_quality=70.0,
+        bottom_rule_quality=0.0, quality=70.0, temperature=30.0,
+        themes=themes, unjustified_slippages=[], unjustified_themes=unjustified,
+        top_rule_signature=[], bottom_rule_signature=[],
+    )
+
+
+def test_all_themes_is_a_plain_append_of_the_two_lists():
+    """``(append (get-themes) (get-unjustified-themes))`` (``answers.ss:456-464``): an entry
+    in both lists, and an entry the unjustified list holds twice, each count as often as
+    they occur, and the length is what "a richer set of ideas" is measured on."""
+    from server.engine.answer_comparison import all_themes_of
+
+    X = "plato-direction-category"
+    answer = _answer_with({X: "identity"}, [(X, "identity"), (X, "opposite"), (X, "opposite")])
+    assert all_themes_of(answer) == [
+        (X, "identity"), (X, "identity"), (X, "opposite"), (X, "opposite"),
+    ]
+
+
+def test_snag_justified_themes_is_a_cross_product():
+    """``intersect-themes`` is ``cross-product-filter-map`` (``utilities.ss:795-797``): an
+    avoiding theme the unjustified list holds twice comes out twice."""
+    from server.engine.answer_comparison import snag_justified_themes
+    from server.engine.memory import EpisodicMemory, SnagDescription
+
+    X = "plato-direction-category"
+    answer = _answer_with({}, [(X, "opposite"), (X, "opposite")])
+    memory = EpisodicMemory()
+    memory.get_equivalent_snag = lambda a: SnagDescription(
+        problem=("abc", "abd", "xyz"), codelet_count=1, temperature=1.0, theme_pattern={},
+        description="r", rule_signature=[], translated_rule_signature=[], explanation="e",
+    )
+    assert snag_justified_themes(answer, memory) == [(X, "opposite"), (X, "opposite")] * 2
 
 
 # ---- Newest-first lists -------------------------------------------------------

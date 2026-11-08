@@ -1216,8 +1216,8 @@ class Rule(WorkspaceStructure):
             for dimension in clause.dimensions:
                 if hasattr(dimension, "activation"):
                     nodes.append(dimension)
-        # ``remq-duplicates`` keeps the LAST occurrence (``utilities.ss:915-927``,
-        # DISCREPANCIES5 C-2), so a node named twice sits where it is named last.  The
+        # ``remq-duplicates`` keeps the LAST occurrence (``utilities.ss:915-927``),
+        # so a node named twice sits where it is named last.  The
         # order is observable: a justify clamp applies the pattern in this order and
         # the concept-activation events follow it (``rst-rsu-xyz-wyz`` seed 4: Metacat
         # logs ObjectCtgy before Opposite).

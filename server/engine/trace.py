@@ -927,7 +927,7 @@ def _associated_concept_pattern(
             positive = activation is None or activation > 0
             pairs.append((opposite.name, ceiling if positive else suppressed))
     # ``(remove-duplicates (flatmap ...))`` (``trace.ss:1506``): ``remove-duplicates``
-    # keeps the LAST occurrence (``utilities.ss:915-930``, DISCREPANCIES5 C-2), so a
+    # keeps the LAST occurrence (``utilities.ss:915-930``), so a
     # pair named twice sits where it is named last.  Clamping follows this order and
     # each clamp can log a concept-activation event, so the order is visible in the
     # trace: ``rst-rsu-xyz-wyz`` seed 4 logs ObjectCtgy before Opposite.

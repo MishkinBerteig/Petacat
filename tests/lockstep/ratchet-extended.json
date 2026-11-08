@@ -1,4 +1,10 @@
 {
+ "discovery/a-b-xyz/s37-cap4000|a-b-xyz/37": {
+  "agreement": 1.0,
+  "reach": 3012,
+  "state_snapshots_differing": 0,
+  "unregistered_errors": 0
+ },
  "discovery/a-z-abc/s2-cap3000|a-z-abc/2": {
   "agreement": 1.0,
   "reach": 242,
@@ -734,6 +740,12 @@
  "justify/zzzy-yzzz-lll-llm/s1-cap5000|justify/zzzy-yzzz-lll-llm/1": {
   "agreement": 1.0,
   "reach": 5000,
+  "state_snapshots_differing": 0,
+  "unregistered_errors": 0
+ },
+ "justify/zzzy-yzzz-lll-llm/s35-cap11000|justify/zzzy-yzzz-lll-llm/35": {
+  "agreement": 1.0,
+  "reach": 10833,
   "state_snapshots_differing": 0,
   "unregistered_errors": 0
  }

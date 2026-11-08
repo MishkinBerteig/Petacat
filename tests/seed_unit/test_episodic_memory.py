@@ -169,7 +169,7 @@ def _described(
         temperature=30.0,
         themes=dict(themes),
         unjustified_slippages=[],
-        unjustified_themes=dict(unjustified or {}),
+        unjustified_themes=list((unjustified or {}).items()),
         top_rule_signature=signature,
         bottom_rule_signature=bottom_signature,
         top_rule_abstractness=abstractness,

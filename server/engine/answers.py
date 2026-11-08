@@ -383,59 +383,79 @@ def _theme_abstractness(dimension: str, relation: str, meta: Any) -> float:
 
 def average_theme_abstractness(
     themes: dict[str, Any],
-    unjustified_themes: dict[str, Any] | None,
+    unjustified_themes: list[tuple[str, str]] | None,
     meta: Any,
 ) -> float:
     """Scheme: ``average-theme-abstractness`` (``answers.ss:885-892``).
 
-    Averaged over the answer's themes *and* its unjustified themes.
+    Averaged over the answer's themes *and* its unjustified themes, an entry that occurs
+    twice in the unjustified list counting twice, as in ``(append get-themes
+    get-unjustified-themes)``.
     """
     if meta is None:
         return 0.0
-    combined = list(themes.items()) + list((unjustified_themes or {}).items())
+    combined = list(themes.items()) + list(unjustified_themes or [])
     if not combined:
         return 0.0
     values = [_theme_abstractness(dim, rel, meta) for dim, rel in combined]
     return round(sum(values) / len(values))
 
 
-def _unjustified_themes(slippages: list[Any], roles: Any) -> dict[str, Any]:
+def _unjustified_themes(slippages: list[Any], roles: Any) -> list[tuple[str, str]]:
     """The theme-pattern implied by slippages the program failed to justify.
 
-    Scheme: ``get-unjustified-theme-pattern`` (``answers.ss:239-264``).  One entry per
-    slippage — and then the **Bond-Facet augmentation**: a Bond-Facet theme implies the
-    existence of groups, so an unjustified Bond-Facet slippage brings accompanying
-    Group-Category and Direction entries with it, defaulting to ``identity`` because
-    the Bond-Facet slippage by itself says nothing about which.  The augmented pattern
-    is what ``all_themes`` compares and what feeds the reminding distance, so leaving
-    it out understated how much two Bond-Facet answers have in common.
+    Scheme: ``get-unjustified-theme-pattern`` (``answers.ss:239-264``).  It returns a
+    **list** of ``(dimension, relation)`` entries, one per slippage, in the slippages'
+    order, and nothing keeps one entry per dimension: two slippages of one dimension with
+    different relations give two entries, and two identical slippages give the same entry
+    twice.
+
+    * With no Bond-Facet entry, that list is the answer (``answers.ss:244-246``).
+    * With one, a Bond-Facet theme implies the existence of groups, so the pattern gets
+      accompanying Group-Category and Direction entries: the *first* entry of that
+      dimension (``assq``) or, if there is none, the dimension with ``identity``, because
+      the Bond-Facet slippage by itself says nothing about which.  Those two are consed
+      onto the front, and then ``remove-duplicates`` (``answers.ss:261``, ``equal?``
+      over whole entries, ``utilities.ss:929-930``) keeps the **last** occurrence of each
+      entry, so an entry the slippages already had stays where the slippages had it.
+      The augmented pattern is what ``all_themes`` compares and what feeds the
+      reminding distance.
     """
     from server.engine.themes import relation_name_for_label
 
-    themes: dict[str, Any] = {}
+    entries: list[tuple[str, str]] = []
     for cm in slippages:
-        dimension = getattr(getattr(cm, "description_type1", None), "name", None)
+        # ``(list (tell s 'get-CM-type) (tell s 'get-label))`` (``answers.ss:242``).  The
+        # unjustified slippages of an answer-justifier come from ``get_unifying_slippages``
+        # (``justify.py``) as mappings with the dimension's name under ``cm_type`` and the
+        # label node (or ``None``) under ``label``; a concept-mapping object has them as
+        # ``description_type1`` and ``label``.
+        if isinstance(cm, dict):
+            dimension, label = cm.get("cm_type"), cm.get("label")
+        else:
+            dimension = getattr(getattr(cm, "description_type1", None), "name", None)
+            label = getattr(cm, "label", None)
         if dimension is None:
             continue
-        # The Scheme keeps one entry per slippage and reads the Bond-Facet
-        # companions with ``assq`` (answers.ss:239-264), i.e. the *first* entry for
-        # a dimension.  The dict form cannot hold two relations for one dimension
-        # (it is persisted/serialised as a mapping), so the first one is kept.
-        themes.setdefault(dimension, relation_name_for_label(getattr(cm, "label", None)))
+        entries.append((dimension, relation_name_for_label(label)))
 
     bond_facet = roles.dimension_bond_facet.name
-    if bond_facet in themes:
-        # ``answers.ss:261-264`` conses the two entries onto the *front* of the
-        # pattern; a dict keeps insertion order, so build them first.
-        # A dimension the configuration lacks is not added (its token is no theme's name).
-        augmented = {
-            node.name: themes.get(node.name, vocab().theme_relation_identity)
-            for node in (roles.dimension_group_category, roles.dimension_direction)
-            if node
-        }
-        augmented.update(themes)
-        themes = augmented
-    return themes
+    if not any(dimension == bond_facet for dimension, _ in entries):
+        return entries
+
+    # A dimension the configuration lacks is not added (its token is no theme's name).
+    companions = [
+        next(
+            (entry for entry in entries if entry[0] == node.name),
+            (node.name, vocab().theme_relation_identity),
+        )
+        for node in (roles.dimension_group_category, roles.dimension_direction)
+        if node
+    ]
+    combined = companions + entries
+    return [
+        entry for position, entry in enumerate(combined) if entry not in combined[position + 1 :]
+    ]
 
 
 def make_translated_string(

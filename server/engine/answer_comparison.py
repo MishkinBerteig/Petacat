@@ -198,19 +198,18 @@ def themes_of(answer: AnswerDescription) -> list[Theme]:
 
 
 def unjustified_of(answer: AnswerDescription) -> list[Theme]:
-    return list(answer.unjustified_themes.items())
+    """``(get-unjustified-themes)``: the stored list as it is, repeats included."""
+    return [(dimension, relation) for dimension, relation in answer.unjustified_themes]
 
 
 def all_themes_of(answer: AnswerDescription) -> list[Theme]:
     """``(append (get-themes) (get-unjustified-themes))`` — ``answers.ss:456-464``.
 
-    The two patterns are separate dicts keyed by dimension, so an entry can occur in
-    both; each distinct ``(dimension, relation)`` pair contributes one theme.  The
-    length of this list is what "a richer set of ideas" is measured on
-    (``answers.ss:876-881``).
+    A plain ``append``: an entry in both lists is in the result twice, and so is an entry
+    the unjustified list holds twice.  The length of this list is what "a richer set of
+    ideas" is measured on (``answers.ss:876-881``).
     """
-    justified = themes_of(answer)
-    return justified + [t for t in unjustified_of(answer) if t not in justified]
+    return themes_of(answer) + unjustified_of(answer)
 
 
 def _lookup(dimension: str, themes: list[Theme]) -> Theme | None:
@@ -259,7 +258,9 @@ def snag_justified_themes(
     snag_themes = list((snag.theme_pattern or {}).items())
     unjustified = unjustified_of(answer)
     avoiding = [t for t in all_themes_of(answer) if t not in snag_themes]
-    return [t for t in avoiding if t in unjustified]
+    # ``intersect-themes`` is a cross product (``utilities.ss:795-797``): an avoiding
+    # theme the unjustified list holds twice comes out twice.
+    return [t for t in avoiding for u in unjustified if t == u]
 
 
 # ---------------------------------------------------------------------------

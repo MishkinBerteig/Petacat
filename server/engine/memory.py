@@ -35,7 +35,10 @@ class AnswerDescription:
     top_themes: dict[str, Any] = field(default_factory=dict)
     vertical_themes: dict[str, Any] = field(default_factory=dict)
     bottom_themes: dict[str, Any] = field(default_factory=dict)
-    unjustified_themes: dict[str, Any] = field(default_factory=dict)
+    #: ``get-unjustified-theme-pattern`` (``answers.ss:239-264``): a *list* of
+    #: ``(dimension, relation)`` entries in Metacat's order, which can hold two entries for
+    #: one dimension (and one entry twice).  Stored as a JSON list of pairs.
+    unjustified_themes: list[tuple[str, str]] = field(default_factory=list)
 
     top_rule_abstractness: float = 0.0
     bottom_rule_abstractness: float = 0.0
@@ -76,6 +79,18 @@ class AnswerDescription:
         # been stored has no place in one yet.  See ``server/engine/ids.py``.
         if not self.vertical_themes:
             self.vertical_themes = dict(self.themes)
+        # A JSON round trip turns the pairs into lists.  An answer stored before the
+        # unjustified theme pattern became Metacat's list holds a mapping instead, and is
+        # not read (no migration): the Episodic Memory it came from is cleared.
+        if isinstance(self.unjustified_themes, dict):
+            raise ValueError(
+                "unjustified_themes is a mapping: this answer was stored before the "
+                "unjustified theme pattern became a list of (dimension, relation) pairs; "
+                "clear the Episodic Memory (or the database) to drop it"
+            )
+        self.unjustified_themes = [
+            (dimension, relation) for dimension, relation in self.unjustified_themes
+        ]
 
     def is_coherent(self, meta: Any) -> bool:
         """Do the rule and the themes sit at the same level of abstraction?
@@ -531,7 +546,7 @@ class EpisodicMemory:
 
     def _classify_unjustified(
         self, answer: AnswerDescription
-    ) -> dict[str, str]:
+    ) -> list[dict[str, str]]:
         """Split an answer's unjustified themes into unjustified / snag-justified.
 
         §4.7.3: what makes ``aaabccc`` justified-after-all while ``aaabaaa`` is not is
@@ -544,15 +559,19 @@ class EpisodicMemory:
         """
         from server.engine.answer_comparison import snag_justified_themes
 
-        snag_justified = {
-            dimension for dimension, _ in snag_justified_themes(answer, self)
-        }
-        return {
-            dimension: (
-                "snag_justified" if dimension in snag_justified else "unjustified"
-            )
-            for dimension in answer.unjustified_themes
-        }
+        snag_justified = snag_justified_themes(answer, self)
+        return [
+            {
+                "dimension": dimension,
+                "relation": relation,
+                "status": (
+                    "snag_justified"
+                    if (dimension, relation) in snag_justified
+                    else "unjustified"
+                ),
+            }
+            for dimension, relation in answer.unjustified_themes
+        ]
 
     def clear_activations(self) -> None:
         """Zero every stored answer's reminding activation.

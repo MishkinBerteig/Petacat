@@ -620,7 +620,7 @@ def _answer(name, themes, *, rule="rule", abstractness=60.0, unjustified=None):
         temperature=30.0,
         themes=dict(themes),
         unjustified_slippages=[],
-        unjustified_themes=dict(unjustified or {}),
+        unjustified_themes=list((unjustified or {}).items()),
         top_rule_abstractness=abstractness,
         top_rule_signature=[], bottom_rule_signature=[],
     )
@@ -729,7 +729,7 @@ class TestMemory:
             temperature=30.0,
             themes={"plato-string-position-category": "identity"},
             unjustified_slippages=[],
-            unjustified_themes={"plato-bond-facet": "diff"},
+            unjustified_themes=[("plato-bond-facet", "diff")],
             bottom_rule_signature=[],
         )
         without_snag = AnswerDescription(
@@ -743,7 +743,7 @@ class TestMemory:
             temperature=30.0,
             themes={"plato-string-position-category": "identity"},
             unjustified_slippages=[],
-            unjustified_themes={"plato-bond-facet": "diff"},
+            unjustified_themes=[("plato-bond-facet", "diff")],
             bottom_rule_signature=[],
         )
         memory.store_snag(
@@ -760,8 +760,12 @@ class TestMemory:
         )
 
         result = memory.compare_answers(with_snag, without_snag, meta=meta)
-        assert result["a_unjustified_themes"]["plato-bond-facet"] == "snag_justified"
-        assert result["b_unjustified_themes"]["plato-bond-facet"] == "unjustified"
+        assert result["a_unjustified_themes"] == [
+            {"dimension": "plato-bond-facet", "relation": "diff", "status": "snag_justified"}
+        ]
+        assert result["b_unjustified_themes"] == [
+            {"dimension": "plato-bond-facet", "relation": "diff", "status": "unjustified"}
+        ]
 
     def test_comparison_produces_english_commentary(self, meta):
         """§4.7.4: the classification is rendered through phrase-templates.
@@ -963,7 +967,7 @@ class TestUiSurface:
                 assert isinstance(answer.top_themes, dict)
                 assert isinstance(answer.vertical_themes, dict)
                 assert isinstance(answer.bottom_themes, dict)
-                assert isinstance(answer.unjustified_themes, dict)
+                assert isinstance(answer.unjustified_themes, list)
                 assert isinstance(answer.is_coherent(meta), bool)
                 return
         pytest.fail("no answer stored in 6 runs")

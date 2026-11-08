@@ -7,7 +7,7 @@ without an entry:
 
 * ``golden/engine_baseline.jsonl`` (188 runs): discovery runs are in ``ratchet.json``, justify runs
   in ``ratchet-justify.json``, the eight runs of its episode in ``ratchet-episodes.json``;
-* ``golden/extended_baseline.jsonl`` (123 runs, besides the 8 ``episode_answers`` lines, which
+* ``golden/extended_baseline.jsonl`` (125 runs, besides the 8 ``episode_answers`` lines, which
   ``scripts/compare_episode_answers.py`` checks): every run is in ``ratchet-extended.json``, under
   ``<case id>|<layout slug>/<seed>`` (``scripts/lockstep_corpus.py --extended``).
 
@@ -74,8 +74,8 @@ def extended_keys() -> list[str]:
 
 def test_the_golden_baselines_have_the_runs_this_test_counts():
     assert len(original_keys()) == 188
-    assert len(extended_keys()) == 123
-    assert len(set(extended_keys())) == 123
+    assert len(extended_keys()) == 125
+    assert len(set(extended_keys())) == 125
 
 
 def test_every_original_golden_run_has_a_ratchet_entry():

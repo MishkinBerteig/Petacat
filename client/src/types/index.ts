@@ -561,7 +561,8 @@ export interface AnswerDescription {
   top_themes?: Record<string, string>;
   vertical_themes?: Record<string, string>;
   bottom_themes?: Record<string, string>;
-  unjustified_themes?: Record<string, string>;
+  /** Metacat's unjustified theme pattern: a list of [dimension, relation] entries, which can hold two for one dimension. */
+  unjustified_themes?: Array<[string, string]>;
   /**
    * §3.3.5: how abstract each rule is, and how abstract the answer's themes are on
    * average. §4.7.3 weighs two answers partly by these, so they travel with the answer.
@@ -574,13 +575,20 @@ export interface AnswerDescription {
   has_picture?: boolean;
 }
 
+/** One entry of an answer's unjustified theme pattern, and whether a stored snag explains it. */
+export interface UnjustifiedThemeEntry {
+  dimension: string;
+  relation: string;
+  status: 'unjustified' | 'snag_justified';
+}
+
 export interface AnswerComparison {
   common_themes: Record<string, string>;
   differing_themes: Record<string, [string, string]>;
   a_unique_themes: Record<string, string>;
   b_unique_themes: Record<string, string>;
-  a_unjustified_themes: Record<string, string>;
-  b_unjustified_themes: Record<string, string>;
+  a_unjustified_themes: UnjustifiedThemeEntry[];
+  b_unjustified_themes: UnjustifiedThemeEntry[];
   a_coherent: boolean;
   b_coherent: boolean;
   a_quality: number;

@@ -1168,11 +1168,11 @@ def _collect_snag_descriptions(objects: list[Any]) -> list[Any]:
     mean taken in :func:`_average_description_depth` is over the deduplicated list, not
     the concatenated one.  ``remq`` is ``eq?``-based, so this is identity.
 
-    ``remove-duplicates-pred`` (``utilities.ss:915-927``) drops the *first* occurrence
+    ``remove-duplicates-pred`` (``utilities.ss:915-924``) drops the *first* occurrence
     when the element recurs later, so it keeps the **last** — the opposite of the obvious
-    ``if seen: continue``.  The mean does not care, but ``DISCREPANCIES5.md`` C-2
-    records four places that already read this backwards, and there is no reason to make
-    a fifth.
+    ``if seen: continue``.  The mean does not care, but the order does elsewhere (the
+    clamp order in ``trace.py``, the node order in ``rules.py``, the unjustified theme
+    pattern in ``answers.py``), so this keeps the Scheme's choice too.
     """
     kept: dict[int, Any] = {}
     for obj in objects:

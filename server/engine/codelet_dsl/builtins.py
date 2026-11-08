@@ -3239,14 +3239,16 @@ def _translate_rule_locked(ctx: EngineContext, rule: Any) -> Any:
     objects.  Collecting every vertical CM here and handing the lot to every
     clause let unrelated mappings shadow the one that counts.
 
-    Returns ``None`` when the translation fails — no vertical mapping at all, a
-    clause naming an object the source string has lost, reference objects in
-    inconsistent enclosing groups, or a translated clause that is not
-    well-formed.  The answer-finder reports "Couldn't translate chosen rule".
-    """
-    if not any(bridge.is_built for bridge in ctx.workspace.vertical_bridges):
-        return None
+    Returns ``None`` when the translation fails — a clause naming an object the source
+    string has lost, reference objects in inconsistent enclosing groups, or a translated
+    clause that is not well-formed.  The answer-finder reports "Couldn't translate
+    chosen rule".
 
+    There is no precondition on the vertical bridges, because ``translate`` has none: a
+    description whose reference objects carry no vertical bridge is translated unchanged
+    (``answers.ss:1436-1448``), so with no vertical bridge at all the rule translates to
+    its literal counterpart, as :func:`server.engine.justify._translate_rule` does.
+    """
     from_string = (
         ctx.workspace.initial_string
         if rule.is_top_rule

@@ -1333,7 +1333,7 @@ class RunService:
                 run_id=a.run_id,
                 top_themes=a.top_themes or {},
                 bottom_themes=a.bottom_themes or {},
-                unjustified_themes=a.unjustified_themes or {},
+                unjustified_themes=a.unjustified_themes or [],
                 top_rule_abstractness=a.top_rule_abstractness or 0.0,
                 bottom_rule_abstractness=a.bottom_rule_abstractness or 0.0,
                 theme_abstractness=a.theme_abstractness or 0.0,

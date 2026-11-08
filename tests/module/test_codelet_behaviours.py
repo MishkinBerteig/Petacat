@@ -1490,14 +1490,29 @@ class TestApplyRule:
 
 
 class TestTranslateRule:
-    def test_returns_none_without_vertical_bridges(self, ctx_abc_abd_xyz):
-        """No vertical bridges → translation returns None."""
-        ctx = ctx_abc_abd_xyz
-        slipnet = ctx.slipnet
+    def test_with_no_vertical_bridge_a_rule_translates_unchanged(self, ctx_abc_abd_xyz):
+        """No vertical bridge is built, and the rule still translates.
 
-        rule = Rule(RULE_TOP, [])
-        result = translate_rule(ctx, rule)
-        assert result is None
+        ``translate`` has no precondition on the vertical bridges: a description whose
+        reference objects carry no vertical bridge is translated unchanged
+        (``answers.ss:1436-1448``).  ``translate_rule`` used to return ``None`` here.
+        """
+        ctx = ctx_abc_abd_xyz
+        assert not any(b.is_built for b in ctx.workspace.vertical_bridges)
+
+        rule = _rightmost_successor_rule(ctx.slipnet)
+        translated = translate_rule(ctx, rule)
+
+        assert translated is not None
+        assert translated.rules_equal(rule)
+        assert translated.translation.slippage_log.directly_applied_slippages == []
+        assert translated.translation.supporting_vertical_bridges == []
+
+    def test_an_empty_rule_translates_to_an_empty_rule(self, ctx_abc_abd_xyz):
+        ctx = ctx_abc_abd_xyz
+        translated = translate_rule(ctx, Rule(RULE_TOP, []))
+        assert translated is not None
+        assert translated.clauses == []
 
 
 # ═══════════════════════════════════════════════════════════════════════

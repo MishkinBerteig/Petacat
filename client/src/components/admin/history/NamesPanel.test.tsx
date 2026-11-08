@@ -21,7 +21,7 @@ describe('memoryNames', () => {
     const names = memoryNames({
       answers: [
         { themes: { 'plato-length': 'identity' }, top_themes: { 'plato-letter-category': 'successor' }, bottom_themes: {}, extra: 1 },
-        { vertical_themes: { 'plato-length': 'opposite' }, unjustified_themes: { 'plato-x': 3 } },
+        { vertical_themes: { 'plato-length': 'opposite' }, unjustified_themes: [['plato-x', 'successor'], ['plato-x', 'opposite']] },
       ],
       snags: [{ theme_pattern: { 'plato-direction-category': 'opposite' } }, { theme_pattern: null }],
     })

@@ -219,7 +219,7 @@ class AnswerDescriptionRow(Base):
     # snag-justified distinction and two of the preference criteria.
     top_themes = Column(JSONB, default=dict)
     bottom_themes = Column(JSONB, default=dict)
-    unjustified_themes = Column(JSONB, default=dict)
+    unjustified_themes = Column(JSONB, default=list)  # a list of [dimension, relation] pairs, Metacat's list
     top_rule_abstractness = Column(Float, default=0)
     bottom_rule_abstractness = Column(Float, default=0)
     theme_abstractness = Column(Float, default=0)

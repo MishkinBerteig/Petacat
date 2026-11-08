@@ -52,17 +52,19 @@ const THEME_LABELS: Record<string, string> = {
 };
 
 function themeChips(
-  themes: Record<string, string> | undefined,
+  themes: Record<string, string> | Array<[string, string]> | undefined,
   tone: string,
   title: string,
 ) {
-  const entries = Object.entries(themes ?? {});
+  // A pattern is a mapping, except the unjustified one, which is Metacat's list of entries
+  // and can show one dimension twice.
+  const entries: Array<[string, string]> = Array.isArray(themes) ? themes : Object.entries(themes ?? {});
   if (entries.length === 0) return null;
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginTop: 3 }} title={title}>
-      {entries.map(([dim, rel]) => (
+      {entries.map(([dim, rel], index) => (
         <span
-          key={dim}
+          key={`${index}:${dim}`}
           className="mono"
           style={{
             fontSize: 9,

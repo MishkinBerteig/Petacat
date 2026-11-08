@@ -16,7 +16,7 @@ const MEMORY = {
   answers: [{
     answer_id: 1, run_id: 1, problem: ['abc', 'abd', 'ijk'], top_rule_description: 'r', bottom_rule_description: 'r',
     quality: 80, temperature: 10, themes: { 'plato-gone': 'identity' }, top_themes: {}, bottom_themes: {},
-    vertical_themes: {}, unjustified_themes: {}, unjustified_slippages: [], has_picture: false,
+    vertical_themes: {}, unjustified_themes: [], unjustified_slippages: [], has_picture: false,
   }],
   snags: [],
 }

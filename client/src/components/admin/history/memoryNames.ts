@@ -22,8 +22,12 @@ const THEME_FIELDS = ['themes', 'top_themes', 'vertical_themes', 'bottom_themes'
 
 function addPattern(into: Set<string>, pattern: unknown): void {
   if (!pattern || typeof pattern !== 'object') return
-  for (const [dimension, relation] of Object.entries(pattern as Record<string, unknown>)) {
-    into.add(dimension)
+  // The unjustified pattern is a list of [dimension, relation] entries; the others are mappings.
+  const pairs: Array<[unknown, unknown]> = Array.isArray(pattern)
+    ? (pattern as unknown[]).filter(Array.isArray).map(e => [e[0], e[1]] as [unknown, unknown])
+    : Object.entries(pattern as Record<string, unknown>)
+  for (const [dimension, relation] of pairs) {
+    if (typeof dimension === 'string') into.add(dimension)
     if (typeof relation === 'string') into.add(relation)
   }
 }
