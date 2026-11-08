@@ -36,7 +36,7 @@ Sources:
 
 - [Comparison harness](../scripts/compare_to_metacat.py): `run_episode`,
   `convergence_answer`, and the episodic portion of `main`.
-- [Historical investigation](../DISCREPANCIES4.md): episodic variations, the
+- [Historical investigation](https://github.com/MishkinBerteig/Petacat/blob/b7fc94081ccc96fbe133884b497c61e8c4fbc658/DISCREPANCIES4.md): episodic variations, the
   RC-A intervention, resource caps, and the RC-E reporting change.
 - [Memory implementation](../server/engine/memory.py) and
   [unit tests](../tests/unit/test_episodic_memory.py): answer identity, memory

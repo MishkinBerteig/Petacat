@@ -517,7 +517,7 @@ These artefacts can be found in the GitHub repository for Petacat at https://git
 | `Petacat/scripts/compare_to_metacat.py`      | The routine check; two flags, exits zero always                          |
 | `Petacat/tests/unit/test_compare_harness.py` | Tests of the comparison's own decision logic                             |
 | `Petacat/measurements/vs-metacat*.json`      | Cycle outputs                                                            |
-| `Petacat/DISCREPANCIES4.md`                  | Every variation found, and its root cause                                |
+| [`Petacat/DISCREPANCIES4.md`](https://github.com/MishkinBerteig/Petacat/blob/b7fc94081ccc96fbe133884b497c61e8c4fbc658/DISCREPANCIES4.md) | Every variation found, and its root cause                                |
 
 ## Appendix B — Notation
 

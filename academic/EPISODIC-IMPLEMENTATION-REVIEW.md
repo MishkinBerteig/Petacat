@@ -72,14 +72,14 @@ stored novel input/endpoint pairs, in 28 versus 14 episodes, with no missing
 stored head member. Their respective capped-run counts are 1,311 and 2,404.
 These are paired saved records, not independent new replications.
 
-[DISCREPANCIES4.md](../DISCREPANCIES4.md), the RC-A investigation and its
+[DISCREPANCIES4.md](https://github.com/MishkinBerteig/Petacat/blob/b7fc94081ccc96fbe133884b497c61e8c4fbc658/DISCREPANCIES4.md), the RC-A investigation and its
 implementation report, associates removal of several episodic novel outcomes
 with the direction-sensitive image repair. That repair is not itself an
 episodic-memory algorithm change. The current memory regression definitions
 must not be described as additional causal explanations for the before/after
 count reduction without a versioned experiment that isolates them.
 
-[DISCREPANCIES3.md](../DISCREPANCIES3.md), "Engine changes since the oracle
+[DISCREPANCIES3.md](https://github.com/MishkinBerteig/Petacat/blob/b7fc94081ccc96fbe133884b497c61e8c4fbc658/DISCREPANCIES3.md), "Engine changes since the oracle
 re-run", reports three further fixes for string handling and says they left
 same-seed measurements byte-identical. This is useful historical context, not
 independent confirmation that every current memory feature was tested in the
