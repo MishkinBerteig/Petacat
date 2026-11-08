@@ -141,18 +141,18 @@ outside the matrix take it too and the run is entirely what it says it is.
 
 ```
 ============================= petacat test matrix ==============================
-  cpu  numpy    float64    1150 tests
-  gpu  mlx      float32    1150 tests
+  cpu  numpy    float64    1161 tests
+  gpu  mlx      float32    1161 tests
   whole suite requested: the full matrix is required of this run
 
-  unit          2008 collected   2008 run   2008 passed      0 failed      0 skipped  complete
+  unit          2010 collected   2010 run   2010 passed      0 failed      0 skipped  complete
   seed_unit     1802 collected   1802 run   1802 passed      0 failed      0 skipped  complete
-  module        1065 collected   1065 run   1065 passed      0 failed      0 skipped  complete
+  module        1087 collected   1087 run   1087 passed      0 failed      0 skipped  complete
   architecture   106 collected    106 run    106 passed      0 failed      0 skipped  complete
   integration    366 collected    366 run    366 passed      0 failed      0 skipped  complete
   parallel       304 collected    304 run    304 passed      0 failed      0 skipped  complete
   lockstep       266 collected    266 run    266 passed      0 failed      0 skipped  complete
-  e2e            692 collected    692 run    692 passed      0 failed      0 skipped  complete
+  e2e            694 collected    694 run    694 passed      0 failed      0 skipped  complete
 
   run complete in 13.9 min against a 60 min ceiling
 ```
@@ -170,8 +170,8 @@ single file or node id. Such a run names what narrowed it, names the roles it
 exercised, and exits on whether its tests passed:
 
 ```
-  cpu  numpy    float64      1150 tests
-  gpu  mlx      float32     1150 tests
+  cpu  numpy    float64      1161 tests
+  gpu  mlx      float32     1161 tests
   cpu  numpy: no selected test ran on it
   narrowed by -k 'mlx': this run reports the roles it exercised and is not held to the full matrix
 ```
@@ -200,7 +200,7 @@ A truncated run reports itself as truncated, and the difference from a clean run
 visible three ways:
 
 ```
-  module         1065 collected    198 run    198 passed      0 failed      0 skipped  INCOMPLETE
+  module         1087 collected    198 run    198 passed      0 failed      0 skipped  INCOMPLETE
 
   RUN TRUNCATED: the 60 min ceiling was reached after 60.4 min. Everything above is
   what the run produced before it stopped; the tests it had not reached never ran.
@@ -224,17 +224,17 @@ that allowance.
 
 | Layer | Directory | Scope | May depend on | Cases |
 |-------|-----------|-------|---------------|-------|
-| **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 2008 |
+| **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 2010 |
 | **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 1802 |
-| **module** | `tests/module/` | Several real components assembled and driven | Real engine objects and `seed_data/*.json`; no DB, no HTTP | 1065 |
+| **module** | `tests/module/` | Several real components assembled and driven | Real engine objects and `seed_data/*.json`; no DB, no HTTP | 1087 |
 | **architecture** | `tests/architecture/` | How the source tree is allowed to depend on itself | The repository's source, `seed_data/*.json`, child interpreters | 106 |
 | **integration** | `tests/integration/` | Agreement between the repository's artifacts, and the harness's own rules | Real `seed_data/*.json`, the ORM declarations, the generated client files, the documentation, a real pytest session | 366 |
 | **parallel** | `tests/parallel/` | The detachable multi-core plugin (`server/parallel/`): each executor against the serial run it claims to equal | Real engine objects and `seed_data/*.json`, worker processes and threads; each test pins the backend it compares on | 304 |
 | **lockstep** | `tests/lockstep/` | Petacat's decision traces against Metacat's: naming, helper conformance, tracing/replay RNGs, determinism guards, the comparer | Real engine in faithful mode (numeric backend off, or a named backend); recorded Metacat traces | 266 |
-| **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 692 |
+| **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 694 |
 
 Those counts are cases, so they include the second pass the numeric matrix makes
-over the 1150 backend-sensitive tests.
+over the 1161 backend-sensitive tests.
 
 One line decides each layer. Read them as a question about what a new test's
 subject is, and write the test where the answer lands:
@@ -267,7 +267,7 @@ first**, then move up toward the API and GUI.
 
 All eight layers run in one command — the
 [required command](#the-required-command) — and, since Petacat runs natively, all
-eight actually run: **6,609 cases**, every one of them executed. A layer that is
+eight actually run: **6,635 cases**, every one of them executed. A layer that is
 normally skipped is not a layer that is normally green, and none of these is.
 
 Wall-clock time depends heavily on the machine and on what else it is doing. The
@@ -487,7 +487,7 @@ changing what it records.
 | `test_rng.py` | 17 | The deterministic RNG wrapper |
 | `test_rule_bond_facet_change.py` | 1 | A GroupCtgy self change's BondFacet change is found wherever it sits (KNOWN-FAILURES) |
 | `test_rule_types.py` | 9 | `Rule` and `RuleClause` predicates and translation |
-| `test_rules_lockstep_ordering.py` | 12 | Rule construction in Metacat's order: subobject gate, common change schemas, `sort-templates`, swaps, list order |
+| `test_rules_lockstep_ordering.py` | 14 | Rule construction in Metacat's order: subobject gate, common change schemas, `sort-templates`, swaps, list order |
 | `test_run_service_ids.py` | 2 | A clamp or Undo on a live run takes its trace-event number from the run's own id allocator |
 | `test_runner_status.py` | 1 | The runner's status constants |
 | `test_scout_counts.py` | 14 | The scout-count aggregates that decide how many codelets a cycle posts |
@@ -565,12 +565,12 @@ changing what it records.
 |------|----:|--------|
 | `test_access_sets.py` | 19 | Read-set / write-set discipline and commit-time validation |
 | `test_lockstep_desync_fixes.py` | 5 | Fixes found by replaying runs beyond the lockstep corpus, as small hand-built states: `get-equivalent-bridge`, rule clauses `self` vs `subobjects`, any-descriptor reference objects, both-order internal coherence, `remove-duplicates` keeping the last entry |
-| `test_answer_description_pattern.py` | 13 | The vertical theme-pattern an answer description is indexed by |
+| `test_answer_description_pattern.py` | 16 | The vertical theme-pattern an answer description is indexed by |
 | `test_wired_numbers.py` | 11 | Stage W: each number the engine used to repeat as a literal or ignore (`probabilistic_activation_exponent`, the four `*_string_salience_*_weight` coefficients, `max_raw_importance`, `max_activation`, `max_theme_activation`, `concept_activation_importance_threshold`, `jootsing_count_scale`) is changed in a configuration built in the test and a real run moves, on every backend in the matrix; and each site is pinned alone (clamp default, label flush, length-description exponent, theme-conjunction admission, theme patterns, derived concept patterns, snag branch of the jootser) |
 | `test_bridge_scouting.py` | 25 | The bridge scouts' probabilistic gates, the build-time mapping augmentation, the incompatibility refinements, and the deferred posting batch |
 | `test_capture_projection.py` | 9 | A recorded capture renders exactly as the same state renders live, including the unbuilt translated rule justify mode adds |
 | `test_coderack_eeg_display.py` | 8 | The coderack window's figures and the EEG's samples from a real run, serial and free-running |
-| `test_codelet_behaviours.py` | 79 | What each of the 27 codelet types does to a live workspace |
+| `test_codelet_behaviours.py` | 80 | What each of the 27 codelet types does to a live workspace |
 | `test_codelet_dsl.py` | 7 | Codelet bodies executed against a live engine context |
 | `test_commentary_writer.py` | 8 | Commentary is an injected writer, and every Run gets a real one |
 | `test_dissertation_parity.py` | 45 | The dissertation's claims, encoded as tests |
@@ -590,6 +590,7 @@ changing what it records.
 | `test_runner_commentary.py` | 6 | Commentary emitted as the runner drives a problem |
 | `test_runner_status.py` | 7 | The status an `EngineRunner` reports as a run moves through it |
 | `test_singleton_group_images.py` | 3 | Every object a rule names owns an image, singleton groups included |
+| `test_start_letter_and_empty_change.py` | 5 | Metacat Mode follows fixes 0005 and 0006 of patched Metacat (round 2, stage P5): a group image with no start letter keeps none in `new_start_letter`, a letter image with none fails, a start letter with no related node becomes none, and `possible_to_instantiate` refuses a template whose change has no descriptor left to pick |
 | `test_sink_emission.py` | 9 | The engine emits a complete run record to its sink |
 | `test_snag_records.py` | 4 | A run records the snags it adds to Metacat Mode's Episodic Memory, once each |
 | `test_snag_response.py` | 7 | The snag response driven end to end through a real run |
@@ -656,12 +657,12 @@ changing what it records.
 | `test_episodes.py` | 8 | Episodes and justify mode: recorder driver text, corpus globs, an episode's self-replay with memory carried, a forced fatal, justify self-replay |
 | `test_golden_baseline.py` | 5 | The EN0 golden baseline gate (G3): `tests/lockstep/golden/engine_baseline.jsonl` and `engine_baseline_rng.json.gz`, captured from the Metacat Standard Configuration on the CPU numeric backend (float64), hold for the 19 demo problems and the justify problems at seeds 1-5 and one 8-run episode the answer, codelet count, final temperature, per-codelet RNG call counts, trace and final-state hashes and the English corpus. A quick consistency check and a four-run sample run always; the slow test recomputes everything in a fresh interpreter and compares byte for byte, naming the first differing run and codelet. Outside the numeric matrix (it pins its backend) |
 | `test_extended_tools.py` | 7 | The tools behind the extended golden baseline, without Docker: the recorder's driver text for a person's clamps, Undo, Self-watching mode and Clear Memory, the interventions calling the product's own `RunService` methods, bare, a description or rule proposal's own time stamp told apart on replay, a cleared-memory header honoured by the answer check, and `scripts/golden_coverage.py` attributing the database's code (codelet bodies, descriptor predicates, posting formulas) to its units |
-| `test_golden_extended.py` | 6 | The extended golden baseline gate: `tests/lockstep/golden/extended_baseline.jsonl` and `extended_baseline_rng.json.gz`, 84 cases chosen by coverage (four added by stage 6 for the alphabetic-position sites, three by stage T4 for runs past a group of six objects, one by stage Y for Self-watching switched off and back on in one run, four by stage V2 for the reversal of all the groups of a string and the group-category row of `rule.apply_first`, one by stage V3 whose own run takes that reversal, two by stage FX whose Metacat recordings reach a translation with no vertical bridge and an unjustified theme pattern that holds one entry twice), each checked against Metacat, under the faithful parameters on the engine's own loops (backend off) or the pure-Python backend. A consistency check against the case list, a baseline-of-real-runs check and a sample always run; the slow test recomputes everything in a fresh interpreter over a process pool (about 10 s) and compares byte for byte, naming the first differing run, field and codelet; a changed update-cycle length is noticed. Four slow tests run every case on `numpy`, `python`, `mlx-cpu` and `mlx` and compare each record field and the final state with numbers normalised (a backend that is not available is a skip). Outside the numeric matrix |
+| `test_golden_extended.py` | 6 | The extended golden baseline gate: `tests/lockstep/golden/extended_baseline.jsonl` and `extended_baseline_rng.json.gz`, 87 cases chosen by coverage (four added by stage 6 for the alphabetic-position sites, three by stage T4 for runs past a group of six objects, one by stage Y for Self-watching switched off and back on in one run, four by stage V2 for the reversal of all the groups of a string and the group-category row of `rule.apply_first`, one by stage V3 whose own run takes that reversal, two by stage FX whose Metacat recordings reach a translation with no vertical bridge and an unjustified theme pattern that holds one entry twice, three by stage P5 for a group image with no start letter and a rule change with nothing left to describe), each checked against Metacat, under the faithful parameters on the engine's own loops (backend off) or the pure-Python backend. A consistency check against the case list, a baseline-of-real-runs check and a sample always run; the slow test recomputes everything in a fresh interpreter over a process pool (about 10 s) and compares byte for byte, naming the first differing run, field and codelet; a changed update-cycle length is noticed. Four slow tests run every case on `numpy`, `python`, `mlx-cpu` and `mlx` and compare each record field and the final state with numbers normalised (a backend that is not available is a skip). Outside the numeric matrix |
 | `test_event_names.py` | 2 | Every Trace event in eight Metacat runs (all event types, all three group directions, flips, slippages on all three bridges, translated rules, the three answer headers) named and headed exactly as Metacat 1.2 logged them |
 | `test_helpers.py` | 11 | Helper conformance: `prob`, `~`, `weighted_pick` and `pick` give Metacat's results for the same draws |
 | `test_naming.py` | 9 | Canonical names for plain values and every kind of object, and the opening state against Metacat's |
 | `test_patched_only.py` | 8 | Only the patched Metacat is ever run (ruling 70): `record.py` has no flag that chooses a build; every recorder reaches Docker only through `run_container`, which refuses a tree that fails verification, the reference tree made with Metacat's own tool (never run) and a recorder copy not marked patched; and every stored trace header in every corpus ends in `+known-failure-fixes` with no exception; the recordings of the crashes of the build without the fixes are gone |
-| `test_ratchet_covers_golden.py` | 4 | Every run of the original golden baseline (188) and of the extended one (125) has a lockstep ratchet entry (`ratchet.json`, `ratchet-justify.json`, `ratchet-episodes.json`, `ratchet-extended.json`), and every ratchet entry has agreement 1.0, no error and no differing state snapshot |
+| `test_ratchet_covers_golden.py` | 4 | Every run of the original golden baseline (188) and of the extended one (128) has a lockstep ratchet entry (`ratchet.json`, `ratchet-justify.json`, `ratchet-episodes.json`, `ratchet-extended.json`), and every ratchet entry has agreement 1.0, no error and no differing state snapshot |
 | `test_replay.py` | 15 | Tracing rules, trace shape, self-replay, Guard 1, fatal and surplus paths, Guard 2 (slow); a committed Metacat trace replayed with the numeric backend on |
 | `test_seam.py` | 5 | The engine's trace seam changes nothing for an ordinary run; the initial clamp is held until Metacat's fixed unclamp time |
 | `test_translation_log.py` | 2 | The slippage log, supporting vertical bridges, reference objects and supporting groups of every answer and snag in six Metacat runs (coattail slippages, a justify-mode answer, a snag with an applied slippage), equal to what Metacat 1.2 logged |
@@ -718,6 +719,7 @@ changing what it records.
 | `test_swarm_api.py` | 5 | `POST /api/swarm` equals the serial runs, persists nothing, and rejects bad requests; `GET /api/swarm` reports the pool |
 | `test_training_mode_sessions_api.py` | 49 | Training Mode Sessions over HTTP: every stored run is the serial run; the 25 + 5 workflow (problems added while it runs); the finished long-poll; pause, resume, close, cancel, delete; the database written only when a problem finishes; a restart redoes what was cut off to the identical result and rebuilds the shared memory exactly; one worker is a serial episode and many replay from the merge log; fair sharing of the cores; every error policy; worker-failure retries, charged only to the run that broke the pool; a policy pause survives a concurrent status change; live counts never step backwards; a summary's finished cursor comes from the same snapshot as its counts; seed ranges fit the database; configuration change stalls or is adopted; validation, export, defaults and fixed settings |
 | `test_unicode_problem_strings.py` | 6 | Any Unicode text in Training Mode, end to end: a Training Mode Session of 20 corpus problems runs, is Stopped and reads back exactly from the database and the API; NFC and NFD problems both kept; U+0000 and a lone surrogate are a 422 in sessions; Metacat Mode reads the same corpus through Metacat's parser (stores what it read, or refuses with `Invalid input!`, in the runs row and Review), demo problems take Unicode names, sections and descriptions, and an empty string is `Invalid input!`, not a crash, in runs and the Swarm |
+| `test_unjustified_theme_list.py` | 2 | An answer's unjustified theme pattern is Metacat's list of `(dimension relation)` entries and survives the database (stage FX) |
 | `test_input_parser_doors.py` | 14 | Metacat Mode's three doors read a problem through Metacat's input parser: one case per row of the table in `THE-THREE-SYSTEMS.md` through `POST /api/runs`, a refusal is a 400 `Invalid input!` that creates nothing, no seed picks a random one that is recorded and shown, a Fast run with no database statement, Swarm (problem and seeds), Admin's demo problems (stored as read, a random seed when none), every shipped demo runs, and a Training Mode Session keeps `abC`, `xy1`, `é`, `日本` and emoji exactly |
 | `test_unlimited_text.py` | 9 | All other text is unlimited too: a Training Mode Session's name and note and a configuration's name and note of any length and script are stored and returned exactly; configuration text (names, labels, formulas, a multi-character glyph) round-trips through the change API, and codelet type and help topic text holds any length; the journal's actor, channel, group and note are stored exactly; U+0000 and a lone surrogate are a 4xx naming the field at every entry point (session, configuration, and every string and key of a change batch); a caller's value for a fixed-vocabulary column is checked first, a 4xx never a 500 |
 | `test_step0_config_from_db.py` | 47 | Step 0's guard tests: a shipped value reproduces the run and a changed one moves it |

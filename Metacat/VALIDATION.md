@@ -147,6 +147,30 @@ Validated on 2026-11-07 (see [KNOWN-FAILURES.md](KNOWN-FAILURES.md), "A rule tha
 - **More runs of the three problems.** 720 runs (seeds 1 to 240 of each of the three problems) recorded with the patch ended
   without an error: 305 answers, 393 caps and 22 give-ups.
 
+### 0005-group-image-with-no-start-letter.patch
+
+Validated on 2026-11-08 (see [KNOWN-FAILURES.md](KNOWN-FAILURES.md), "A group image with no start letter").
+
+- **Patching.** On the tree with 0001 to 0004 it applies with zero fuzz, and the result verifies as the fixed tree
+  (`--verify build/source`, 69 files). The bundle's tests pass.
+- **The 41 crashes.** All 41 runs (`wxyz -> xxyz; fgzzz` 16 seeds, `ihg -> ih; xyaaa` 12, `bcd -> bc; xbxmnm` 13), recorded again with state
+  snapshots at cap 100,000, end normally: 35 with an answer (29 of them at the codelet where the run used to stop) and 6 `bcd` runs at the
+  cap, with no second crash. Where the build before the fix was recorded (`wxyz` 27, `ihg` 121, `bcd` 15, 18 and 25), the old recording minus its
+  end record is an exact prefix of the new one.
+- **No other run changes.** 90 never-crashing runs (the reference traces of stage PX on the four crash problems and the 19 corpus problems, and `ihg` 91 at cap 100,000)
+  and the 266 recorded traces of earlier stages (plain, justify, episode, person-action, Self-watching-off and long runs, and `abc -> abd; xyz` seeds 1 to 10)
+  recorded with the fix are identical record for record to their stored recordings, apart from the header's `revision`.
+
+### 0006-literal-only-change-not-describable.patch
+
+Validated on 2026-11-08 (see [KNOWN-FAILURES.md](KNOWN-FAILURES.md), "A rule change with nothing left to describe").
+
+- **Patching.** On the tree with 0001 to 0005 it applies with zero fuzz, and the result verifies as the fixed tree
+  (`--verify build/source`, 69 files). The bundle's tests pass.
+- **The crash.** `abcx -> xwva; ijkr` seed 19, recorded again with snapshots at cap 100,000, is identical to the old recording up to the codelet where it
+  stopped (8,012), where the `rule-scout` now fizzles, and then goes on and answers `rqpa` after 14,991 codelets.
+- **No other run changes.** The same 90 and 266 runs as for 0005 (recorded with both patches).
+
 The fixes are not part of the reference reconstruction behind the published studies, which
 the bundle no longer builds or verifies: `--verify` accepts only the patched tree. Results gathered
 with the fixes are from a changed engine (KNOWN-FAILURES.md, "When Returning to This Work").

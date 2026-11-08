@@ -668,12 +668,28 @@
         "CODE-FIXES.md",
         "rules.ss"
       ]
+    },
+    {
+      "path": "patches/fixes/0005-group-image-with-no-start-letter.patch",
+      "sha256": "448433e33a261a6f58fce5493f5b0469e0116e4905877ec26782cdca4a47561f",
+      "files": [
+        "CODE-FIXES.md",
+        "images.ss"
+      ]
+    },
+    {
+      "path": "patches/fixes/0006-literal-only-change-not-describable.patch",
+      "sha256": "44f384d9b61fab66fe94eb05205384515043edf03db8525443cd5af8b4195afd",
+      "files": [
+        "CODE-FIXES.md",
+        "rules.ss"
+      ]
     }
   ],
   "fixed_files": {
     "CODE-FIXES.md": {
-      "sha256": "a59672af85f532a0b629efd39b78d3d263ef9918367af4c51187dde2f7e86deb",
-      "bytes": 13470,
+      "sha256": "ec7721ca8be86053adbd47a89ce695c154fd727b3cf3c1c75213828725da29c2",
+      "bytes": 18301,
       "executable": false
     },
     "bridges.ss": {
@@ -686,9 +702,14 @@
       "bytes": 43388,
       "executable": false
     },
+    "images.ss": {
+      "sha256": "5bacd8078a45a99f48766096ffe776c8d03ebbae86d1697e6dbfea8bc3a4ad1c",
+      "bytes": 14764,
+      "executable": false
+    },
     "rules.ss": {
-      "sha256": "d2c065ee7b5e78ad664af381c1bb162e15af54031eaaeb340e6f7a21d62e540f",
-      "bytes": 84403,
+      "sha256": "aad6d7f8c369f2a17868cdf5fee6fbc0dade21312fc1958ede05d42ebf8e9b20",
+      "bytes": 84612,
       "executable": false
     },
     "syntactic-sugar.ss": {
@@ -697,7 +718,7 @@
       "executable": false
     }
   },
-  "fix_note": "Second patch group, always applied: fixes for the crashes in KNOWN-FAILURES.md (the three study crashes, the group of six or more, a letter outside a to z, and the reversal of the groups of a string). Not part of the reference reconstruction behind the published studies; tools/reconstruct.py --output applies it, and --apply-fixes brings an old reference tree up. fixed_files lists the files whose hashes change when it is applied.",
+  "fix_note": "Second patch group, always applied: fixes for the crashes in KNOWN-FAILURES.md (the three study crashes, the group of six or more, a letter outside a to z, the reversal of the groups of a string, a group image with no start letter, and a change with only a literal descriptor). Not part of the reference reconstruction behind the published studies; tools/reconstruct.py --output applies it, and --apply-fixes brings an old reference tree up. fixed_files lists the files whose hashes change when it is applied.",
   "excluded_files": {
     "CLAUDE.md": "Repository-specific agent instructions.",
     "oracle/derived/convergence-p50.json": "Measured data are not part of this source reconstruction bundle.",

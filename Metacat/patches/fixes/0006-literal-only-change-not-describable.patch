@@ -1,0 +1,46 @@
+--- a/rules.ss
++++ b/rules.ss
+@@ -447,7 +447,7 @@
+     (andmap
+       (lambda (template)
+ 	(if (intrinsic-clause? template)
+-	  (object-description-possible? (2nd template))
++	  (and (object-description-possible? (2nd template)) (andmap (lambda (change-template) (pair? (3rd change-template))) (3rd template))) ; a literal DirCtgy/GroupCtgy change is disallowed (make-change-template): no descriptor left to pick, so not describable
+ 	  (andmap object-description-possible? (2nd template))))
+       rule-clause-templates)))
+ 
+--- a/CODE-FIXES.md
++++ b/CODE-FIXES.md
+@@ -207,6 +207,32 @@
+ (it changes runs that do not crash and undoes fix 0001's withholding), taking the letter from the first sub-image,
+ calling `(fail)` in the group branch (completed rule applications would snag), and catching the error in `answer-finder`.
+ 
++### 1.8 A literal-only change that cannot be described — `patches/fixes/0006-literal-only-change-not-describable.patch`
++
++Also in the second patch group, and also a send to `#f`. A literal DirCtgy or GroupCtgy change is disallowed:
++`make-change-template` (`rules.ss:1060-1065`) removes the literal descriptor from the template's descriptor list.
++When the only descriptor was the literal one (a subobjects DirCtgy change with only a literal descriptor), the list
++is left empty. `instantiate-change-template` (`rules.ss:893-912`) then `stochastic-pick`s from `()`, which gives `#f` without
++drawing a random number, and `set-quality-values` reaches `compute-rule-abstractness` (`rules.ss:1609`), which sends
++`get-conceptual-depth` to it (`abcx -> xwva; ijkr`, seed 19, at codelet 8012: `rule-scout`, `Exception: attempt
++to apply non-procedure #f`).
++
++`rule-scout` already stops a rule whose objects cannot be described: `possible-to-instantiate?` (`rules.ss:445-458`)
++makes it fizzle with "Not all rule objects are describable", but it looked only at the objects, not at the changes.
++
++- **`possible-to-instantiate?`** now also needs, for every intrinsic clause template, a non-empty descriptor list in
++  each of its change templates: `(andmap (lambda (change-template) (pair? (3rd change-template))) (3rd template))`.
++  A template with an empty list is not describable, and `rule-scout` fizzles, as it does for an object it cannot describe.
++  It is the only caller of `instantiate-rule-clause-template` and so the only place the descriptor list is picked from.
++
++The patch is written on the line it replaces, so no line of `rules.ss` moves.
++
++**Effect on behaviour: none where it does not fire.** Every rule clause whose change templates all have a descriptor
++takes the same path as before, with the same random draws; the clause that is now refused ended the run in an error.
++Rejected: dropping the empty change (the rule then says less than the bridges did), filtering `#f` in
++`compute-rule-abstractness`, skipping it in `abstract-change-descriptions` (it changes the random stream), and
++allowing a literal DirCtgy change (it is disallowed on purpose).
++
+ ---
+ 
+ ## 2. Headless mode — new files, GUI untouched

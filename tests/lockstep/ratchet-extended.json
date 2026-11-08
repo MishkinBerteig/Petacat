@@ -83,6 +83,12 @@
   "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
+ "discovery/abcx-xwva-ijkr/s19-cap20000|abcx-xwva-ijkr/19": {
+  "agreement": 1.0,
+  "reach": 14992,
+  "state_snapshots_differing": 0,
+  "unregistered_errors": 0
+ },
  "discovery/abcxyz-cbazyx-ijkpqr/s23-cap6000|abcxyz-cbazyx-ijkpqr/23": {
   "agreement": 1.0,
   "reach": 3197,
@@ -272,6 +278,18 @@
  "discovery/wxyz-wxyy-bcd/s1-cap3000|wxyz-wxyy-bcd/1": {
   "agreement": 1.0,
   "reach": 1354,
+  "state_snapshots_differing": 0,
+  "unregistered_errors": 0
+ },
+ "discovery/wxyz-xxyz-fgzzz/s13-cap6000|wxyz-xxyz-fgzzz/13": {
+  "agreement": 1.0,
+  "reach": 6000,
+  "state_snapshots_differing": 0,
+  "unregistered_errors": 0
+ },
+ "discovery/wxyz-xxyz-fgzzz/s27-cap6000|wxyz-xxyz-fgzzz/27": {
+  "agreement": 1.0,
+  "reach": 2852,
   "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },

@@ -352,6 +352,7 @@ ENTRIES: dict[tuple[str, str, str], list[tuple[int, str, str]]] = {
     ('server/engine/answers.py', '_select_transform', '2'): [(1, 'UNIT', 'LEN_PAIR')],
     ('server/engine/answers.py', '_theme_abstractness', '2.0'): [(1, 'UNIT', 'MEAN_OF_N')],
     ('server/engine/answers.py', 'average_theme_abstractness', '0.0'): [(2, 'UNIT', 'ZERO_RESULT')],
+    ('server/engine/answers.py', '_unjustified_themes', '1'): [(1, 'UNIT', 'PLUS_ONE')],
     ('server/engine/answers.py', 'compute_answer_quality', '0'): [(1, 'UNIT', 'ZERO_TEST')],
     ('server/engine/answers.py', 'compute_answer_quality', '100.0'): [(1, 'UNIT', 'PCT_COMPLEMENT')],
     ('server/engine/answers.py', 'make_translated_string', '0'): [(1, 'UNIT', 'ZERO_INIT')],

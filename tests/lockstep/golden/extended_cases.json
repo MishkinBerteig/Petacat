@@ -3543,6 +3543,114 @@
      }
     ]
    }
+  },
+  {
+   "id": "discovery/wxyz-xxyz-fgzzz/s27-cap6000",
+   "kind": "discovery",
+   "problem": [
+    "wxyz",
+    "xxyz",
+    "fgzzz"
+   ],
+   "seeds": [
+    27
+   ],
+   "cap": 6000,
+   "why": {
+    "engine_lines": 0,
+    "engine_arcs": 0,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [
+     "stage P5 (fix 0005): in Metacat's own run (patched build) the answer-finder at codelet 2851 applies a letter-category successor to a group image with no start letter (the group xy+aaa, born with start letter #f because its first object is a length-based group) and answers ggh; images.ss:281 used to send get-related-node to #f there and stop with 'attempt to apply non-procedure #f'. Metacat Mode keeps the none as none (Image.new_start_letter) and its replay of this recording takes the path at codelet 2851 and reaches 2852"
+    ],
+    "most_new_in": [],
+    "note": "Petacat's own run of seed 27 (backend off) is a different run: it halts at the cap, 6000 codelets, with no answer, and never sends a relation to an image with no start letter; the path is shown by the next case in Petacat's own record, and by this case's ratchet entry on Metacat's recording"
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 2852,
+      "run_length": 2852,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "discovery/wxyz-xxyz-fgzzz/s13-cap6000",
+   "kind": "discovery",
+   "problem": [
+    "wxyz",
+    "xxyz",
+    "fgzzz"
+   ],
+   "seeds": [
+    13
+   ],
+   "cap": 6000,
+   "why": {
+    "engine_lines": 0,
+    "engine_arcs": 0,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [
+     "stage P5 (fix 0005): Petacat's own run of seed 13 (backend off) sends a platonic relation to a group image with no start letter twice from codelet 1741 (Image.new_start_letter keeps the start letter none, as images.ss:281 does) and answers ggh at codelet 1742; the smallest of the 21 seeds in 1 to 150 (cap 12000) whose own run takes the path"
+    ],
+    "most_new_in": [],
+    "note": "Metacat's recording of seed 13 is a different run: it does not take the path (checked with the reproduction driver's wrapper) and runs to the cap, 6000 codelets, and its replay has reach 6000, agreement 1.0, 0 errors and 0 differing snapshots, so this case shows the path in Petacat's own record and holds Metacat's fidelity in the ratchet"
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 6000,
+      "run_length": 6000,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "discovery/abcx-xwva-ijkr/s19-cap20000",
+   "kind": "discovery",
+   "problem": [
+    "abcx",
+    "xwva",
+    "ijkr"
+   ],
+   "seeds": [
+    19
+   ],
+   "cap": 20000,
+   "why": {
+    "engine_lines": 0,
+    "engine_arcs": 0,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [
+     "stage P5 (fix 0006): in Metacat's own run (patched build) the rule-scout at codelet 8012 builds a rule template with a change whose only descriptor was a literal DirCtgy, which make-change-template emptied; possible-to-instantiate? refuses it (rules.ss:450) and the codelet fizzles, where it used to stop with 'attempt to apply non-procedure #f'; the run goes on and answers rqpa at codelet 14991. Metacat Mode's possible_to_instantiate refuses the same template, and its replay of this recording takes the path at codelet 8012 (four times) and reaches 14992"
+    ],
+    "most_new_in": [],
+    "note": "Petacat's own run of seed 19 (backend off) is a different run: it answers xwvijk in 3609 codelets and never builds such a template, and none of Petacat's own runs of this problem at seeds 1 to 150 (cap 100000, backend off) does, so no golden record takes this path; the ratchet entry on Metacat's recording is what holds the fidelity"
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 14992,
+      "run_length": 14992,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
   }
  ]
 }

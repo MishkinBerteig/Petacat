@@ -150,6 +150,12 @@ naming table in its `README.md`):
   medium instead of stopping at `(cadr #f)` in `apply-transforms`, and makes `same-dimension-as-GroupCtgy-medium?` answer false for a letter
   (`Metacat/KNOWN-FAILURES.md`, "A rule that reverses all the groups of a string"); Metacat Mode follows with
   `_group_category_medium` in `server/engine/rules.py`, and nothing is registered for it.
+  The fifth, `0005-group-image-with-no-start-letter.patch`, keeps a group image's missing start letter missing in `new-start-letter`
+  (`images.ss:281`) and makes a letter image with none fail (`images.ss:274`), instead of sending `get-related-node` to `#f`; the sixth,
+  `0006-literal-only-change-not-describable.patch`, makes `possible-to-instantiate?` refuse a rule-clause template whose change has no
+  descriptor left to pick, so the `rule-scout` fizzles (`Metacat/KNOWN-FAILURES.md`, "A group image with no start letter" and "A rule
+  change with nothing left to describe").  Metacat Mode follows in `Image.new_start_letter` and `possible_to_instantiate`; nothing is
+  registered for either.
 * **Seam test pins.** `test_seam.py`'s four ordinary runs were measured before and after
   the seam was added and matched exactly. Since then they have been re-pinned with each
   port fix, so they now guard the seam against later change.

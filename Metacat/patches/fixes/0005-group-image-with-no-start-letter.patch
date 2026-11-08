@@ -1,0 +1,59 @@
+--- a/images.ss
++++ b/images.ss
+@@ -271,14 +271,14 @@
+ 		((not (exists? arg)) (fail))
+ 		((tell self 'letter-image?)
+ 		 (if (platonic-relation? arg)
+-		   (let ((new-letter (tell start-letter 'get-related-node arg)))
++		   (let ((new-letter (and (exists? start-letter) (tell start-letter 'get-related-node arg)))) ; no start letter: no related letter, so fail
+ 		     (if (not (exists? new-letter))
+ 		       (fail)
+ 		       (set! start-letter new-letter)))
+ 		   (set! start-letter arg)))
+ 		((platonic-relation? arg)
+ 		 (tell-all sub-images 'new-start-letter arg fail)
+-		 (set! start-letter (tell start-letter 'get-related-node arg)))
++		 (set! start-letter (and (exists? start-letter) (tell start-letter 'get-related-node arg)))) ; a group image whose first object is length-based has no start letter: none stays none
+ 		((platonic-letter? arg)
+ 		 (let ((new-letters
+ 			 (enumerate-letter arg letter-relation (length sub-images) fail)))
+--- a/CODE-FIXES.md
++++ b/CODE-FIXES.md
+@@ -176,6 +176,37 @@
+ **Effect on behaviour: none where it does not fire.** A transform list with a BondFacet entry takes
+ the same branch as before, and the objects that reach the new branch always ended in an error.
+ 
++### 1.7 A group image with no start letter — `patches/fixes/0005-group-image-with-no-start-letter.patch`
++
++Also in the second patch group, and again a send to `#f`. A group is born with the start letter of its
++first object, `(tell (1st ordered-objects) 'get-descriptor-for plato-letter-category)` (`groups.ss:81-82`), and
++`make-image` is given that as the image's start letter (`groups.ss:90`). When the group's first object is itself a
++length-based group, that object has no letter category (fix 0001 already lets such a group have none,
++`groups.ss:43-47`), so the new group's image has the start letter `#f`. This is common and harmless:
++`relationship-between`, `shorten`, `extend`, `enumerate-letter`, `reverse-medium` and the letter branch of
++`new-start-letter` all treat an absent letter by failing or by staying absent. Two sites did not:
++
++- **`new-start-letter`, group branch** (`images.ss:281`): `(set! start-letter (tell start-letter 'get-related-node arg))`
++  with a platonic relation (successor, predecessor, identity) sent `get-related-node` to `#f`. `answer-finder`
++  reaches it through `apply-transforms`, `transform-image` and the image's `new-start-letter`
++  (`wxyz -> xxyz; fgzzz`, seed 27, at codelet 2851: `Exception: attempt to apply non-procedure #f`). In all 41
++  runs found, the image was a length-based group of two objects whose first object is itself a length-based
++  group (`xy` + `aaa`, `fg` + `zzz`), and the sub-images had already done their work on the line before.
++- **`new-start-letter`, letter-image branch** (`images.ss:274`): the same send for a letter image whose start
++  letter is `#f`. No recorded run reaches it (a letter image always has its letter); a directed trial does.
++
++The patch is written on the two lines it replaces:
++
++- **`images.ss:274`** is `(let ((new-letter (and (exists? start-letter) (tell start-letter 'get-related-node arg)))) ...`:
++  no start letter has no related letter, so the branch fails, as it already does when the related letter does not exist.
++- **`images.ss:281`** is `(set! start-letter (and (exists? start-letter) (tell start-letter 'get-related-node arg)))`:
++  none stays none (the sub-images have already been given the relation).
++
++**Effect on behaviour: none where it does not fire.** An image with a start letter takes the same branch as before,
++and every image that reaches the new code ended the run in an error. Rejected: giving the image a start letter at birth
++(it changes runs that do not crash and undoes fix 0001's withholding), taking the letter from the first sub-image,
++calling `(fail)` in the group branch (completed rule applications would snag), and catching the error in `answer-finder`.
++
+ ---
+ 
+ ## 2. Headless mode — new files, GUI untouched

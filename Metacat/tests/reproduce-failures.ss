@@ -1,7 +1,7 @@
-;; Reproduction proofs for the fixes in patches/fixes/ (0001 to 0004), one case per process.
+;; Reproduction proofs for the fixes in patches/fixes/ (0001 to 0006), one case per process.
 ;;
 ;; THIS IS OUR OWN TEST DRIVER.  It contains no upstream Metacat source.  It runs on the patched Metacat
-;; (the reconstruction with all four fixes) and on nothing else: the project never runs a tree without a
+;; (the reconstruction with all six fixes) and on nothing else: the project never runs a tree without a
 ;; fix.  A case is the input that once stopped Metacat (see "How to reproduce the problem behind each fix"
 ;; in KNOWN-FAILURES.md).  On the patched build the same input no longer stops, and this driver shows
 ;; that the run takes the FIXED PATH at the codelet where the run used to stop.
@@ -26,6 +26,14 @@
 ;;         transform; apply-transforms returns (it used to take (cadr #f)).
 ;;         check-for-conflicts:  a letter that has a group-category transform; it returns 'done
 ;;         (it used to send get-bond-facet to the letter).
+;;   0005  new-start-letter of a group image (message to an image; every image is wrapped, in this process
+;;         only): a group image whose start letter is #f is sent a platonic relation (successor,
+;;         predecessor or identity) and returns (it used to send get-related-node to #f); the start letter
+;;         stays #f.  The directed trial image-trial does the same to a letter image with start letter #f
+;;         (the branch at images.ss:274), which now calls its fail procedure, and to a group image.
+;;   0006  possible-to-instantiate?:  a rule-clause template whose objects can be described but whose
+;;         change template has an empty descriptor list; it returns #f and rule-scout fizzles (it used to
+;;         return #t, and the rule's abstractness then sent get-conceptual-depth to #f).
 ;;
 ;; The driver exits 0 only when the case does what its record says: every expected EVENT at its codelet,
 ;; and the expected end of the run.  Anything else, including a crash of the patched build, prints
@@ -74,7 +82,16 @@
      ((group-category-transform-without-bond-facet . 3824)) cap #f 6000)
     ("fix4-tugx-105" run pqcd cbpo tugx 105 6000
      ((group-category-transform-without-bond-facet . 3792)) cap #f 6000)
-    ("fix4-letter-trial" trial bcdep ponmb fghiw 1 1)))
+    ("fix4-letter-trial" trial bcdep ponmb fghiw 1 1)
+    ("fix5-wxyz-27" run wxyz xxyz fgzzz 27 100000
+     ((group-image-without-start-letter-relation . 2851)) answer "ggh" 2851)
+    ("fix5-ihg-121" run ihg ih xyaaa 121 100000
+     ((group-image-without-start-letter-relation . 6615)) answer "yz" 6615)
+    ("fix5-bcd-18" run bcd bc xbxmnm 18 100000
+     ((group-image-without-start-letter-relation . 10351)) answer "wawlm" 57496)
+    ("fix5-image-trial" image-trial)
+    ("fix6-abcx-19" run abcx xwva ijkr 19 100000
+     ((change-template-without-descriptor-not-describable . 8012)) answer "rqpa" 14991)))
 
 (define reproducer-arguments (cdr (command-line)))
 (define reproducer-case
@@ -188,6 +205,51 @@
             (note-event! 'letter-with-group-category-transform))
           result)))))
 
+;; 0005: every image is put behind a wrapper that looks at new-start-letter messages.  A group image
+;; (it has sub-images) whose start letter is #f and that is sent a platonic relation takes the
+;; group branch, images.ss:279-281; the original returns (it used to send get-related-node to #f).
+;; The wrapper asks the image only for its start letter and whether it is a letter image: neither
+;; draws a random number.  Images are made by make-image, also inside the engine (copy), and every
+;; call goes through the top-level name, so the wrapper sees them all.
+(define (wrap-0005)
+  (let ((original-make-image make-image))
+    (set! make-image
+      (lambda args
+        (let ((inner (apply original-make-image args)))
+          (lambda msg
+            (let ((result (apply inner msg)))
+              (when (and (eq? (cadr msg) 'new-start-letter)
+                         (pair? (cddr msg))
+                         (platonic-relation? (caddr msg))
+                         (not (eq? result 'invalid-message-indicator))
+                         (not (tell (car msg) 'letter-image?))
+                         (not (exists? (tell (car msg) 'get-letter))))
+                (note-event! 'group-image-without-start-letter-relation))
+              result)))))))
+
+;; 0006: possible-to-instantiate? is called with the rule-clause templates of rule-scout.  The event is:
+;; it returned #f, the objects of every template can be described, and an intrinsic template has a change
+;; template whose descriptor list is empty.  Without that last condition it would not have been the
+;; fixed path.
+(define (wrap-0006)
+  (let ((original-possible-to-instantiate? possible-to-instantiate?))
+    (set! possible-to-instantiate?
+      (lambda (rule-clause-templates)
+        (let ((result (original-possible-to-instantiate? rule-clause-templates)))
+          (when (and (not result)
+                     (andmap (lambda (template)
+                               (if (intrinsic-clause? template)
+                                   (object-description-possible? (2nd template))
+                                   (andmap object-description-possible? (2nd template))))
+                             rule-clause-templates)
+                     (ormap (lambda (template)
+                              (and (intrinsic-clause? template)
+                                   (ormap (lambda (change-template) (null? (3rd change-template)))
+                                          (3rd template))))
+                            rule-clause-templates))
+            (note-event! 'change-template-without-descriptor-not-describable))
+          result)))))
+
 ;;----------------------------------------------------------------------------------
 ;; A run
 
@@ -218,7 +280,7 @@
     (printf "REPRODUCER ~a: ~a ~a ~a, seed ~a, cap ~a, fresh Episodic Memory, Self-watching on\n"
       (car c) initial modified target seed cap)
     (flush-output-port (current-output-port))
-    (wrap-0001) (wrap-0002) (wrap-0004)
+    (wrap-0001) (wrap-0002) (wrap-0004) (wrap-0005) (wrap-0006)
     (tell *memory* 'clear)
     (init-mcat initial modified target #f seed)
     (let* ((outcome (run-with-cap cap))
@@ -277,6 +339,43 @@
              (printf "apply-rule returned a list of ~a (object, transforms) entries\n" (length (cadr result))))))
         (check-events! '((letter-with-group-category-transform . 1)))
         (finish!)))))
+
+;;----------------------------------------------------------------------------------
+;; 0005, the directed trial for images.ss:274 and :281: images made by hand, no run.
+;;   1. a letter image whose start letter is #f, sent successor: it calls its fail procedure (:274);
+;;   2. a group image of two letter images (a and b) whose start letter is #f, sent successor: it
+;;      returns done, the sub-images become b and c, and its start letter is still #f (:281);
+;;   3. controls: a letter image with start letter a, sent successor, becomes b; a group image with
+;;      start letter a, sent successor, gets start letter b.
+
+(define (image-trial-case)
+  (printf "REPRODUCER ~a: directed trial of new-start-letter on images with and without a start letter\n"
+    (car reproducer-case))
+  (flush-output-port (current-output-port))
+  (let* ((failed (lambda (image arg)
+                   (call/cc (lambda (k)
+                     (tell image 'new-start-letter arg (lambda () (k 'failed)))))))
+         (letter-image (lambda (letter) (make-image letter #f #f #f #f '())))
+         (group-image (lambda (start sub-letters)
+                        (make-image start plato-letter-category plato-successor plato-identity plato-right
+                          (map letter-image sub-letters))))
+         (names (lambda (image) (map (lambda (l) (if (exists? l) (tell l 'get-lowercase-name) '#f))
+                                     (tell-all (tell image 'get-sub-images) 'get-letter)))))
+    (let* ((i1 (letter-image #f))
+           (r1 (failed i1 plato-successor)))
+      (check! (eq? r1 'failed) (format "a letter image with no start letter, sent successor, calls fail (~s)" r1))
+      (check! (not (exists? (tell i1 'get-letter))) "its start letter is still none"))
+    (let* ((i2 (group-image #f (list plato-a plato-b)))
+           (r2 (failed i2 plato-successor)))
+      (check! (eq? r2 'done) (format "a group image with no start letter, sent successor, returns (~s)" r2))
+      (check! (not (exists? (tell i2 'get-letter))) "its start letter is still none")
+      (check! (equal? (names i2) '("b" "c")) (format "its sub-images became ~s (b and c expected)" (names i2))))
+    (let* ((i3 (letter-image plato-a)) (r3 (failed i3 plato-successor)))
+      (check! (and (eq? r3 'done) (eq? (tell i3 'get-letter) plato-b)) "control: a letter image a, sent successor, becomes b"))
+    (let* ((i4 (group-image plato-a (list plato-a plato-b))) (r4 (failed i4 plato-successor)))
+      (check! (and (eq? r4 'done) (eq? (tell i4 'get-letter) plato-b) (equal? (names i4) '("b" "c")))
+        "control: a group image starting at a, sent successor, starts at b"))
+    (finish!)))
 
 ;;----------------------------------------------------------------------------------
 ;; 0003, input refused before any run starts.
@@ -353,5 +452,6 @@
 (case (cadr reproducer-case)
   ((run) (run-case))
   ((trial) (trial-case))
+  ((image-trial) (image-trial-case))
   ((command-line) (command-line-case))
   ((mcat-form) (mcat-form-case)))

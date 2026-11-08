@@ -290,8 +290,10 @@ class Image:
     slipnet : Slipnet
         A reference to the slipnet so that node lookups and ``get_related_node``
         calls can be made.
-    start_letter : SlipnetNode
-        The letter-category node (plato-a .. plato-z) at this image's position.
+    start_letter : SlipnetNode | None
+        The letter-category node (plato-a .. plato-z) at this image's position.  ``None``
+        for a group image whose first object is a length-based group (``groups.ss:81-82``):
+        it has no start letter, and ``new_start_letter`` keeps it ``None`` (``images.ss:281``).
     bond_facet : SlipnetNode | None
         The bond facet (plato-letter-category or plato-length).  ``None`` for a
         pure letter image.
@@ -309,7 +311,7 @@ class Image:
     def __init__(
         self,
         slipnet: Slipnet,
-        start_letter: SlipnetNode,
+        start_letter: SlipnetNode | None,
         bond_facet: SlipnetNode | None = None,
         letter_relation: SlipnetNode | None = None,
         length_relation: SlipnetNode | None = None,
@@ -407,11 +409,16 @@ class Image:
 
         if self.is_letter_image:
             if is_platonic_relation(arg):
-                new_letter = get_related_node(self.start_letter, arg, self.slipnet)
+                # images.ss:274 (fix 0005): no start letter has no related letter, so fail,
+                # as the branch already does when the related letter does not exist.
+                new_letter = (
+                    get_related_node(self.start_letter, arg, self.slipnet)
+                    if self.start_letter is not None else None
+                )
                 if new_letter is None:
                     raise ImageFailure(
                         f"new_start_letter: no related node for "
-                        f"{self.start_letter.name} via {arg.name}"
+                        f"{getattr(self.start_letter, 'name', None)} via {arg.name}"
                     )
                 self.start_letter = new_letter
             else:
@@ -420,9 +427,14 @@ class Image:
         elif is_platonic_relation(arg):
             for sub in self.sub_images:
                 sub.new_start_letter(arg)
-            new_start = get_related_node(self.start_letter, arg, self.slipnet)
-            if new_start is not None:
-                self.start_letter = new_start
+            # images.ss:281 (fix 0005): assigned unconditionally, so a start letter with no
+            # related node becomes none, and a group image born with none (its first object is
+            # a length-based group, ``groups.ss:81-82``) stays none; the sub-images above have
+            # already been given the relation.
+            self.start_letter = (
+                get_related_node(self.start_letter, arg, self.slipnet)
+                if self.start_letter is not None else None
+            )
         elif is_platonic_letter(arg):
             letters = enumerate_letter(
                 arg, self.letter_relation, len(self.sub_images), self.slipnet

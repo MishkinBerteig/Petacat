@@ -7,7 +7,7 @@ decisions inside Petacat, and checks at each one that Petacat had the same optio
 with the same weights or probabilities. Each mismatch is a located bug report. The
 design is in `meta-peta-trace-idea.md` (repository root). The decisions taken while
 building and running it are in [`DECISIONS.md`](DECISIONS.md). The port bugs it found
-that are still open are recorded in `DISCREPANCIES5.md`; the ones it fixed are in the git history. The differences
+have all been fixed and none is open; the fixes are in the git history. The differences
 that Metacat Mode keeps on purpose are in [`METACAT-MODE-DIFFERENCES.md`](../../METACAT-MODE-DIFFERENCES.md); none shows in a
 ratchet, because the recorder logs no trivial decision and the replay matches a coderack choice by names and weights.
 
@@ -205,7 +205,7 @@ ijkk --seeds 1-10 --cap 4000 --out /tmp/w` then `scripts/lockstep_corpus.py --tr
 difference that did not change a decision yet (one such difference was found by re-recording one run with
 snapshots).
 
-The individual fixes are in the git history; `DISCREPANCIES5.md` keeps only what is still open, and
+The individual fixes are in the git history. No port difference is open, and
 `METACAT-MODE-DIFFERENCES.md` keeps the differences that are on purpose.
 
 ## The extended golden baseline
@@ -254,7 +254,7 @@ runs the default configuration on NumPy. One caveat: the replay follows Metacat'
 runs Petacat's own random stream on the same inputs, so the check says that the situations Metacat reaches
 are handled as Metacat handles them, not that the baseline's own trajectory is Metacat's.
 
-**Every case is in a ratchet.** All 125 runs are in `ratchet-extended.json` (key `<case id>|<layout slug>/<seed>`, for
+**Every case is in a ratchet.** All 128 runs are in `ratchet-extended.json` (key `<case id>|<layout slug>/<seed>`, for
 example `episode/a-aa-b/s1x6-cap4000|episodes/a-aa-b/1.r1`), and all 188 runs of the original baseline are in
 `ratchet.json`, `ratchet-justify.json` and `ratchet-episodes.json`. `test_ratchet_covers_golden.py` fails for any run of
 either golden baseline that has no entry. The extended traces are recorded from the patched Metacat, one folder per
@@ -265,10 +265,10 @@ them `python`, is replayed with that backend whatever `--numeric-backend` says) 
 entry is full reach, agreement 1.0, 0 errors and 0 differing snapshots. The 8 episode answer reports stay checked
 by `scripts/compare_episode_answers.py`, which is not a ratchet.
 
-**What is in it** (84 cases, 125 runs, 8 episode answer reports; about 30 s in one process, the whole file
-recomputed in 6-12 s over a process pool): 56 discovery cases, 20 justify cases, 8 episodes; ten with a
+**What is in it** (87 cases, 128 runs, 8 episode answer reports; about 30 s in one process, the whole file
+recomputed in 6-12 s over a process pool): 59 discovery cases, 20 justify cases, 8 episodes; ten with a
 person's actions (the Options menu's group and rule codelet clamps, Clamp Themes with two themes, Undo last
-clamp, and the Self-watching check item: switched off in one case, off and on again in two), one episode with Clear Memory before run 4, 39 runs
+clamp, and the Self-watching check item: switched off in one case, off and on again in two), one episode with Clear Memory before run 4, 41 runs
 that the codelet cap ends in Petacat's own record, and the first appearance of `conflict` snags, `manual-clamp` events and cap-ended
 runs in any baseline. Five cases (`-selfwatchingoff-`) run with Self-watching mode off from the start, through a
 per-case `parameters` entry (`self_watching_enabled_default: false`). Twenty-nine were added by stage F of round 2 after
@@ -358,6 +358,32 @@ and `ratchet-extended.json` gained that one key. The number of runs the cap ends
 only golden run that reaches two engine lines, the fallback of `_group_category_medium` and the English of a subobjects
 group-category change, "Reverse starting and ending points of all objects in ..." (measured with `scripts/golden_coverage.py`:
 12,711 of 14,828 engine lines and 4,557 of 5,890 branches without it, 12,713 and 4,559 with it).
+
+Stage P5 added three cases and re-recorded stage FX's two, for fixes 0005 and 0006 of patched Metacat (`Metacat/KNOWN-FAILURES.md`, "A group image with
+no start letter" and "A rule change with nothing left to describe"). Patched Metacat used to stop with `attempt to apply non-procedure #f` in 42 of 13,500 runs of a
+sweep (stage FX): in 41 a group image with no start letter was sent a platonic relation (`images.ss:281`), in one a rule template had a change with no descriptor
+left (`rules.ss:450`). Each case was recorded from the final patched Metacat with state snapshots and replayed in faithful mode with full reach, agreement 1.0, 0 errors
+and 0 differing snapshots, and then appended to the case file, so every earlier line of `extended_baseline.jsonl` is unchanged (only the header's case count and
+`cases_file_sha` moved), the original baseline is byte-identical, and `ratchet-extended.json` gained exactly three keys (stage FX's two were already there). A golden
+baseline holds Petacat's own run and a ratchet replays Metacat's recording, and the same seed gives different runs in the two, so what each does is measured:
+- `wxyz -> xxyz; fgzzz`, seed 27, cap 6000. Metacat's recording applies a letter-category successor to a group image with no start letter at codelet 2,851 (where the
+  build before the fix stopped) and answers `ggh`; its replay has reach 2,852 and takes the new `Image.new_start_letter` path at codelet 2,851. Petacat's own run of seed 27
+  (backend `off`) is a different run: it halts at the cap with no answer and never takes the path, so this case holds the fidelity in the ratchet only.
+- `wxyz -> xxyz; fgzzz`, seed 13, cap 6000, searched for because seed 27 does not take the path in Petacat's own record: of seeds 1 to 150 (cap 12,000, backend `off`), 21 own
+  runs send a relation to a group image with no start letter (18 of them are the ones that stopped with the `AttributeError` below, and the sub-images of the other 3 fail first), and seed 13 is the one that gets there first, at codelet 1,741 (twice), answering `ggh` at 1,742. Metacat's
+  recording of seed 13 does not take the path (checked with the reproduction helper's wrapper) and runs to the cap; its replay has reach 6,000 and agreement 1.0. Of those 150
+  seeds, 18 stopped with an `AttributeError` in Petacat's own stream before the change (`'NoneType' object has no attribute 'outgoing_links'`, `new_start_letter` of a group
+  image with no start letter); none stops now, and the three others whose own run calls it (seeds 35, 129 and 135, where a sub-image fails with an `ImageFailure` first) and every run that does not call it are unchanged.
+- `abcx -> xwva; ijkr`, seed 19, cap 20000. Metacat's recording builds the template with a literal-only change at codelet 8,012, `possible-to-instantiate?` refuses it and the
+  `rule-scout` fizzles, and the run answers `rqpa` at 14,991; the replay has reach 14,992 and `possible_to_instantiate` refuses the same template at 8,012 (four times). Petacat's own run of seed 19
+  answers `xwvijk` in 3,609 codelets and never builds such a template, and **none of Petacat's own runs of this problem at seeds 1 to 150 (cap 100,000, backend `off`) does**, so no
+  golden record takes this path and the ratchet entry holds the fidelity.
+- Stage FX's `a -> b; xyz` seed 37 and `zzzy -> yzzz; lll` (justify, answer `llm`) seed 35 were recorded again on the final build: identical to stage FX's recordings record for record, apart from the header's `revision`.
+
+They add no engine or database line or branch (measured with `scripts/golden_coverage.py`: 12,715 of 14,831 lines, 4,560 of 5,892 branches, 795 of 849 database lines and 645 of 722
+database arcs, with and without them). The 42 crash runs (`wxyz` 16 seeds, `ihg` 12, `bcd` 13, `abcx` 1), recorded again with snapshots at cap 100,000, end normally (36 answers, 29 of them at the
+codelet where patched Metacat used to stop, and 6 `bcd` runs at the cap), and Metacat Mode replays all 42 to the end with agreement 1.0, 0 errors and 0 differing snapshots; the old recordings
+that exist (6 of the 42) are exact prefixes of the new ones. 90 never-crashing runs of stage PX's reference set and the 266-run sample of earlier stages are identical to their recordings, apart from the header's `revision`.
 
 | | Original baseline | Original + extended |
 | --- | --- | --- |

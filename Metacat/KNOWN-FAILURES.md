@@ -11,10 +11,12 @@ its exact reference.
 Everything needed to reproduce the problem behind each fix is in
 [How to reproduce the problem behind each fix](#how-to-reproduce-the-problem-behind-each-fix), below.
 
-Three more crashes, found later by Petacat's lockstep checks and reach studies and not by the study, have their own
+Five more crashes, found later by Petacat's lockstep checks, reach studies and a sweep, and not by the study, have their own
 sections at the end ([A fourth crash: a group of six or more](#a-fourth-crash-a-group-of-six-or-more),
-[A letter outside a to z](#a-letter-outside-a-to-z) and
-[A rule that reverses all the groups of a string](#a-rule-that-reverses-all-the-groups-of-a-string)).
+[A letter outside a to z](#a-letter-outside-a-to-z),
+[A rule that reverses all the groups of a string](#a-rule-that-reverses-all-the-groups-of-a-string),
+[A group image with no start letter](#a-group-image-with-no-start-letter) and
+[A rule change with nothing left to describe](#a-rule-change-with-nothing-left-to-describe)).
 
 All three inputs and seeds are in the intended domain. The failures occurred
 in reference Metacat, not the Python port, during the held-out validation phase
@@ -26,7 +28,7 @@ discarding chunks, or treating crashes as ordinary answers.
 
 Added 2026-11-08, at the user's ruling: the recordings of the crashes were removed, but there must be a record, for each
 incremental patch, of exactly how to reproduce the problem that drove it. This section is that record. There is one entry
-per fix (0001 to 0004) and, inside it, one entry per case that drove the fix.
+per fix (0001 to 0006) and, inside it, one entry per case that drove the fix.
 
 **What "reproduce" can mean here.** A crash can be reproduced only by running a tree without the fix. **This project never
 runs such a tree**, and no tool in it can take a fix off. So the record gives, for each case:
@@ -64,7 +66,7 @@ docker run --rm --platform linux/amd64 --network none --read-only \
 exits 0 only if every case does. The cases are: `misc1-20713988`, `misc1-20716342`, `misc3-20226148` (0001),
 `fix2-aaa-seed1` (0002), `fix3-command-line`, `fix3-mcat-form` (0003), `fix4-pqcd-1`, `fix4-pqcd-69`, `fix4-pqcd-238`,
 `fix4-defpqr-79`, `fix4-defpqr-102`, `fix4-defpqr-161`, `fix4-abcxyz-35`, `fix4-abcxyz-74`, `fix4-ijkm-11`,
-`fix4-ijkm-126`, `fix4-ijkm-184`, `fix4-tugx-105` and `fix4-letter-trial` (0004).
+`fix4-ijkm-126`, `fix4-ijkm-184`, `fix4-tugx-105` and `fix4-letter-trial` (0004), `fix5-wxyz-27`, `fix5-ihg-121`, `fix5-bcd-18` and `fix5-image-trial` (0005), and `fix6-abcx-19` (0006).
 
 **How the helper proves the fixed path.** [`tests/reproduce-failures.ss`](tests/reproduce-failures.ss) is our own driver and
 contains no upstream source. After it loads the patched engine it wraps one engine procedure in its own process only
@@ -271,6 +273,111 @@ At that point the string `bcdep` has five letters and no groups (`(tell *initial
 - **Command:** the Docker command with `<case>` = `fix4-letter-trial`.
 - **Fixed path on the patched build:** after one codelet, `check-for-conflicts` meets a letter with a group-category transform and returns `done`, `apply-rule` returns a list of five entries (the transforms of the five letters), and no error is raised. A real run reaches the same site: `fix4-ijkm-11` and `fix4-ijkm-126` above.
 - **Evidence in the repository:** the section "A rule that reverses all the groups of a string" below.
+
+### 0005: a group image with no start letter (`patches/fixes/0005-group-image-with-no-start-letter.patch`)
+
+Seen on: the reconstruction with fixes 0001 to 0004, manifest
+`c875a653ebf3737948c3e091e5a79e61ed56aaecdf36201d47d851dd93004e74`, trace header `revision` ending `+known-failure-fixes`, Chez Scheme 9.5.4
+on Linux/amd64. Found by stage FX's sweep of 90 problems (seeds 1 to 150, cap 100,000, 13,500 runs: 42 runs stopped, 41 of them this way)
+and diagnosed by stage PX. Every run below: the project recorder `python3 tests/lockstep/metacat/record.py --problem <initial> <modified> <target> --seeds <seed> --cap 100000 --jobs 1 --out <dir>`
+(snapshots on), which is a fresh Episodic Memory, Self-watching on, no answer; the helper's plain `init-mcat` driver gives the same runs.
+
+**Where it stopped, for the smallest case `fix5-wxyz-27`.** `wxyz -> xxyz; fgzzz`, seed 27, **2,851 codelets** (the 2,852nd was running; an
+`answer-finder`). Exact error `Exception: attempt to apply non-procedure #f`. Call chain on the tree before the fix: `step-mcat` ->
+`answer-finder` -> `apply-transforms` (`rules.ss:1341-1353`) -> `transform-image` (`rules.ss:1370-1385`) -> the image's `new-start-letter`
+(`images.ss:269-287`) -> `(tell start-letter 'get-related-node arg)` at **`images.ss:281`** with `start-letter` = `#f` (the message in progress
+is `(173 new-start-letter (plato-successor ...))`). The same on the project recorder: the stored recording of the build before the fix ends
+with `{"t":"end","c":2852,"reason":"error","error":"Exception: attempt to apply non-procedure #f","codelets":2851}`.
+
+**Cause.** A group is born with the start letter of its first object, `(tell (1st ordered-objects) 'get-descriptor-for plato-letter-category)`
+(`groups.ss:81-82`), and `make-image` is given that as the image's start letter (`groups.ss:90`). When the group's first object is itself a
+length-based group, that object has no letter category (fix 0001 already lets such a group have none, `groups.ss:43-47`), so the new image's
+start letter is `#f`. In all 41 runs the image was a length-based group of two objects whose first object is a length-based group with a real
+start letter and whose second is a letter-category sameness group (`xy` + `aaa`, `fg` + `zzz`). Such images are common and harmless (`wxyz` seed 3 has 6). Nothing
+else sends to a start letter without asking `exists?` first: `relationship-between`, `shorten`, `extend`, `enumerate-letter`, `reverse-medium` and `new-start-letter` of a
+letter given a letter (`images.ss:244-246`, `:262-266`, `:283-286`, `:318-319`, `:342`) all fail or stay absent. Only the two sends of `get-related-node`
+at `images.ss:274` (a letter image) and `:281` (a group image) did not. By the 41 runs: `plato-successor` 27 times, `plato-predecessor` 14; always `:281`, never `:274`.
+
+**All 41 runs** (stages FX and PX; "Stopped at" is the codelet count when the run stopped, from the draw-free crash driver of stage FX's sweep, and for
+seeds `wxyz` 27, `ihg` 121 and `bcd` 15, 18 and 25 also from the project recorder's recording of the build before the fix, which agree; "Ended on the
+patched build" is the project recorder at cap 100,000, stage P5). The 29 whose end is the same number as "Stopped at" answer at the codelet where they used to stop.
+
+| # | Input (initial, modified, target) | Seed | Stopped at (codelets) | Ended on the patched build |
+| ---: | --- | ---: | ---: | --- |
+| 1 | `wxyz` `xxyz` `fgzzz` | 22 | 14,312 | answer `ggh`, 14,312 codelets |
+| 2 | `wxyz` `xxyz` `fgzzz` | 27 | 2,851 | answer `ggh`, 2,851 codelets |
+| 3 | `wxyz` `xxyz` `fgzzz` | 29 | 3,900 | answer `ggh`, 3,900 codelets |
+| 4 | `wxyz` `xxyz` `fgzzz` | 30 | 4,692 | answer `ghi`, 4,692 codelets |
+| 5 | `wxyz` `xxyz` `fgzzz` | 42 | 5,445 | answer `ghi`, 5,445 codelets |
+| 6 | `wxyz` `xxyz` `fgzzz` | 49 | 45,529 | answer `gh`, 45,529 codelets |
+| 7 | `wxyz` `xxyz` `fgzzz` | 62 | 16,093 | answer `ggh`, 16,093 codelets |
+| 8 | `wxyz` `xxyz` `fgzzz` | 63 | 4,803 | answer `gh`, 4,803 codelets |
+| 9 | `wxyz` `xxyz` `fgzzz` | 80 | 9,375 | answer `ggh`, 9,375 codelets |
+| 10 | `wxyz` `xxyz` `fgzzz` | 109 | 7,375 | answer `ggh`, 7,375 codelets |
+| 11 | `wxyz` `xxyz` `fgzzz` | 120 | 7,390 | answer `ggh`, 7,390 codelets |
+| 12 | `wxyz` `xxyz` `fgzzz` | 124 | 4,367 | answer `ggh`, 4,367 codelets |
+| 13 | `wxyz` `xxyz` `fgzzz` | 132 | 13,096 | answer `gh`, 13,096 codelets |
+| 14 | `wxyz` `xxyz` `fgzzz` | 134 | 4,470 | answer `ggh`, 4,470 codelets |
+| 15 | `wxyz` `xxyz` `fgzzz` | 144 | 8,956 | answer `gh`, 8,956 codelets |
+| 16 | `wxyz` `xxyz` `fgzzz` | 146 | 4,206 | answer `ggh`, 4,206 codelets |
+| 17 | `ihg` `ih` `xyaaa` | 20 | 14,514 | answer `yz`, 14,514 codelets |
+| 18 | `ihg` `ih` `xyaaa` | 22 | 6,843 | answer `yz`, 6,843 codelets |
+| 19 | `ihg` `ih` `xyaaa` | 44 | 7,275 | answer `yzbbb`, 7,275 codelets |
+| 20 | `ihg` `ih` `xyaaa` | 48 | 31,967 | answer `wx`, 31,967 codelets |
+| 21 | `ihg` `ih` `xyaaa` | 56 | 9,440 | answer `yz`, 9,440 codelets |
+| 22 | `ihg` `ih` `xyaaa` | 57 | 45,615 | answer `yzbbb`, 76,967 codelets |
+| 23 | `ihg` `ih` `xyaaa` | 95 | 37,500 | answer `yzbbb`, 37,500 codelets |
+| 24 | `ihg` `ih` `xyaaa` | 99 | 12,213 | answer `ih`, 16,022 codelets |
+| 25 | `ihg` `ih` `xyaaa` | 118 | 9,579 | answer `yz`, 9,579 codelets |
+| 26 | `ihg` `ih` `xyaaa` | 121 | 6,615 | answer `yz`, 6,615 codelets |
+| 27 | `ihg` `ih` `xyaaa` | 138 | 26,590 | answer `yzbbb`, 26,590 codelets |
+| 28 | `ihg` `ih` `xyaaa` | 143 | 18,055 | answer `yz`, 18,055 codelets |
+| 29 | `bcd` `bc` `xbxmnm` | 15 | 84,683 | answer `awlml`, 84,683 codelets |
+| 30 | `bcd` `bc` `xbxmnm` | 18 | 10,351 | answer `wawlm`, 57,496 codelets |
+| 31 | `bcd` `bc` `xbxmnm` | 25 | 65,176 | answer `wawlml`, 65,176 codelets |
+| 32 | `bcd` `bc` `xbxmnm` | 29 | 80,130 | cap, 100,000 |
+| 33 | `bcd` `bc` `xbxmnm` | 30 | 21,931 | answer `wawlm`, 69,420 codelets |
+| 34 | `bcd` `bc` `xbxmnm` | 44 | 67,600 | answer `lml`, 75,770 codelets |
+| 35 | `bcd` `bc` `xbxmnm` | 49 | 65,377 | cap, 100,000 |
+| 36 | `bcd` `bc` `xbxmnm` | 50 | 47,855 | answer `lml`, 61,305 codelets |
+| 37 | `bcd` `bc` `xbxmnm` | 73 | 37,072 | answer `wawlml`, 37,072 codelets |
+| 38 | `bcd` `bc` `xbxmnm` | 85 | 75,535 | cap, 100,000 |
+| 39 | `bcd` `bc` `xbxmnm` | 86 | 95,492 | cap, 100,000 |
+| 40 | `bcd` `bc` `xbxmnm` | 99 | 74,877 | cap, 100,000 |
+| 41 | `bcd` `bc` `xbxmnm` | 121 | 74,925 | cap, 100,000 |
+
+- **Directed trial for `images.ss:274`** (case `fix5-image-trial`; stage PX's trial `T2`, no run). A letter image with start letter `#f` is sent a platonic
+  relation. Built exactly, with `(define (group-image start subs) (make-image start plato-length plato-successor plato-length plato-right subs))` and
+  `g` = `(make-image #f plato-letter-category plato-successor plato-length plato-right (list (group-image plato-x (list (make-letter-image plato-x) (make-letter-image plato-y))) (group-image plato-a (list (make-letter-image plato-a) (make-letter-image plato-a)))))` (a group image with
+  start letter `#f`), then `(tell g 'letter fail)`, which makes it a letter image with `sub-images` empty and start letter still `#f`, then
+  `(tell g 'new-start-letter plato-successor fail)`. On the tree before the fix: `Exception: attempt to apply non-procedure #f` at `images.ss:274`
+  (stage PX's log `logs/trial_px_ref.log`: `T2 ... CRASH attempt to apply non-procedure ~s (#f)`). No recorded run reaches it.
+  The case builds the same state directly (`(make-image #f #f #f #f #f '())`, a letter image with no start letter) and, for `:281`, a group image with two letter sub-images and start
+  letter `#f`.
+- **Command:** the Docker command with `<case>` = `fix5-wxyz-27`, `fix5-ihg-121`, `fix5-bcd-18` or `fix5-image-trial`.
+- **Fixed path on the patched build:** for the three runs, a group image with start letter `#f` is sent a platonic relation (successor, predecessor or identity) at the codelet of
+  "Stopped at" (2,851, 6,615 and 10,351), `new-start-letter` returns, and the run ends as the table says (`fix5-wxyz-27`: answer `ggh` after 2,851 codelets; `fix5-ihg-121`: `yz` after 6,615; `fix5-bcd-18`: `wawlm` after 57,496).
+  For the trial, the letter image calls its `fail` procedure and keeps no start letter; the group image returns `done`, its sub-images become `b` and `c`, and its start letter is still none; the controls (a letter image `a`, a group image starting at `a`, sent successor) become `b`.
+- **Evidence in the repository:** the golden cases `wxyz-xxyz-fgzzz` s27 and s13 in `tests/lockstep/golden/extended_cases.json`, and the section "A group image with no start letter" below.
+
+### 0006: a rule change with nothing left to describe (`patches/fixes/0006-literal-only-change-not-describable.patch`)
+
+Seen on: the reconstruction with fixes 0001 to 0004 (as for 0005). Found by the same sweep; one run of 13,500. Recorded with the project recorder, cap 100,000, snapshots on, fresh Episodic Memory, Self-watching on.
+
+| Case key | Input (initial, modified, target) | Seed | Stopped at | Exact error | Call chain (before the fix) | Ended on the patched build |
+| --- | --- | ---: | ---: | --- | --- | --- |
+| `fix6-abcx-19` | `abcx` `xwva` `ijkr` | 19 | 8,012 codelets (a `rule-scout`) | `Exception: attempt to apply non-procedure #f` | `rule-scout` (`rules.ss:397`) -> `set-quality-values` (`:196`) -> `compute-rule-abstractness` (`:1609`) -> `map` -> `tell-all` -> `get-conceptual-depth` sent to `#f` | answer `rqpa`, 14,991 codelets |
+
+**Cause.** A literal DirCtgy or GroupCtgy change is disallowed, and `make-change-template` (`rules.ss:1060-1065`) strips the literal descriptor from the
+change template's descriptor list. When a subobjects DirCtgy change has only a literal descriptor, the list is left as `()`. `instantiate-change-template`
+(`rules.ss:893-912`) then `stochastic-pick`s from `()`, which gives `#f` without drawing a random number, and the abstractness of the rule asks `#f` for its conceptual depth.
+`rule-scout` already stops a rule whose objects cannot be described ("Not all rule objects are describable. Fizzling.", `possible-to-instantiate?`, `rules.ss:445-458`), but that function did not look at the changes. Every
+change template with an empty descriptor list crashed. `instantiate-change-template` is the only `stochastic-pick` of a change template's descriptor list, and
+`rule-scout` is the only caller of `instantiate-rule-clause-template`.
+
+- **Command:** the Docker command with `<case>` = `fix6-abcx-19`.
+- **Fixed path on the patched build:** `possible-to-instantiate?` returns `#f` at codelet 8,012 for a template list whose objects can all be described and one of whose change templates has an empty descriptor list, so the `rule-scout` fizzles (the helper's wrapper checks all three conditions), and the run goes on and ends with the answer `rqpa` after 14,991 codelets.
+- **Evidence in the repository:** the golden case `abcx-xwva-ijkr` s19 in `tests/lockstep/golden/extended_cases.json` and the section "A rule change with nothing left to describe" below.
 
 ---
 
@@ -617,3 +724,53 @@ replaces, so no line of `rules.ss` moves and these citations stay true):
   `agents-workspace/metacat-cleanup/round2/V-crash/REPORT-FIX.md`.
 - With the target `ijkm` (a group and a letter), seeds 11 and 126 reach `check-for-conflicts` with a letter that has a
   group-category transform, and answer `kjim`: a group reversed and the letter left as it is.
+
+## A group image with no start letter
+
+Added 2026-11-08. Stage FX swept 90 problems at seeds 1 to 150 with cap 100,000 (13,500 runs) and found 42 runs where patched Metacat (fixes 0001 to 0004)
+stopped with `Exception: attempt to apply non-procedure #f`: 16 of `wxyz -> xxyz; fgzzz`, 12 of `ihg -> ih; xyaaa`, 13 of `bcd -> bc; xbxmnm`, and one of another kind
+(next section). Stage PX diagnosed the 41 of this kind by tracing every one with a wrapper on `make-image` that draws no random number.
+
+**Cause.** A group's image takes the start letter of the group's first object, `#f` when that object is a length-based group (`groups.ss:81-82`, `:90`); the
+group then has no letter category, as fix 0001's comment at `groups.ss:43-47` says. `answer-finder` later applies the rule's letter-category successor or
+predecessor to that image (`apply-transforms`, `transform-image`), and `new-start-letter` sent `get-related-node` to the image's start letter at `images.ss:281`
+(group branch) with no test. The sibling send at `images.ss:274` (letter image) has the same defect and is reached by a directed trial only. Born-`#f` images are
+common and harmless; the others of the Scheme's image code already treat an absent letter by failing or staying absent.
+
+**The fix: the second patch group's `patches/fixes/0005-group-image-with-no-start-letter.patch`**, written on the two lines it replaces (no line of `images.ss` moves):
+- `images.ss:274`: `(and (exists? start-letter) (tell start-letter 'get-related-node arg))`, so a letter image with no start letter finds no related letter and fails, as that branch already does.
+- `images.ss:281`: `(set! start-letter (and (exists? start-letter) (tell start-letter 'get-related-node arg)))`, so none stays none; the sub-images have already been given the relation on the line above.
+
+Rejected: giving the image a start letter at birth (it changes runs that do not crash and undoes fix 0001's withholding), taking it from the first sub-image,
+`(fail)` in the group branch (completed rule applications would snag, so the rule would do other than it says), and catching the error in `answer-finder`.
+The patch also adds §1.7 to the reconstructed `CODE-FIXES.md`.
+
+Other sites that could meet the same `#f` were read, and none needed a change: every other send to an image's start letter (`images.ss:120-123` the `print` method, a debugging
+display no run calls; `:144` `get-letter`, which only returns it; `:177` `make-letter` for a letter image, whose start letter always exists; `:229` `generate`;
+`:244-246` and `:262-266` `reverse-medium` and `new-alpha-position-category`, which pass the letters to `replace-all` and so to `new-start-letter`, whose first test is `(not (exists? arg))`; `:283-286`, `:318-319`, `:336-342`),
+and every other use of a group's `get-initial-letter-category` (`groups.ss:51-56`, tested with `exists?` by fix 0001; `:94`, handed to `relationship-between`, which answers `#f` unless
+all nodes exist; `rules.ss:1052`, `get-ending-letter-category`, compared with `eq?`).
+
+**Verified on 2026-11-08.**
+- The 42 crash runs of the two sections, recorded again with the fixes (snapshots on, cap 100,000): the six runs whose recordings of the build before the fix exist (`wxyz` 27, `ihg` 121, `bcd` 15, 18, 25, `abcx` 19), the old recording minus its end record is an exact prefix of the new one; for the other 36 only the codelet of the stop is known, and for all 42
+  a one-off copy of the helper with a case for each run (same wrappers, no random draw) shows the first event of the fixed path at exactly the codelet where the run used to stop and the end of the table. 36 end with an answer (29 at the codelet where they used to stop) and 6 `bcd` runs reach the cap with no further error.
+- 90 runs that never crashed, recorded again (the 89 never-crashing reference traces of stage PX on the four crash problems and the 19 corpus problems, and `ihg` 91 at cap 100,000), are identical record for record, snapshots included, apart from the header's `revision`; the 266-run sample of earlier stages
+  (plain, justify, episode, person-action, Self-watching off, long, and `abc -> abd; xyz` seeds 1 to 10) is identical too.
+
+## A rule change with nothing left to describe
+
+Added 2026-11-08. One of the 42 runs of the sweep above, `abcx -> xwva; ijkr` seed 19, stopped in a `rule-scout` at codelet 8,012.
+
+**Cause.** See the entry for 0006 above: a literal DirCtgy change is disallowed, `make-change-template` (`rules.ss:1060-1065`) empties its descriptor list when the literal was the only descriptor, `instantiate-change-template` picks
+from the empty list and gets `#f`, and `compute-rule-abstractness` sends `get-conceptual-depth` to it. The intent of the code is clear from both ends: literal DirCtgy changes are disallowed on purpose, and `rule-scout`
+already fizzles on a rule that cannot be described.
+
+**The fix: the second patch group's `patches/fixes/0006-literal-only-change-not-describable.patch`**, written on the line it replaces (no line of `rules.ss` moves). `possible-to-instantiate?` (`rules.ss:445-458`) now needs, for an intrinsic clause template,
+`(andmap (lambda (change-template) (pair? (3rd change-template))) (3rd template))` as well as a describable object, so a template with an empty descriptor list makes `rule-scout` fizzle. The patch adds §1.8 to `CODE-FIXES.md`.
+
+Rejected: dropping the empty change from the template (the rule would say less than the bridges did), filtering `#f` in `compute-rule-abstractness`, skipping the change in `abstract-change-descriptions` (that changes the random stream), and allowing a literal DirCtgy change (it is disallowed on purpose).
+
+Other sites that `stochastic-pick` a change template's descriptor list: none. `instantiate-change-template` (`rules.ss:893-912`) is the only one, and its only caller is `instantiate-rule-clause-template` (`rules.ss:866-878`), whose only caller is `rule-scout` (`rules.ss:437`), after the
+`possible-to-instantiate?` test. The other `stochastic-pick`s of the engine (`bonds.ss`, `groups.ss`, `bridges.ss`, `answers.ss`, `justify.ss`, `descriptions.ss`, `coderack.ss`) pick from their own lists.
+
+**Verified on 2026-11-08.** The run, recorded again with the fix, is identical record for record to the stored recording of the build before the fix up to its stop, then goes on (the `rule-scout` fizzles) and answers `rqpa` after 14,991 codelets. The same 90-run and 266-run samples as for 0005 are identical.

@@ -2617,6 +2617,9 @@ def _instantiate_change_template(
     scope, dimension, possible_descriptors = ct
 
     if not possible_descriptors:
+        # Not reached from ``build_rule_from_bridges``: ``possible_to_instantiate`` refuses a
+        # template with an empty descriptor list (``rules.ss:450``, fix 0006), where Metacat's
+        # ``stochastic-pick`` of ``()`` gave ``#f`` and the run stopped.
         return RuleChange(dimension=dimension, referent=scope)
 
     # Choose descriptor by conceptual depth.  rules.ss:894-898 is
@@ -3867,10 +3870,22 @@ def possible_to_instantiate(templates: list[tuple], slipnet: Any = None) -> bool
     Scheme: possible-to-instantiate? (rules.ss:446-458).  With a *slipnet*, a template that
     names the string needs the String-Position dimension and ``whole`` of the configuration
     to name it by; a configuration without them cannot build such a clause.
+
+    An intrinsic template also needs every one of its change templates to have a descriptor
+    left to pick: ``rules.ss:450`` (fix 0006, ``Metacat/patches/fixes/0006-literal-only-change-not-describable.patch``)
+    is ``(and (object-description-possible? (2nd template)) (andmap (lambda (change-template)
+    (pair? (3rd change-template))) (3rd template)))``.  A literal DirCtgy or GroupCtgy change
+    whose only descriptor is the literal one is emptied by ``make_change_template``
+    (``rules.ss:1060-1065``); Metacat's ``instantiate-change-template`` then picked from ``()``
+    and the rule's abstractness sent ``get-conceptual-depth`` to ``#f``, so patched Metacat
+    now refuses the template and ``rule-scout`` fizzles, as it does for an object it cannot
+    describe.  The test draws nothing.
     """
     for t in templates:
         if t[0] == constants().vocab.clause_type_intrinsic:
             if not _object_description_possible(t[1], slipnet):
+                return False
+            if not all(ct[2] for ct in t[2]):
                 return False
         elif t[0] == constants().vocab.clause_type_extrinsic:
             for obj in t[1]:

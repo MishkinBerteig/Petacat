@@ -285,6 +285,19 @@ reach the end of Metacat's recording with agreement 1.0.  Two of the crash runs,
 cases of the extended golden baseline (stage V2), and so is `abcxyz` seed 23 (stage V3), the one whose own golden run takes
 the new reversal (`tests/lockstep/README.md`).
 
+**The sixth and seventh crashes (found by stage FX's sweep of 90 problems, seeds 1 to 150, cap 100,000).**  42 of its 13,500 runs
+ended with `Exception: attempt to apply non-procedure #f`, in two ways.  In 41 (`wxyz -> xxyz; fgzzz`, `ihg -> ih; xyaaa`,
+`bcd -> bc; xbxmnm`) a group image whose first object is a length-based group has the start letter `#f` (`groups.ss:81-90`), and
+`new-start-letter` sent `get-related-node` to it at `images.ss:281` (the sibling send at `:274` for a letter image is reached by a
+directed trial).  In one (`abcx -> xwva; ijkr` seed 19) a literal-only DirCtgy change is emptied by `make-change-template` and the rule's
+abstractness sent `get-conceptual-depth` to the `#f` that `stochastic-pick` of `()` gives.  The patch group gained
+`Metacat/patches/fixes/0005-group-image-with-no-start-letter.patch` and `0006-literal-only-change-not-describable.patch`
+(`Metacat/KNOWN-FAILURES.md`, "A group image with no start letter" and "A rule change with nothing left to describe"); Metacat Mode
+follows (`Image.new_start_letter` in `server/engine/images.py`, `possible_to_instantiate` in `server/engine/rules.py`).  Nothing is
+registered for them.  All 42 runs recorded again end normally (36 answers, 29 of them at the old crash codelet, and 6 `bcd` runs at the cap),
+and their replays reach the end of Metacat's recording with agreement 1.0, 0 errors and 0 differing snapshots.  `wxyz` seeds 27 and 13 and
+`abcx` seed 19 are cases of the extended golden baseline (stage P5, `tests/lockstep/README.md`).
+
 ## Translation logs: `record_translation.py`
 
 `record_translation.py I M T LO-HI [--answer A] [--cap N] [--out DIR]` runs the seeds in the

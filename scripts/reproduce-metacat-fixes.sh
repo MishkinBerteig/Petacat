@@ -9,7 +9,7 @@ METACAT="$ROOT/Metacat"
 HERE="$METACAT/tests"
 python3 "$METACAT/tools/reconstruct.py" --verify "$METACAT/build/source" || exit 1
 if [ $# -gt 0 ]; then KEYS="$*"; else
-  KEYS=$(grep -oE '\("[a-z0-9-]+" (run|trial|command-line|mcat-form)' "$HERE/reproduce-failures.ss" | sed 's/^("\([a-z0-9-]*\)".*/\1/'); fi
+  KEYS=$(grep -oE '\("[a-z0-9-]+" (run|trial|image-trial|command-line|mcat-form)' "$HERE/reproduce-failures.ss" | sed 's/^("\([a-z0-9-]*\)".*/\1/'); fi
 status=0
 for key in $KEYS; do
   echo "=== $key"

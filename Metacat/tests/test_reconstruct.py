@@ -176,9 +176,9 @@ class ReconstructionTests(unittest.TestCase):
 
     def test_every_reproduction_case_is_in_the_record(self):
         helper = (BUNDLE / 'tests/reproduce-failures.ss').read_text()
-        keys = re.findall(r'\("([a-z0-9-]+)" (?:run|trial|command-line|mcat-form)', helper)
+        keys = re.findall(r'\("([a-z0-9-]+)" (?:run|trial|image-trial|command-line|mcat-form)', helper)
         self.assertEqual(len(keys), len(set(keys)))
-        self.assertGreaterEqual(len(keys), 19)
+        self.assertGreaterEqual(len(keys), 24)
         record = (BUNDLE / 'KNOWN-FAILURES.md').read_text()
         self.assertIn('How to reproduce the problem behind each fix', record)
         for key in keys:
@@ -197,7 +197,7 @@ class ReconstructionTests(unittest.TestCase):
                               capture_output=True, text=True, timeout=1800)
         self.assertEqual(done.returncode, 0, done.stdout[-3000:] + done.stderr[-1000:])
         self.assertIn('all cases: exit 0', done.stdout)
-        self.assertEqual(done.stdout.count('the fixed path was taken'), 19)
+        self.assertEqual(done.stdout.count('the fixed path was taken'), 24)
 
 
 if __name__ == '__main__':

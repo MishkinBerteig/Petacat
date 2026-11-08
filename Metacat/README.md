@@ -270,11 +270,13 @@ archive into this repository or apply the patches yourself.
 second patch group in `patches/fixes/` ([`0001-known-failures.patch`](patches/fixes/0001-known-failures.patch),
 [`0002-length-group-of-six-or-more.patch`](patches/fixes/0002-length-group-of-six-or-more.patch),
 [`0003-non-english-letter-invalid-input.patch`](patches/fixes/0003-non-english-letter-invalid-input.patch),
-[`0004-subobjects-group-category-reversal.patch`](patches/fixes/0004-subobjects-group-category-reversal.patch)
+[`0004-subobjects-group-category-reversal.patch`](patches/fixes/0004-subobjects-group-category-reversal.patch),
+[`0005-group-image-with-no-start-letter.patch`](patches/fixes/0005-group-image-with-no-start-letter.patch)
+and [`0006-literal-only-change-not-describable.patch`](patches/fixes/0006-literal-only-change-not-describable.patch),
 and any later file). The tree without the second group, the reference
 reconstruction behind Petacat's published studies, still crashes on the three rare inputs in
-[KNOWN-FAILURES.md](KNOWN-FAILURES.md), on a bridge to a group of six or more objects, on a letter outside a to z, and on a rule that reverses
-all the groups of a string. It exists
+[KNOWN-FAILURES.md](KNOWN-FAILURES.md), on a bridge to a group of six or more objects, on a letter outside a to z, on a rule that reverses
+all the groups of a string, on a group image with no start letter, and on a rule change with nothing left to describe. It exists
 only inside the temporary directory of the build and is never left as a usable tree. The patched
 Metacat is the only Metacat: the GUI, Petacat's lockstep harness (`tests/lockstep/`) and every
 comparison use it. The fixes change no run except those that would have crashed. A crash of the
@@ -549,8 +551,8 @@ The manifest describes two patch groups:
 
 - `patches` and `reconstructed_files`: the reference reconstruction.
 - `fix_patches` and `fixed_files`: the known-failure fixes, always applied, and the
-  hashes of the five files they change (`CODE-FIXES.md`, `bridges.ss`,
-  `groups.ss`, `rules.ss`, `syntactic-sugar.ss`).
+  hashes of the six files they change (`CODE-FIXES.md`, `bridges.ss`,
+  `groups.ss`, `images.ss`, `rules.ss`, `syntactic-sugar.ss`).
 
 `--apply-fixes` works in place. It first verifies the tree, dry-runs each patch, applies
 it with zero fuzz, and verifies the result, so a mismatched tree is never half-patched.
@@ -584,7 +586,9 @@ they make the reference reconstruction. The second patch group, always applied o
 [patches/fixes/0001-known-failures.patch](patches/fixes/0001-known-failures.patch),
 [patches/fixes/0002-length-group-of-six-or-more.patch](patches/fixes/0002-length-group-of-six-or-more.patch),
 [patches/fixes/0003-non-english-letter-invalid-input.patch](patches/fixes/0003-non-english-letter-invalid-input.patch)
-and [patches/fixes/0004-subobjects-group-category-reversal.patch](patches/fixes/0004-subobjects-group-category-reversal.patch),
+[patches/fixes/0004-subobjects-group-category-reversal.patch](patches/fixes/0004-subobjects-group-category-reversal.patch),
+[patches/fixes/0005-group-image-with-no-start-letter.patch](patches/fixes/0005-group-image-with-no-start-letter.patch)
+and [patches/fixes/0006-literal-only-change-not-describable.patch](patches/fixes/0006-literal-only-change-not-describable.patch),
 go on top of them in that order; they are described [below](#second-patch-group-the-known-failure-fixes).
 
 The engine patch changes six upstream Scheme files and adds `headless.ss` and
@@ -679,13 +683,27 @@ around them, and adds an entry to the reconstructed `CODE-FIXES.md` for each pat
   from the object's own image when the list has none, so each group reverses along its own medium, and
   `same-dimension-as-GroupCtgy-medium?` answers false for a letter, which has no medium (it used to stop with a
   bad-message error once the first crash was out of the way).
+- **A group image with no start letter** (`images.ss`, `new-start-letter`;
+  `0005-group-image-with-no-start-letter.patch`). Found by a sweep of 90 problems. A group whose first object is a
+  length-based group has no letter category, so its image is made with the start letter `#f` (`groups.ss:81-90`).
+  `answer-finder` later applies a letter-category successor or predecessor to it, and `new-start-letter` sent
+  `get-related-node` to `#f` (`wxyz -> xxyz; fgzzz` seed 27, `ihg -> ih; xyaaa`, `bcd -> bc; xbxmnm`: 41 of the 13,500 runs of a sweep of 90 problems, seeds 1 to 150, cap 100,000).
+  A group image with no start letter now keeps none (`images.ss:281`; the sub-images have already been given the
+  relation), and a letter image with none fails, as the branch already does when there is no related letter
+  (`images.ss:274`).
+- **A rule change with nothing left to describe** (`rules.ss`, `possible-to-instantiate?`;
+  `0006-literal-only-change-not-describable.patch`). Found by the same sweep (`abcx -> xwva; ijkr` seed 19, the 42nd crashing run).
+  A literal DirCtgy or GroupCtgy change is disallowed, so `make-change-template` strips it, and a change whose only
+  descriptor was the literal one is left with none to pick; the rule's abstractness then sent `get-conceptual-depth`
+  to `#f`. `rule-scout` already fizzles on a rule it cannot describe, and `possible-to-instantiate?` now also refuses a
+  template with such a change.
 
 None of the fixes changes a run that did not crash. The second bug always crashed
 when it arose. The first crashed for a sameness group; for a successor or
 predecessor group it would instead have attached a letter description with no
 letter, a branch no recorded run reaches. Recordings of every demo problem are
 byte-identical with and without the first two fixes, and 266 recorded runs that
-never crashed are byte-identical with and without each of the third, the fourth and the fifth
+never crashed are byte-identical with and without each of the third to the sixth fix
 ([VALIDATION.md](VALIDATION.md)).
 
 ### Supporting tools
