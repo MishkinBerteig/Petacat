@@ -36,6 +36,7 @@ from server.services.training_mode_session_executor import (
     outcome_fingerprint,
     run_task,
 )
+from tests.support.settled import wait_until_settled
 
 STEPS = 400
 PROBLEM = ("abc", "abd", "xyz")
@@ -149,6 +150,7 @@ def test_the_swarm_never_rebinds_across_many_versions_and_two_alternating_sessio
             f.result(timeout=300)
         assert sw.rebinds == 0
         assert sw.config_hash() == bound
+        wait_until_settled(sw, ex)  # both counts are lowered by done-callbacks, after result() returns
         assert sw.status()["inflight_jobs"] == 0 and ex.in_flight == 0
 
 

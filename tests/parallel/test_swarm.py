@@ -32,6 +32,7 @@ from server.parallel.swarm import (
     _worker_probe,
     run_inprocess,
 )
+from tests.support.settled import wait_until_settled
 
 # Keep runs short: this is a fidelity test, and a capped run is as good a witness as a
 # finished one so long as swarm and serial agree on where it stopped.
@@ -334,18 +335,9 @@ def test_submit_returns_a_future_of_outcomes_equal_to_serial_and_counts_in_fligh
     # The counters are settled by the future's done-callback, which ``concurrent.futures`` runs just
     # AFTER it wakes whoever waits on ``result()`` (see ``test_the_counters_are_settled_after_the_
     # future_resolves``), so the last job may still be in flight the instant ``result()`` returns.
-    _wait_until_settled(swarm)
+    wait_until_settled(swarm)
     assert swarm.status()["tasks_run"] - before == len(tasks) + 3
     assert swarm.status()["inflight_jobs"] == 0  # released in the done-callback
-
-
-def _wait_until_settled(swarm, seconds: float = 30.0) -> None:
-    import time
-
-    deadline = time.monotonic() + seconds
-    while swarm.status()["inflight_jobs"] and time.monotonic() < deadline:
-        time.sleep(0.005)
-    assert swarm.status()["inflight_jobs"] == 0
 
 
 def test_the_counters_are_settled_after_the_future_resolves(swarm, meta, monkeypatch):
@@ -372,7 +364,7 @@ def test_the_counters_are_settled_after_the_future_resolves(swarm, meta, monkeyp
     assert during["tasks_run"] == before["tasks_run"]  # ... but not yet counted
     assert during["inflight_jobs"] == before["inflight_jobs"] + 1  # and still in flight
     gate.set()
-    _wait_until_settled(swarm)
+    wait_until_settled(swarm)
     after = swarm.status()
     assert after["tasks_run"] == before["tasks_run"] + 1
 
@@ -415,6 +407,7 @@ def test_the_serial_executor_equals_the_swarm_for_the_same_tasks(swarm, meta):
             for t in tasks
         ]
         assert [outcome_fingerprint(o) for o in via_swarm] == [outcome_fingerprint(o) for o in via_serial]
+        wait_until_settled(None, ex)  # the executor's count is lowered by a done-callback too
         assert ex.in_flight == 0 and ex.kind == "serial" and ex.workers == 1
     finally:
         ex.close()
