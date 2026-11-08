@@ -35,7 +35,8 @@ GROUPS: list[tuple[str, str, str]] = [
         "outside a to z is invalid); the run holds the strings it read, and the response shows them. "
         "Input it cannot read is a 400 whose detail is exactly `Invalid input!`, with nothing "
         "created. `seed` is optional: a whole number from 1 to the configuration's `largest_seed`, "
-        "and none picks a random seed that the response states.",
+        "and none picks a random seed that the response states. Each run in `GET /api/runs` carries "
+        "its `seed`, which Run History shows.",
     ),
     (
         "/api/swarm",

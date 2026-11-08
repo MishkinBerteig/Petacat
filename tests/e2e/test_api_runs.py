@@ -385,6 +385,23 @@ async def test_the_run_list_carries_each_run_s_mode(app_client):
 
 
 @pytest.mark.asyncio
+async def test_the_run_list_carries_each_run_s_seed(app_client):
+    """Run History shows a Seed column, so the list states the seed each run used."""
+    created = {}
+    for seed in (SEED, SEED + 1):
+        resp = await app_client.post("/api/runs", json={
+            "initial": "abc", "modified": "abd", "target": "xyz", "seed": seed,
+            "mode": "normal",
+        })
+        created[resp.json()["run_id"]] = seed
+
+    listing = (await app_client.get("/api/runs?limit=50")).json()
+    seeds = {r["run_id"]: r["seed"] for r in listing["runs"]}
+    for run_id, seed in created.items():
+        assert seeds[run_id] == seed
+
+
+@pytest.mark.asyncio
 async def test_a_fast_run_is_absent_from_the_list_by_construction(app_client):
     """It has no row, so nothing can list it. The client explains the absence."""
     resp = await app_client.post("/api/runs", json={

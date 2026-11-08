@@ -158,7 +158,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Petacat",
-    version="0.9.0",
+    version="1.3.0",
     description="Python/React port of Metacat cognitive architecture for analogy-making",
     lifespan=lifespan,
 )

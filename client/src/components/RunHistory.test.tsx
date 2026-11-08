@@ -725,3 +725,19 @@ describe('RunHistory — how many workers ran each run', () => {
     expect(screen.getByText('—').title).toMatch(/not recorded/)
   })
 })
+
+describe('RunHistory — the seed of each run', () => {
+  it('shows the seed of every run in the Seed column', async () => {
+    mockedListRuns.mockResolvedValue({
+      runs: [runInfo({ run_id: 23, seed: 4242 }), runInfo({ run_id: 17, seed: 31337 })],
+      total: 2,
+    })
+
+    render(<RunHistory />)
+    await waitFor(() => expect(screen.getByText('#23')).toBeTruthy())
+
+    expect(screen.getByText('Seed')).toBeTruthy()
+    expect(screen.getByText('4242')).toBeTruthy()
+    expect(screen.getByText('31337')).toBeTruthy()
+  })
+})

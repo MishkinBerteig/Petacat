@@ -343,6 +343,12 @@ export function RunHistory() {
         >
           W
         </span>
+        <span
+          style={{ width: 72, flexShrink: 0, textAlign: 'right' }}
+          title="Seed: the random seed the run used. The same problem, seed and memory reproduce a serial run."
+        >
+          Seed
+        </span>
         <span style={{ width: 64, flexShrink: 0 }}>Status</span>
         <span style={{ width: 48, flexShrink: 0, textAlign: 'right' }}>Cdlts</span>
         <span style={{ width: 30, flexShrink: 0, textAlign: 'right' }}>T</span>
@@ -447,6 +453,18 @@ export function RunHistory() {
               title={workersTitle(run.workers)}
             >
               {run.workers ?? '—'}
+            </span>
+            {/* A run with no seed recorded shows nothing, as the detail panel's Seed row does. */}
+            <span
+              className="mono"
+              style={{
+                width: 72,
+                flexShrink: 0,
+                textAlign: 'right',
+                color: 'var(--text-secondary)',
+              }}
+            >
+              {run.seed ?? ''}
             </span>
             <span
               style={{
