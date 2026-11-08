@@ -12,7 +12,7 @@ corpus-mode training), "training population" (a Fast population of runs) and "LL
 
 Not scanned, because they record the past or quote the old names: ``PHASE * PLAN.md``,
 ``DISCREPANCIES*.md``, ``FUTURE_DIRECTION*.md``, ``SELF_WATCHING_AUDIT.md``, ``CLAUDE.md``
-(which quotes the old name when it defines the new one), ``SMOKE-TESTS.md``, ``academic/``,
+(which quotes the old name when it defines the new one), ``academic/``,
 ``Metacat/`` and ``agents-workspace/`` (except the
 API contract), ``node_modules`` and this file.
 """
