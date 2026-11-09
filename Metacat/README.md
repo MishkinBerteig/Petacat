@@ -585,7 +585,7 @@ the reconstruction helper handles their application and permissions. Together
 they make the reference reconstruction. The second patch group, always applied on top,
 [patches/fixes/0001-known-failures.patch](patches/fixes/0001-known-failures.patch),
 [patches/fixes/0002-length-group-of-six-or-more.patch](patches/fixes/0002-length-group-of-six-or-more.patch),
-[patches/fixes/0003-non-english-letter-invalid-input.patch](patches/fixes/0003-non-english-letter-invalid-input.patch)
+[patches/fixes/0003-non-english-letter-invalid-input.patch](patches/fixes/0003-non-english-letter-invalid-input.patch),
 [patches/fixes/0004-subobjects-group-category-reversal.patch](patches/fixes/0004-subobjects-group-category-reversal.patch),
 [patches/fixes/0005-group-image-with-no-start-letter.patch](patches/fixes/0005-group-image-with-no-start-letter.patch)
 and [patches/fixes/0006-literal-only-change-not-describable.patch](patches/fixes/0006-literal-only-change-not-describable.patch),
@@ -642,8 +642,10 @@ settings; the engine algorithms and headless loader are otherwise unchanged.
 
 Two bugs in the original engine crashed three runs of the 969,000 in the
 support study, a third crashes a run whose bridge reaches a group of six or
-more objects, a fourth crashes on a letter outside a to z, and a fifth on a rule that reverses all the groups of a string. The second patch group fixes all five, in the spirit of the code
-around them, and adds an entry to the reconstructed `CODE-FIXES.md` for each patch.
+more objects, a fourth crashes on a letter outside a to z, a fifth on a rule that reverses all the groups of a string,
+a sixth on a group image with no start letter, and a seventh on a rule change with nothing left to describe. The second
+patch group fixes all seven, in the spirit of the code around them, and adds an entry to the reconstructed
+`CODE-FIXES.md` for each patch.
 
 - **A letter-based group with no letter** (`groups.ss`, `make-group`). While
   building an answer, a translated rule that swaps a one-letter group with a
@@ -702,8 +704,9 @@ None of the fixes changes a run that did not crash. The second bug always crashe
 when it arose. The first crashed for a sameness group; for a successor or
 predecessor group it would instead have attached a letter description with no
 letter, a branch no recorded run reaches. Recordings of every demo problem are
-byte-identical with and without the first two fixes, and 266 recorded runs that
-never crashed are byte-identical with and without each of the third to the sixth fix
+byte-identical with and without the first two fixes. For each later patch, 0002 to
+0006, 266 recorded runs that never crashed are identical with and without it, apart from
+the recording's revision header, and 90 more were checked the same way for 0005 and 0006
 ([VALIDATION.md](VALIDATION.md)).
 
 ### Supporting tools

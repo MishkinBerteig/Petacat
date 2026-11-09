@@ -97,7 +97,7 @@ def require_patched() -> None:
     if state != "fixes":
         sys.exit(f"{SOURCE} does not verify as the patched Metacat (the reconstruction with the "
                  f"known-failure fixes; it verifies as {state!r}); this harness runs only the "
-                 "patched Metacat, see Metacat/README.md, 'Optional: the known-failure fixes'")
+                 "patched Metacat, see Metacat/README.md, 'The known-failure fixes'")
 
 
 def source_state() -> str:
