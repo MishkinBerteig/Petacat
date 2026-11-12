@@ -22,10 +22,10 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 
-#: The engine tree nothing may change without re-basing this: the last engine commit of the final
-#: Metacat cleanup, which removed the code nothing used and read in what the database held.  The
-#: C and S packages left the tree alone; engine work moves this commit on purpose.
-ENGINE_BASELINE = "1db706f"
+#: The engine tree nothing may change without re-basing this: the last commit that changed
+#: ``server/engine/`` (now v2.0's first increment).  Engine work moves this commit on purpose, in a
+#: follow-up commit that also adds the engine commit's subject to the set below.
+ENGINE_BASELINE = "de3c483"
 #: The only commits that touched the engine between EN11's close-out (``0ce7f5d``) and the
 #: baseline; all are allowed engine work.
 ENGINE_COMMITS_AFTER_EN11 = {
@@ -52,6 +52,7 @@ ENGINE_COMMITS_AFTER_EN11 = {
     "Citations of Metacat's source are corrected, and Metacat Mode's deliberate differences have their own file",
     "Metacat Mode follows patched Metacat on an answer's unjustified themes and on translation with no vertical bridge",
     "Patched Metacat no longer crashes on a group image with no start letter or a rule change with nothing left to describe, and Metacat Mode follows",
+    "A Training Mode Session perceives a symbol it has never seen",
 }
 
 
