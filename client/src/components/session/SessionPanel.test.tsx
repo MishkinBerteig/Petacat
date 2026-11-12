@@ -1090,6 +1090,20 @@ describe('SessionPanel: the new-session form (v2)', () => {
     })
   })
 
+  it('starts from the Training Mode Base Configuration, v2.0 unless another base is picked', async () => {
+    m.createSession.mockResolvedValue({ session: session({ id: 8 }), added: 1, problem_ids: [1], persisted: true })
+    await openForm()
+    const picker = screen.getByLabelText('Starting configuration') as HTMLSelectElement
+    expect(picker.value).toBe('training-v2')
+    expect(Array.from(picker.options).map((o) => o.value)).toEqual(['training-v2', 'global', 'standard'])
+    user.type(screen.getByLabelText('Name (required)'), 'G')
+    fireEvent.change(picker, { target: { value: 'global' } })
+    user.type(screen.getByLabelText('Problems'), 'abc abd xyz')
+    fireEvent.click(screen.getByRole('button', { name: 'Create session' }))
+    await waitFor(() => expect(m.createSession).toHaveBeenCalled())
+    expect(m.createSession.mock.calls[0][0].settings?.configuration_base).toBe('global')
+  })
+
   it('refuses max codelets above the server limit', async () => {
     await openForm()
     user.type(screen.getByLabelText('Name (required)'), 'x')

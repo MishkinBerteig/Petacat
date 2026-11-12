@@ -13,12 +13,14 @@ import type {
 } from '@/types/configuration'
 import { badgeText } from './configurationLabels'
 
-type Ref = number | 'standard'
+type Ref = number | 'standard' | 'training-v2'
 
 const STANDARD_LABEL = 'Metacat Standard Configuration'
+const BASE_LABEL = 'Training Mode Base Configuration, v2.0'
+const NAMED_LABEL = { standard: STANDARD_LABEL, 'training-v2': BASE_LABEL } as const
 const rowId = (r: CompareRow) => `${r.table} ${JSON.stringify(r.key)}`
 const show = (v: unknown) => (typeof v === 'string' ? v : JSON.stringify(v))
-const parseRef = (v: string): Ref => (v === 'standard' ? 'standard' : Number(v))
+const parseRef = (v: string): Ref => (v === 'standard' || v === 'training-v2' ? v : Number(v))
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 
 function describe(r: CompareRow): string {
@@ -35,7 +37,7 @@ interface Pending {
 }
 
 /**
- * Compare any two configurations, or one and the Metacat Standard Configuration, row by row
+ * Compare any two configurations, or one and the Metacat Standard Configuration or the Training Mode Base Configuration, v2.0, row by row
  * (table and natural key). From the result the Admin selects rows and applies them to the other
  * side: a change batch with a preview and a reason, which takes effect at that configuration's
  * next run.
@@ -132,13 +134,14 @@ export function ConfigurationCompare({
     }
   }
 
-  const sideName = (s: CompareSide) => (s.id === 'standard' ? STANDARD_LABEL : s.name)
+  const sideName = (s: CompareSide) => (typeof s.id === 'number' ? s.name : NAMED_LABEL[s.id])
   const options = (
     <>
       {configurations.map(c => (
         <option key={c.id} value={c.id}>{`${c.name} (${badgeText(c)})`}</option>
       ))}
       <option value="standard">{STANDARD_LABEL}</option>
+      <option value="training-v2">{BASE_LABEL}</option>
     </>
   )
   const button = { fontSize: 11, padding: '3px 8px' } as const
@@ -208,14 +211,14 @@ export function ConfigurationCompare({
               <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
                 <button
                   style={button}
-                  disabled={selected.size === 0 || busy || result.a.id === 'standard'}
+                  disabled={selected.size === 0 || busy || typeof result.a.id !== 'number'}
                   onClick={() => void startApply('a')}
                 >
                   Apply to A (make A match B) for selected ({selected.size})
                 </button>
                 <button
                   style={button}
-                  disabled={selected.size === 0 || busy || result.b.id === 'standard'}
+                  disabled={selected.size === 0 || busy || typeof result.b.id !== 'number'}
                   onClick={() => void startApply('b')}
                 >
                   Apply to B (make B match A) for selected ({selected.size})
@@ -228,7 +231,7 @@ export function ConfigurationCompare({
             <div role="group" aria-label="Preview" style={{ marginTop: 8, padding: 8, border: '1px solid var(--border)', borderRadius: 4 }}>
               <div data-testid="apply-preview">
                 Apply {plural(pending.rows.length, 'row', 'rows')} to <b>{targetName(pending.target)}</b>
-                {' '}from {pending.source === 'standard' ? STANDARD_LABEL : targetName(pending.source)}:{' '}
+                {' '}from {typeof pending.source === 'number' ? targetName(pending.source) : NAMED_LABEL[pending.source]}:{' '}
                 {plural(pending.preview?.ops ?? 0, 'change', 'changes')}
                 {(pending.preview?.cascaded?.length ?? 0) > 0
                   ? `, and ${plural(pending.preview!.cascaded!.length, 'dependent row', 'dependent rows')} removed with them`

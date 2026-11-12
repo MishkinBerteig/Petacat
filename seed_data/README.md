@@ -361,5 +361,9 @@ change to a configuration in the database, not to these files.
   restore-selected --row TABLE KEY_JSON | verify-journal`.
 - A new Training Mode Session can take it as its base (`settings.configuration_base` of `"standard"`),
   which is its Starting Conceptual State. In testing that is often a replica of this directory's content.
+  A new session's default base is the Training Mode Base Configuration, v2.0 (`"training-v2"`): this
+  directory plus the delta in `training_base/v2.0/`, which evolves where this directory does not (its
+  README says how an op takes a codelet body from a file). The Admin view and `server.config` can compare
+  a configuration with it. Metacat Mode never reads `training_base/`.
 - The main [README](../README.md#the-configuration-the-journal-and-the-change-api) describes the
   configuration, the change API and the journal.

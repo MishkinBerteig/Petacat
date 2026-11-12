@@ -77,7 +77,8 @@ The session's own configuration
 -------------------------------
 Each session has its own evolving configuration (the configuration entity of
 ``server/services/configurations.py``), created with the session in its creation transaction:
-the base (``settings.configuration_base``: ``global``, ``standard`` or ``{"session_id": n}``)
+the base (``settings.configuration_base``: ``training-v2``, the default, which is the Training Mode
+Base Configuration, v2.0 of ``training_base/v2.0/``; ``global``; ``standard``; or ``{"session_id": n}``)
 plus the creation overrides, which are ``settings.parameters`` folded in once as one creation
 batch.  The result is the session's Starting Conceptual State; the stored ``settings.parameters``
 stays as the record, and a task carries no overrides.  Nothing in a session reads or writes
@@ -88,9 +89,12 @@ A live session holds that configuration in memory as a ``LiveConfiguration``
 Episodic Memory and the whole configuration, and the configuration revision (the entity's own
 counter, the compare-and-set token).  A run takes a ``ConfigRef`` with its ``MemoryRef`` when it
 is dispatched (the provider, its ``config_hash`` and revision, the episode version) and records
-them.  When a run finishes (``_record``) one entry is made, in completion order: the memory
-merge, then the batch of the after-run seam (``set_after_run``; none ships) if any, then one
-version.  An external or Admin batch (``submit_changes`` / ``apply_live``) is an entry with no
+them.  When a run finishes (``_record``) an entry is made, in completion order: the memory
+merge, then the in-worker learner's batch (the run's ``proposals``: the nodes its codelets made,
+one ``add_node`` per row, actor ``learner:in-worker``), then one version.  The batch of
+the after-run seam (``set_after_run``; none ships), if it returns ops, rides that entry when the
+run made no proposals (actor ``learner:after-run``), and is a second entry straight after it when
+the run did, so the journal names the learning source of every op.  An external or Admin batch (``submit_changes`` / ``apply_live``) is an entry with no
 memory part; it reaches runs dispatched after it, never one in flight.  Every entry that
 changed the configuration is held as a ``journal.PendingEntry`` until the Stop write, which is
 S5's.  The configuration store reads a live session through the live source this service
@@ -148,6 +152,12 @@ from server.services.training_mode_session_executor import (
     create_executor,
     default_session_backend,
 )
+
+#: The names of the learning sources whose batches ride a run's finish, as the journal's actor
+#: ``learner:<name>`` (the source is ``learner``): the in-worker learner, which submits the
+#: nodes a run made, and the after-run seam (``set_after_run``).
+IN_WORKER_LEARNER = "in-worker"
+AFTER_RUN_LEARNER = "after-run"
 
 logger = logging.getLogger("petacat.session")
 
@@ -417,7 +427,7 @@ class LiveSession:
     #: ``(provider, why a run cannot start under it or None)``: the run-start check, once per
     #: configuration.
     start_check: tuple | None = None
-    configuration_base: Any = "global"
+    configuration_base: Any = "training-v2"
     queue: deque = field(default_factory=deque)        # LiveProblem not yet started
     active: dict = field(default_factory=dict)         # pid -> LiveProblem, started and unfinished
     problems: dict = field(default_factory=dict)       # pid -> LiveProblem, every one since Start
@@ -1019,19 +1029,35 @@ class TrainingModeSessionService:
         )
         blob = o.additions
         adds = pickle.loads(blob) if blob else tm.Additions()
-        # One entry, in completion order (the scheduler is one thread of control, so this is
-        # the session's lock): the memory merge, then the learner's batch, then one version.
-        batch = self._learner_batch(sub, o)
+        # Entries, in completion order (the scheduler is one thread of control, so this is the
+        # session's lock).  The run-finish entry holds the memory merge and the in-worker
+        # learner's batch (the nodes the run made, one op per row); then the batch of the
+        # after-run seam, if one is set and returned ops, is a second entry straight after,
+        # so the journal names the learning source of every op (``learner:in-worker``
+        # and ``learner:after-run``).  With no proposals the seam's batch rides the run-finish
+        # entry as it always did.
+        proposed = self._proposal_batch(o)
+        seam = self._learner_batch(sub, o)
         finished = lt.config.finish_run(
-            memory_merge=lambda: tm.apply_merge(lt.memory, adds), batch=batch,
+            memory_merge=lambda: tm.apply_merge(lt.memory, adds),
+            batch=proposed if proposed is not None else seam,
             run=(lp.id, o.seed), started_revision=sub.configuration_revision,
+            learner=IN_WORKER_LEARNER if proposed is not None else AFTER_RUN_LEARNER,
         )
         n_a, n_s = finished.memory
-        lt.version = finished.version
-        rec.seq, rec.added_answers, rec.added_snags = lt.version, n_a, n_s
-        lt.merge_blobs[lt.version] = blob or tm.dump_additions(adds)
-        lt.merge_blobs.pop(lt.version - MERGE_KEEP, None)
-        lt.pending_merges.append((lt.version, lp.id, o.seed, adds))
+        if proposed is not None and seam is not None:
+            second = lt.config.finish_run(
+                memory_merge=None, batch=seam, run=(lp.id, o.seed),
+                started_revision=sub.configuration_revision, learner=AFTER_RUN_LEARNER,
+            )
+            lt.version = second.version
+        else:
+            lt.version = finished.version
+        merged_at = finished.version  # the entry that holds this run's memory merge
+        rec.seq, rec.added_answers, rec.added_snags = merged_at, n_a, n_s
+        lt.merge_blobs[merged_at] = blob or tm.dump_additions(adds)
+        lt.merge_blobs.pop(merged_at - MERGE_KEEP, None)
+        lt.pending_merges.append((merged_at, lp.id, o.seed, adds))
         lp.outcomes[o.seed] = rec
         lp.failures.pop(o.seed, None)
         lt.pending_runs.append(rec)
@@ -1055,6 +1081,17 @@ class TrainingModeSessionService:
             self._after_run.pop(session_id, None)
         else:
             self._after_run[session_id] = learner
+
+    @staticmethod
+    def _proposal_batch(outcome: Any) -> dict[str, Any] | None:
+        """The in-worker learner's batch: the run's ``proposals`` (the nodes its codelets made),
+        one op per row, with ``rebase`` and ``on_op_failure: skip`` (the ``finish_run`` defaults),
+        so a node that several runs made is one row and the duplicates are skipped cleanly.
+        ``None`` when the run proposed nothing."""
+        ops = [dict(p) for p in (getattr(outcome, "proposals", None) or ())]
+        if not ops:
+            return None
+        return {"ops": ops, "note": f"in-worker learner: made by the run of seed {outcome.seed}"}
 
     def _learner_batch(self, sub: Sub, outcome: Any) -> dict[str, Any] | None:
         learner = self._after_run.get(sub.lt.id)
@@ -1689,14 +1726,16 @@ class TrainingModeSessionService:
 
     @staticmethod
     def _check_configuration_base(base: Any) -> Any:
-        """``settings.configuration_base``: ``'global'``, ``'standard'`` or ``{"session_id": n}``."""
-        if base in ("global", "standard"):
+        """``settings.configuration_base``: ``'training-v2'`` (the default), ``'global'``,
+        ``'standard'`` or ``{"session_id": n}``."""
+        if base in ("training-v2", "global", "standard"):
             return base
         if (isinstance(base, dict) and set(base) == {"session_id"}
                 and isinstance(base["session_id"], int) and not isinstance(base["session_id"], bool)):
             return base
         raise SessionError(
-            422, "settings.configuration_base must be 'global', 'standard' or {\"session_id\": <number>}")
+            422, "settings.configuration_base must be 'training-v2', 'global', 'standard' or "
+                 "{\"session_id\": <number>}")
 
     def resolve_backend(self, meta: MetadataProvider, requested: str | None) -> str:
         if requested is not None:
@@ -1745,7 +1784,7 @@ class TrainingModeSessionService:
         if (not isinstance(max_codelets, int) or isinstance(max_codelets, bool)
                 or not 1 <= max_codelets <= MAX_CODELETS_LIMIT):
             raise SessionError(422, f"settings.max_codelets must be 1..{MAX_CODELETS_LIMIT}")
-        base = self._check_configuration_base(settings.get("configuration_base", "global"))
+        base = self._check_configuration_base(settings.get("configuration_base", "training-v2"))
         # The overrides are checked against the configuration the session will start from (its
         # base), because a reference parameter's shape comes from that configuration's
         # ``engine_params.refers_to``, not from the global configuration's.

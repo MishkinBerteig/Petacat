@@ -1093,6 +1093,8 @@ export interface SessionSettings {
   max_codelets: number;
   parameters: Record<string, unknown> | null;
   backend: string;
+  /** Where the Starting Conceptual State comes from: `'training-v2'` (the Training Mode Base Configuration, v2.0; the default), `'global'`, `'standard'` or `{ session_id }`. */
+  configuration_base?: 'training-v2' | 'global' | 'standard' | { session_id: number };
 }
 
 /** A problem as a client sends it. Any Unicode text is a valid string (any script, emoji, spaces, line breaks; any length), kept exactly. */

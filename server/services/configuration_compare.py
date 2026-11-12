@@ -2,7 +2,7 @@
 
 * ``compare(session, a, b)``: a row-level diff by table and natural key between any two
   configurations, or one and the Metacat Standard Configuration.  ``a`` and ``b`` are a
-  configuration id or the word ``standard``.  A row is *added* when only ``a`` has it,
+  configuration id, the word ``standard`` or the word ``training-v2`` (the v2.0 Base).  A row is *added* when only ``a`` has it,
   *removed* when only ``b`` has it, and *changed* when both have it with different values
   (the differing columns, with both sides' values).
 * ``apply_from(session, target, source, rows, ...)``: make the chosen rows of ``target`` equal
@@ -27,6 +27,11 @@ from server.services.configuration_writer import ChangeService
 
 STANDARD = "standard"
 STANDARD_NAME = "Metacat Standard Configuration"
+#: The Training Mode Base Configuration, v2.0 (``training_base/v2.0/``), resolved over the
+#: Standard when it is read.  A side like ``standard``: read-only, never a target.
+V2_BASE = "training-v2"
+V2_BASE_NAME = "Training Mode Base Configuration, v2.0"
+_NAMED = (STANDARD, V2_BASE)
 
 SOURCE_RESTORE = "restore"
 
@@ -40,11 +45,11 @@ def parse_ref(ref: Any) -> int | str:
     if isinstance(ref, int) and not isinstance(ref, bool):
         return ref
     if isinstance(ref, str):
-        if ref.strip().lower() == STANDARD:
-            return STANDARD
+        if ref.strip().lower() in _NAMED:
+            return ref.strip().lower()
         if ref.strip().isdigit():
             return int(ref.strip())
-    raise CompareError(f"{ref!r} is not a configuration id or 'standard'")
+    raise CompareError(f"{ref!r} is not a configuration id, 'standard' or 'training-v2'")
 
 
 async def _side(session: AsyncSession, ref: int | str) -> tuple[dict[str, Any], cd.ConfigDocument]:
@@ -52,6 +57,10 @@ async def _side(session: AsyncSession, ref: int | str) -> tuple[dict[str, Any], 
     if ref == STANDARD:
         return ({"id": STANDARD, "name": STANDARD_NAME, "mode_label": STANDARD_NAME,
                  "revision": None}, admin.reference_document())
+    if ref == V2_BASE:
+        document = configurations._resolve_training_base(V2_BASE).document
+        return ({"id": V2_BASE, "name": V2_BASE_NAME, "mode_label": V2_BASE_NAME,
+                 "revision": None}, document)
     row = await configurations.get_row(session, int(ref))
     document = await configurations.current_document(session, int(ref))
     summary = await configurations.summary(session, int(ref))

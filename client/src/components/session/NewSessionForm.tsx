@@ -26,10 +26,18 @@ import {
 const DEFAULT_SEEDS = 100;
 const FALLBACK_REQUEST_SIZE = 500;
 
+type BaseName = 'training-v2' | 'global' | 'standard';
+
+const BASE_CHOICES: { value: BaseName; label: string }[] = [
+  { value: 'training-v2', label: 'Training Mode Base Configuration, v2.0 (default)' },
+  { value: 'global', label: 'The global configuration (Metacat Mode\'s, copied)' },
+  { value: 'standard', label: 'Metacat Standard Configuration' },
+];
+
 /** The configuration a new session starts from, when the manager chose one (not the default). */
 export interface ConfigurationBase {
-  /** `settings.configuration_base`: `'global'`, `'standard'` or `{ session_id }`. */
-  value: 'global' | 'standard' | { session_id: number };
+  /** `settings.configuration_base`: `'training-v2'`, `'global'`, `'standard'` or `{ session_id }`. */
+  value: BaseName | { session_id: number };
   /** For the person reading the form. */
   label: string;
 }
@@ -58,6 +66,7 @@ export function NewSessionForm({ configurationBase = null, limits, defaults, onC
   );
   const [useOverrides, setUseOverrides] = useState(false);
   const [backend, setBackend] = useState('');
+  const [base, setBase] = useState<BaseName>('training-v2');
   const [backends, setBackends] = useState<string[]>([]);
   const [policy, setPolicy] = useState<SessionErrorPolicy>(defaults?.policy ?? FALLBACK_POLICY);
   const [text, setText] = useState('');
@@ -128,7 +137,12 @@ export function NewSessionForm({ configurationBase = null, limits, defaults, onC
           max_codelets: codeletsN,
           ...(useOverrides && overrideCount > 0 ? { parameters: overrides } : {}),
           ...(backend !== '' ? { backend } : {}),
-          ...(configurationBase ? { configuration_base: configurationBase.value } : {}),
+          // Left out when it is the default: the server starts a session from the v2.0 Base unless told otherwise.
+          ...(configurationBase
+            ? { configuration_base: configurationBase.value }
+            : base !== 'training-v2'
+              ? { configuration_base: base }
+              : {}),
         } as Partial<SessionSettings>,
         policy,
         problems: parts[0],
@@ -164,7 +178,7 @@ export function NewSessionForm({ configurationBase = null, limits, defaults, onC
       </div>
       <div className="text-xs text-muted" style={{ marginTop: 4 }}>
         A Training Mode Session is a named episode: many problems, each over many seeds. The settings below are fixed once it
-        is created. {configurationBase ? 'It never changes Metacat Mode.' : 'It copies the global configuration that Metacat Mode uses and never changes it.'}
+        is created. {configurationBase ? 'It never changes Metacat Mode.' : 'It starts from the base chosen below and never changes Metacat Mode.'}
         <ControlHelp topic="starting_conceptual_state" label="the Starting Conceptual State" />
       </div>
 
@@ -187,6 +201,26 @@ export function NewSessionForm({ configurationBase = null, limits, defaults, onC
           style={{ maxWidth: 320 }}
         />
       </div>
+
+      {!configurationBase && (
+        <div style={fieldGroupStyle}>
+          <label style={labelStyle} htmlFor="session-base">
+            Starting configuration
+          </label>
+          <select
+            id="session-base"
+            value={base}
+            disabled={busy}
+            onChange={(e) => setBase(e.target.value as BaseName)}
+          >
+            {BASE_CHOICES.map((c) => (
+              <option key={c.value} value={c.value}>
+                {c.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <div style={fieldGroupStyle}>
         <span style={{ display: 'flex', alignItems: 'center' }}>

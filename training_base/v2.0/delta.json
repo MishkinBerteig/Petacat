@@ -1,0 +1,71 @@
+{
+ "name": "training-v2",
+ "title": "The Training Mode Base Configuration, v2.0",
+ "ops": [
+  {
+   "op": "add_param",
+   "name": "new_node_conceptual_depth",
+   "to": 10,
+   "value_type": "int"
+  },
+  {
+   "op": "add_codelet_type",
+   "name": "symbol-scout",
+   "fields": {
+    "family": "description",
+    "phase": "scout",
+    "description": "Notices a Letter object whose symbol has no letter-category description. If the symbol has a node it binds the object to it and proposes the ordinary description; if not it posts symbol-builder. The v2.0 Base only.",
+    "source_file": null,
+    "source_line": null,
+    "execute_body": {
+     "$file": "codelets/symbol-scout.py"
+    }
+   }
+  },
+  {
+   "op": "add_codelet_type",
+   "name": "symbol-builder",
+   "fields": {
+    "family": "description",
+    "phase": "builder",
+    "description": "Makes the Slipnet node for a symbol that has none, connected to nothing, with apply_ops, binds the object to it and proposes the ordinary description. One add_node row per code point. The v2.0 Base only.",
+    "source_file": null,
+    "source_line": null,
+    "execute_body": {
+     "$file": "codelets/symbol-builder.py"
+    }
+   }
+  },
+  {
+   "op": "add_posting_rule",
+   "rule_key": "symbol-scout",
+   "fields": {
+    "codelet_type": "symbol-scout",
+    "direction": "bottom_up",
+    "urgency_level": "low",
+    "posting_formula": "1.0",
+    "count_formula": "fixed",
+    "count_values": {
+     "fixed": 1
+    },
+    "condition": "num_unperceived_symbols > 0"
+   }
+  },
+  {
+   "op": "set_codelet_body",
+   "name": "rule-scout",
+   "source": {
+    "$file": "codelets/rule-scout.py"
+   },
+   "standard_sha256": "3ad9df54b91322c335cbafb2894e6c46816c69a3d4c656d0d2608bce619d6980"
+  },
+  {
+   "op": "set_codelet_body",
+   "name": "answer-finder",
+   "source": {
+    "$file": "codelets/answer-finder.py"
+   },
+   "standard_sha256": "c73b005876f7f561a0d9edc4509e857ff90f0567615f38f108f06a72d6b20ba1"
+  }
+ ]
+}

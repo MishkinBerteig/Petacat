@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import importlib.util
 import itertools
+import json
 import logging
 import multiprocessing
 import os
@@ -90,11 +91,15 @@ class SessionOutcome:
     worker_pid: int = 0
     additions: bytes | None = None
     need_snapshot: bool = False
+    #: The change-API ops the run's codelets applied to its own Slipnet (``apply_ops``): plain,
+    #: picklable dicts, identical ops removed.  The session's in-worker learner submits them.
+    proposals: list = field(default_factory=list)
 
     def fingerprint(self) -> tuple:
         return (
             self.seed, self.status, self.answer, tuple(self.answers), self.codelets,
             self.stopping_state, self.temperature, self.answer_quality, self.error,
+            _proposals_key(self.proposals),
         )
 
 
@@ -102,8 +107,12 @@ def outcome_fingerprint(o: Any) -> tuple:
     """The deterministic fields of an outcome of either executor."""
     return (
         o.seed, o.status, o.answer, tuple(o.answers), o.codelets, o.stopping_state,
-        o.temperature, o.answer_quality, o.error,
+        o.temperature, o.answer_quality, o.error, _proposals_key(getattr(o, "proposals", ())),
     )
+
+
+def _proposals_key(proposals: Any) -> tuple:
+    return tuple(json.dumps(p, sort_keys=True) for p in proposals or ())
 
 
 # ---------------------------------------------------------------------------
@@ -259,6 +268,7 @@ def run_task(task: SessionTask, meta: MetadataProvider | None = None) -> Session
                 temperature=float(ctx.temperature.value) if ctx else 0.0,
                 answer_quality=quality, worker_pid=os.getpid(),
                 additions=tm.end(memory, base_a, base_s) if memory is not None else None,
+                proposals=list(ctx.proposals) if ctx else [],
             )
     except Exception:  # noqa: BLE001 - one bad run must not sink a Training Mode Session
         return SessionOutcome(

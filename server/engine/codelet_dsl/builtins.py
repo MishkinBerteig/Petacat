@@ -16,6 +16,7 @@ Organized by category:
 
 from __future__ import annotations
 
+import copy
 import logging
 
 from typing import TYPE_CHECKING, Any
@@ -83,6 +84,7 @@ def get_builtins() -> dict[str, Any]:
         "role": role,
         "relation": relation,
         "letter_node": letter_node,
+        "apply_ops": apply_ops,
         "get_activation": get_activation,
         "fully_active": fully_active,
         "get_bond_category": get_bond_category,
@@ -2409,6 +2411,65 @@ def letter_node(ctx: EngineContext, ch: str) -> Any:
     (a capital letter, a digit: a symbol with no node is not perceived)."""
     node = ctx.slipnet.alphabet.glyph_nodes.get(ch)
     return node if node is not None else absent("letter." + str(ch))
+
+
+#: The columns of ``slipnet_node_defs`` an ``add_node`` op may name in its ``fields``, and what
+#: ``apply_ops`` does with them: the ones a ``SlipnodeSpec`` holds go to the run's node, and
+#: ``description`` and ``sort_order`` are configuration only.
+_NODE_SPEC_FIELDS = (
+    "short_name", "conceptual_depth", "descriptor_predicate", "plain_name", "glyph",
+    "numeric_value", "full_name", "cm_short_name", "article_an",
+)
+_NODE_OP_FIELDS = (*_NODE_SPEC_FIELDS, "description", "sort_order")
+
+
+def apply_ops(ctx: EngineContext, ops: list) -> None:
+    """Apply ``add_node`` ops to **this run's own** Slipnet, and record them on the run.
+
+    Each op is a change-API op dict: ``{"op": "add_node", "name": ..., "fields": {...}}``.
+    Any other op is refused by name (``ValueError``), and so is an ``add_node`` that carries
+    ``links``, ``roles``, ``params``, ``layout`` or ``theme_dimension``: a node made inside a
+    run is connected to nothing.  Everything is checked before anything is changed.
+
+    For each op, ``Slipnet.add_node`` makes the node (and rebuilds the alphabet when it has a
+    glyph, so :func:`letter_node` finds it, and invalidates the numeric layout, so the next
+    update flattens the Slipnet again), the run's metadata view gains the node's spec
+    (``EngineContext.add_node_spec``), and the op is recorded in ``ctx.proposals``, which the
+    run's outcome carries to the session.  An op identical to one already recorded is a
+    no-op.  It never writes the shared provider or anything another run can see, draws no
+    random number and does not touch the Workspace.
+    """
+    from server.engine.metadata import SlipnodeSpec
+
+    ops = list(ops)
+    for op in ops:
+        kind = op.get("op") if isinstance(op, dict) else None
+        if kind != "add_node":
+            raise ValueError(f"apply_ops takes add_node only, not {kind!r}")
+        extra = sorted(set(op) - {"op", "name", "fields"})
+        if extra:
+            raise ValueError(f"apply_ops: a node made in a run has no {extra}")
+        if not isinstance(op.get("name"), str) or not op["name"]:
+            raise ValueError("apply_ops: add_node needs a name")
+        fields = op.get("fields")
+        if not isinstance(fields, dict):
+            raise ValueError("apply_ops: add_node needs fields")
+        unknown = sorted(set(fields) - set(_NODE_OP_FIELDS))
+        if unknown:
+            raise ValueError(f"apply_ops: add_node has no field {unknown}")
+        for needed in ("short_name", "conceptual_depth"):
+            if needed not in fields:
+                raise ValueError(f"apply_ops: add_node needs the field {needed!r}")
+    for op in ops:
+        if op in ctx.proposals:
+            continue
+        spec = SlipnodeSpec(
+            name=op["name"], **{k: v for k, v in op["fields"].items() if k in _NODE_SPEC_FIELDS}
+        )
+        ctx.slipnet.add_node(spec)
+        ctx.add_node_spec(spec)
+        ctx.proposals.append(copy.deepcopy(op))
+    _wrote_component(ctx, "slipnet_act")
 
 
 def get_activation(ctx: EngineContext, name: str) -> float:

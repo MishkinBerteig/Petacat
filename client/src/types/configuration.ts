@@ -102,9 +102,10 @@ export interface ConfigurationSummary {
   unsaved?: number
 }
 
-/** A side of a comparison: a configuration, or the Metacat Standard Configuration. */
+/** A side of a comparison: a configuration, the Metacat Standard Configuration, or the Training Mode Base Configuration, v2.0. */
+export type NamedReference = 'standard' | 'training-v2'
 export interface CompareSide {
-  id: number | 'standard'
+  id: number | NamedReference
   name: string
   mode_label: string
   revision: number | null

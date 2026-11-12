@@ -71,7 +71,8 @@ class PatchRequest(BaseModel):
 async def get_compare(a: str, b: str, session: AsyncSession = Depends(get_session)):
     """A row-level diff, by table and natural key, of configuration ``a`` against ``b``.
 
-    Either is a configuration id or ``standard`` (the Metacat Standard Configuration).  A row
+    Either is a configuration id, ``standard`` (the Metacat Standard Configuration) or
+    ``training-v2`` (the Training Mode Base Configuration, v2.0, resolved over the Standard now).  A row
     is ``added`` when only ``a`` has it, ``removed`` when only ``b`` has it, and ``changed``
     (with the differing columns on both sides) when both do.  Declared before the
     ``/{configuration_id}`` routes so ``compare`` is not read as an id.
@@ -184,7 +185,7 @@ async def post_restore_selected(
 
 
 class ApplyFromRequest(BaseModel):
-    #: A configuration id or ``"standard"``.
+    #: A configuration id, ``"standard"`` or ``"training-v2"``.
     source: int | str
     rows: list[RowRef] = Field(min_length=1)
     #: The reason, kept in the journal entry.
@@ -197,7 +198,7 @@ class ApplyFromRequest(BaseModel):
 async def post_apply_from(
     configuration_id: int, body: ApplyFromRequest, session: AsyncSession = Depends(get_session)
 ):
-    """Make the chosen rows of this configuration equal another's (or the standard's).
+    """Make the chosen rows of this configuration equal another's (or the standard's, or the v2.0 Base's).
 
     Restore-selected generalised: ``source`` is a configuration id or ``standard``.  It is a
     change batch (``source = restore``, ``actor = admin``) through the change API, so it has a

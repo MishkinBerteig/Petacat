@@ -373,3 +373,12 @@ def test_without_the_digest_the_same_edit_does_run_on_a_worker(meta, monkeypatch
         _rec, seen = _predicate_threads(monkeypatch, edited, problem, seed)
         on_workers += sum(n for t, n in seen.items() if t != "MainThread")
     assert on_workers > 0
+
+
+def test_apply_ops_is_a_barrier_so_the_speculative_executor_serialises_it():
+    """``apply_ops`` appends to the run's Slipnet and replaces its alphabet and metadata view.  The
+    speculative executor has no guard class, node list or structure read for a created node yet
+    (``Slipnet`` nodes are wrapped at construction), so the table makes it a BARRIER."""
+    entry = fx.load().builtins["apply_ops"]
+    assert entry.kind == fx.BARRIER
+    assert entry.writes & fx.BIT["slipnet_act"] and entry.writes & fx.BIT["ctx"]

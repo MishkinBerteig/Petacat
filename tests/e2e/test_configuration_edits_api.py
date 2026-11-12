@@ -41,7 +41,8 @@ def base_value() -> int:
 
 async def make(client, name: str) -> tuple[int, int]:
     """A Stopped session; ``(session_id, configuration_id)``."""
-    body = {"name": name, "settings": {"seeds_per_problem": 100000, "max_codelets": 300},
+    body = {"name": name, "settings": {"seeds_per_problem": 100000, "max_codelets": 300,
+                                       "configuration_base": "global"},  # these tests mean the global configuration
             "problems": [{"initial": "abc", "modified": "abd", "target": "abc"}]}
     resp = await client.post("/api/training-mode/sessions", json=body)
     assert resp.status_code == 201, resp.text

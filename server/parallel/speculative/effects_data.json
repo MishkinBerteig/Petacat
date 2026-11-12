@@ -300,7 +300,19 @@
    "kind": "READ",
    "reads": [],
    "writes": [],
-   "why": "slipnet.alphabet.glyph_nodes.get(ch): the alphabet is frozen after build."
+   "why": "slipnet.alphabet.glyph_nodes.get(ch): the alphabet is replaced only by apply_ops, which is a BARRIER."
+  },
+  "apply_ops": {
+   "kind": "BARRIER",
+   "reads": [
+    "slipnet_act"
+   ],
+   "writes": [
+    "ctx",
+    "slipnet_act",
+    "slipnet_buf"
+   ],
+   "why": "Slipnet.add_node on this run's own Slipnet: appends to slipnet.nodes, rebuilds slipnet.alphabet, invalidates the numeric layout, gives ctx.meta a view with the node's spec and appends to ctx.proposals. The speculative executor's guard class, node list and structure read for created nodes are not built, so it runs serialised under the commit token. Draws no random number; touches no Workspace structure."
   },
   "get_activation": {
    "kind": "READ",

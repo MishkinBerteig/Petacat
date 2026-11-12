@@ -1011,6 +1011,66 @@ class Slipnet:
         # numeric layout needs them.
         self._numeric: Any = _UNRESOLVED
 
+    @staticmethod
+    def _build_node(spec: SlipnodeSpec, activation_params: ActivationParams) -> SlipnetNode:
+        """One node from its spec: no links, no decay rate, no place in any Slipnet yet.
+
+        The one place a node is built.  ``from_metadata`` calls it for every node of the
+        configuration, and :meth:`add_node` for a node made inside a run, so Metacat Mode's
+        construction goes through the code a created node uses.
+        """
+        node = SlipnetNode(
+            spec.name,
+            spec.short_name,
+            spec.conceptual_depth,
+            activation_params=activation_params,
+        )
+        node.plain_name = spec.plain_name
+        node.glyph = spec.glyph
+        node.numeric_value = spec.numeric_value
+        node.full_name = spec.full_name
+        node.cm_short_name = spec.cm_short_name
+        node.article_an = spec.article_an
+        if spec.descriptor_predicate:
+            node.descriptor_predicate = compile_descriptor_predicate(
+                spec.descriptor_predicate, spec.name
+            )
+        return node
+
+    def add_node(
+        self, spec: SlipnodeSpec, *, intrinsic_link_length: int | None = None
+    ) -> SlipnetNode:
+        """Add a node, connected to nothing, to this Slipnet (and to this one only).
+
+        A node made inside a run: it is built by :meth:`_build_node`, given its decay rate
+        and the Slipnet's relations, and appended to ``nodes`` (so it comes last in node
+        order, as a row appended to the configuration does).  When it has a ``glyph`` or a
+        ``numeric_value`` the alphabet is rebuilt, so ``letter_node`` finds it.  The numeric
+        layout is invalidated, so the next update flattens the Slipnet again with the new
+        node: without that, the Python and NumPy backends fail and MLX silently never updates
+        the node.  Draws no random number.  A name already in this Slipnet raises ``ValueError``.
+        """
+        if spec.name in self.nodes:
+            raise ValueError(f"the Slipnet already has a node named {spec.name!r}")
+        node = self._build_node(spec, self.activation_params)
+        node.intrinsic_link_length = intrinsic_link_length
+        node.relations = self.relations
+        node.compute_rate_of_decay(self.update_cycle_length)
+        self.nodes[spec.name] = node
+        if node.glyph is not None or node.numeric_value is not None:
+            self.alphabet = Alphabet.build(self.nodes, self.roles)
+        self.invalidate_numeric_layout()
+        return node
+
+    def invalidate_numeric_layout(self) -> None:
+        """Forget the flattened layout and the backend session built on it.
+
+        Called after the node set changes (:meth:`add_node`).  The next
+        :meth:`_numeric_session` selects a backend for the new node count and flattens the
+        Slipnet again.
+        """
+        self._numeric = _UNRESOLVED
+
     @classmethod
     def from_metadata(cls, meta: MetadataProvider) -> Slipnet:
         """Construct full graph from DB-loaded specs."""
@@ -1018,23 +1078,7 @@ class Slipnet:
 
         # Create nodes
         for spec in meta.slipnet_node_specs.values():
-            node = SlipnetNode(
-                spec.name,
-                spec.short_name,
-                spec.conceptual_depth,
-                activation_params=slipnet.activation_params,
-            )
-            node.plain_name = spec.plain_name
-            node.glyph = spec.glyph
-            node.numeric_value = spec.numeric_value
-            node.full_name = spec.full_name
-            node.cm_short_name = spec.cm_short_name
-            node.article_an = spec.article_an
-            if spec.descriptor_predicate:
-                node.descriptor_predicate = compile_descriptor_predicate(
-                    spec.descriptor_predicate, spec.name
-                )
-            slipnet.nodes[spec.name] = node
+            slipnet.nodes[spec.name] = cls._build_node(spec, slipnet.activation_params)
 
         # Set intrinsic link lengths from engine params
         intrinsic_lengths = meta.get_param("intrinsic_link_lengths")

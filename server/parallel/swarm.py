@@ -49,6 +49,7 @@ from __future__ import annotations
 
 import atexit
 import importlib.util
+import json
 import multiprocessing
 import os
 import pickle
@@ -153,6 +154,11 @@ class EpisodeTask:
     tag: Any = None
 
 
+def proposals_key(proposals: Any) -> tuple:
+    """A hashable, order-keeping form of a run's ``proposals`` for the fingerprints."""
+    return tuple(json.dumps(p, sort_keys=True) for p in proposals or ())
+
+
 @dataclass
 class RunOutcome:
     """What a run produced, small and picklable."""
@@ -180,12 +186,16 @@ class RunOutcome:
     additions: bytes | None = None
     #: The worker could not reach the task's memory version; resubmit with a snapshot.
     need_snapshot: bool = False
+    #: The change-API ops the run's codelets applied to its own Slipnet (``apply_ops``), as plain,
+    #: picklable dicts with identical ops removed, in order.  Empty for a run that made nothing.
+    proposals: list = field(default_factory=list)
 
     def fingerprint(self) -> tuple:
         """The fields that must be identical to a serial run (not timing/pid/index)."""
         return (
             self.seed, self.status, self.answer, tuple(self.answers), self.codelets,
             self.stopping_state, self.temperature, self.answer_quality, self.error,
+            proposals_key(self.proposals),
         )
 
 
@@ -285,6 +295,7 @@ def _outcome(runner, result, seed: int, started: float, memory_before: int | Non
         temperature=float(ctx.temperature.value) if ctx else 0.0,
         answer_quality=quality,
         worker_pid=os.getpid(),
+        proposals=list(ctx.proposals) if ctx else [],
     )
 
 

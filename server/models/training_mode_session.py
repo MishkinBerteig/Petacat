@@ -63,11 +63,12 @@ class TrainingModeSession(Base):
     max_codelets = Column(Integer, nullable=False)
     parameters = Column(JSONB, nullable=True)
     backend = Column(String(32), nullable=False)
-    #: Where the session's configuration came from, fixed at creation: ``"global"``,
-    #: ``"standard"`` or ``{"session_id": n}``.  The session's own configuration is the
+    #: Where the session's configuration came from, fixed at creation: ``"training-v2"``
+    #: (the default: the Training Mode Base Configuration, v2.0), ``"global"``, ``"standard"``
+    #: or ``{"session_id": n}``.  The session's own configuration is the
     #: ``configurations`` row whose ``session_id`` is this session's; ``parameters`` above is
     #: folded into it at creation and stays here as the record.
-    configuration_base = Column(JSONB, nullable=False, default="global")
+    configuration_base = Column(JSONB, nullable=False, default="training-v2")
 
     #: The error policy (``ErrorPolicy`` in the API contract); changeable at any time.
     policy = Column(JSONB, nullable=False)

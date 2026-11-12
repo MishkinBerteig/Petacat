@@ -305,6 +305,21 @@ describe('compare and apply-from', () => {
     expect(calls.some(c => c.key === 'GET /configurations/compare?a=5&b=6')).toBe(true)
   })
 
+  it('compares one configuration with the Training Mode Base Configuration, v2.0, and applies nothing to it', async () => {
+    const base = { id: 'training-v2', name: 'Training Mode Base Configuration, v2.0', mode_label: 'Training Mode Base Configuration, v2.0', revision: null }
+    serve({ 'GET /configurations/compare?a=5&b=training-v2': () => reply(200, { ...COMPARE, b: base }) })
+    render(<ConfigurationsTab openId={1} onOpen={() => {}} onHistory={() => {}} />)
+    await screen.findByTestId('badge-1')
+    fireEvent.change(screen.getByLabelText('Compare A'), { target: { value: '5' } })
+    fireEvent.change(screen.getByLabelText('Compare B'), { target: { value: 'training-v2' } })
+    fireEvent.click(await compareButton())
+    await screen.findByText(/2 rows differ/)
+    expect(screen.getAllByText('Training Mode Base Configuration, v2.0').length).toBeGreaterThan(0)
+    fireEvent.click(screen.getAllByRole('checkbox')[0])
+    expect((screen.getByRole('button', { name: /^Apply to B/ }) as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByRole('button', { name: /^Apply to A/ }) as HTMLButtonElement).disabled).toBe(false)
+  })
+
   it('refuses to compare a configuration with itself', async () => {
     serve()
     render(<ConfigurationsTab openId={1} onOpen={() => {}} onHistory={() => {}} />)

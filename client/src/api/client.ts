@@ -1156,10 +1156,10 @@ export async function patchConfiguration(
   });
 }
 
-/** `b` may be `'standard'` (the Metacat Standard Configuration). */
+/** A side may be `'standard'` (the Metacat Standard Configuration) or `'training-v2'` (the Training Mode Base Configuration, v2.0). */
 export async function compareConfigurations(
-  a: number | 'standard',
-  b: number | 'standard',
+  a: number | 'standard' | 'training-v2',
+  b: number | 'standard' | 'training-v2',
 ): Promise<ConfigurationCompare> {
   return request<ConfigurationCompare>(`/configurations/compare?a=${a}&b=${b}`);
 }
@@ -1167,7 +1167,7 @@ export async function compareConfigurations(
 /** Make the chosen rows of `target` equal `source`'s (`dryRun` previews and writes nothing). */
 export async function applyConfigurationFrom(
   target: number,
-  source: number | 'standard',
+  source: number | 'standard' | 'training-v2',
   rows: ConfigurationRowRef[],
   options: { note?: string; dryRun?: boolean } = {},
 ): Promise<ApplyFromReport> {

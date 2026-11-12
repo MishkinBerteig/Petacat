@@ -213,18 +213,34 @@ async def base_document_for(
         from server.services.configuration_admin import reference_document
 
         return reference_document(), None, None
+    if base == "training-v2":
+        # The Standard with the Base's delta applied.  (Session creation journals the delta as
+        # the creation batch instead, so the journal shows what the Base adds.)
+        return _resolve_training_base(base).document, None, None
     if isinstance(base, Mapping) and set(base) == {"session_id"} and isinstance(
         base["session_id"], int
     ) and not isinstance(base["session_id"], bool):
         row = await row_for_session(session, base["session_id"])
         return await current_document(session, row["id"]), row["id"], row["revision"]
-    raise BadBase("base must be 'global', 'standard' or {\"session_id\": <number>}")
+    raise BadBase(
+        "base must be 'training-v2', 'global', 'standard' or {\"session_id\": <number>}")
+
+
+def _resolve_training_base(name: str):
+    """The Training Mode Base, resolved over the Standard now (``ConfigurationError`` if it
+    cannot be)."""
+    from server.services import training_base
+
+    try:
+        return training_base.resolve_base(name)
+    except training_base.BaseOutOfDate as exc:
+        raise ConfigurationError(str(exc)) from exc
 
 
 async def create_session_configuration(
     session: AsyncSession,
     session_id: int,
-    base: Any = "global",
+    base: Any = "training-v2",
     overrides: Sequence[Mapping[str, Any]] | None = None,
     *,
     name: str | None = None,
@@ -234,15 +250,31 @@ async def create_session_configuration(
     """Create Training Mode Session ``session_id``'s configuration; return its id.
 
     Runs in the caller's transaction and does not commit (the session row must already be
-    flushed).  ``base`` is ``'global'`` (the default), ``'standard'`` or ``{"session_id": n}``
-    (that session's current stored configuration).  ``overrides`` is a list of ordinary change
+    flushed).  ``base`` is ``'training-v2'`` (the default: the Training Mode Base Configuration, v2.0),
+    ``'global'``, ``'standard'`` or ``{"session_id": n}`` (that session's current stored
+    configuration).  For ``'training-v2'`` the document is the Standard and the Base's resolved
+    delta heads the creation batch, so the session's journal shows exactly what v2.0 adds; the
+    note records the Standard's ``config_hash`` and the delta's hash.  ``overrides`` is a list of ordinary change
     ops (convenience ops allowed); they are resolved against the base and written as the
     creation batch (``source = creation``, revision 1).  A refused override raises
     ``ChangeError`` and nothing is written.  ``name`` defaults to the session's name.
     """
     from server.models.training_mode_session import TrainingModeSession
 
-    document, from_id, from_revision = await base_document_for(session, base)
+    delta_resolved: list[dict] = []
+    delta_proposed: list = []
+    base_note = ""
+    if base == "training-v2":
+        from server.services.configuration_admin import reference_document
+
+        resolved_base = _resolve_training_base(base)
+        document, from_id, from_revision = reference_document(), None, None
+        delta_resolved, delta_proposed = list(resolved_base.resolved), list(resolved_base.proposed)
+        base_note = resolved_base.note
+        after_delta = resolved_base.document
+    else:
+        document, from_id, from_revision = await base_document_for(session, base)
+        after_delta = document
     if name is None:
         name = (
             await session.execute(
@@ -256,16 +288,20 @@ async def create_session_configuration(
     resolved: list[dict] = []
     overrides = list(overrides or [])
     if overrides:
-        resolved = _resolve_overrides(document, overrides, actor)
+        resolved = _resolve_overrides(after_delta, overrides, actor)
+    if base_note:
+        note = f"Starting Conceptual State: {base_note}" + (" plus creation overrides" if overrides else "")
+    else:
+        note = note or "Starting Conceptual State: creation overrides"
     result = await journal.create_session_configuration_rows(
         session,
         session_id=session_id,
         name=name,
         document=document,
-        creation_ops=resolved,
-        proposed=overrides,
+        creation_ops=delta_resolved + resolved,
+        proposed=delta_proposed + overrides,
         actor=actor,
-        note=note or "Starting Conceptual State: creation overrides",
+        note=note,
         created_from_configuration_id=from_id,
         created_from_revision=from_revision,
     )

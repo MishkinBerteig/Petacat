@@ -244,12 +244,34 @@ class EngineContext:
         self.track_access: bool = False
         self.access: AccessRecorder | None = None
 
+        #: What this run asked to be kept: the change-API ops its codelets applied to the run's
+        #: own Slipnet (``apply_ops``), as plain, picklable dicts with identical ops removed,
+        #: in the order they were applied.  The outcome carries them to the session, which
+        #: submits them through the change API.  Not run state: nothing restores it.
+        self.proposals: list[dict[str, Any]] = []
+        #: Is :attr:`meta` a view this run owns (``add_node_spec`` made it)?  Until then
+        #: ``meta`` is the provider other runs share, and nothing may write to it.
+        self._meta_is_run_view: bool = False
+
         #: Held while a codelet mutates the Workspace, under free-running (WP4.4).
         #: ``None`` when serial, so the serial loop takes no lock at all rather than an
         #: uncontended one — the reference mode must not pay for machinery it cannot use.
         #: A codelet is a long read-and-decide followed by a short mutation, so
         #: serialising only the mutation leaves the expensive part parallel.
         self.commit_lock: Any = None
+
+    def add_node_spec(self, spec: Any) -> None:
+        """Give this run's metadata the spec of a node the run created.
+
+        The first call replaces :attr:`meta` with a view of its own
+        (``MetadataProvider.with_node_spec``); later calls add to that view.  The provider
+        the run was given, which other runs share, is never written.
+        """
+        if self._meta_is_run_view:
+            self.meta.slipnet_node_specs[spec.name] = spec
+        else:
+            self.meta = self.meta.with_node_spec(spec)
+            self._meta_is_run_view = True
 
     def initial_clamp_due(self, count: int) -> bool:
         """Is *count*, a codelet count just reached, the initial unclamp time (``run.ss:151``)?

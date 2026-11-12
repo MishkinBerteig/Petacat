@@ -137,6 +137,7 @@ async def create(client, n: int = 0, policy=None, name="test session", start=Tru
     """Create a Training Mode Session (Stopped) and, unless ``start`` is false, start it."""
     settings.setdefault("seeds_per_problem", 2)
     settings.setdefault("max_codelets", STEPS)
+    settings.setdefault("configuration_base", "global")  # these tests mean the global configuration
     body = {"name": name, "settings": settings, "problems": [problem(i) for i in range(n)]}
     if policy is not None:
         body["policy"] = policy
@@ -327,7 +328,8 @@ async def test_start_pause_resume_stop_and_start_again(app_client, sessions):
 
 async def partial_session(client, seeds=40000, extra=0) -> tuple[int, int]:
     """A session whose first problem is long, paused while it is mid-way."""
-    body = {"name": "partial", "settings": {"seeds_per_problem": seeds, "max_codelets": STEPS},
+    body = {"name": "partial", "settings": {"seeds_per_problem": seeds, "max_codelets": STEPS,
+                                            "configuration_base": "global"},
             "problems": [problem(0)] + [problem(1 + i) for i in range(extra)]}
     made = (await client.post("/api/training-mode/sessions", json=body)).json()
     await client.post(f"/api/training-mode/sessions/{made['session']['id']}/start")
@@ -580,7 +582,8 @@ async def test_listing_filtering_and_the_executor_report(app_client, sessions):
 
 @pytest.mark.asyncio
 async def test_tag_justification_and_per_problem_seeds(app_client, sessions):
-    body = {"name": "tags", "settings": {"seeds_per_problem": 2, "max_codelets": STEPS}, "problems": [
+    body = {"name": "tags", "settings": {"seeds_per_problem": 2, "max_codelets": STEPS,
+                                         "configuration_base": "global"}, "problems": [
         {**problem(0), "answer": "abd", "tag": {"job": 7}, "seeds": 3}, problem(1)]}
     made = (await app_client.post("/api/training-mode/sessions", json=body)).json()
     bid = made["session"]["id"]
@@ -733,7 +736,8 @@ SHARED_PROBLEMS = [("abc", "abd", "xyz"), ("abc", "abd", "ijk"), ("abc", "abd", 
 
 
 async def create_shared(client, seeds=5, codelets=2500, problems=SHARED_PROBLEMS, **extra) -> dict:
-    body = {"name": "episode", "settings": {"seeds_per_problem": seeds, "max_codelets": codelets},
+    body = {"name": "episode", "settings": {"seeds_per_problem": seeds, "max_codelets": codelets,
+                                            "configuration_base": "global"},
             "problems": [{"initial": i, "modified": m, "target": t} for i, m, t in problems], **extra}
     resp = await client.post("/api/training-mode/sessions", json=body)
     assert resp.status_code == 201, resp.text

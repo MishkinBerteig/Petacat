@@ -66,6 +66,7 @@ _PRODUCERS: dict[str, Callable[["PostingContext"], Any]] = {
     # -- Counts ---------------------------------------------------------------
     "num_possible_rule_types": lambda c: len(c.workspace.get_possible_rule_types()),
     "num_workspace_objects": lambda c: len(c.workspace.all_objects),
+    "num_unperceived_symbols": lambda c: _num_unperceived_symbols(c),
     # -- The triggering slipnode, for a top-down rule's urgency ----------------
     #
     # Only a `top_down` rule has one.  Reading either of these from a bottom-up or
@@ -74,6 +75,20 @@ _PRODUCERS: dict[str, Callable[["PostingContext"], Any]] = {
     "conceptual_depth": lambda c: _require_node(c, "conceptual_depth").conceptual_depth,
     "activation": lambda c: _require_node(c, "activation").activation,
 }
+
+
+def _num_unperceived_symbols(context: "PostingContext") -> int:
+    """How many Letter objects of the Workspace carry no description on the letter-category
+    dimension: a symbol that has no Slipnet node, or has one this object is not yet described
+    by.  0 when the configuration binds no letter-category dimension, because nothing is then
+    perceived as a letter at all."""
+    from server.engine.workspace_objects import Letter
+
+    dimension = context.ctx.slipnet.roles.dimension_letter_category
+    objects = context.workspace.all_objects if dimension else ()
+    return sum(
+        isinstance(obj, Letter) and obj.get_descriptor_for(dimension) is None for obj in objects
+    )
 
 
 def _require_node(context: "PostingContext", name: str) -> Any:

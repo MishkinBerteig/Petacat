@@ -5,7 +5,8 @@ strings, help topics and docs.  After the allowed phrases below are removed, the
 must not remain in any scanned file.
 
 Allowed: "Training Mode" (and ``training_mode``, ``training-mode``, ``TRAINING_MODE_SOURCES``,
-``TrainingMode``), "Training episode", the table ``training_memory_merges`` (S5 kept it as
+``TrainingMode``), "Training episode", the v2.0 Base's names (``training_base/``, ``training_base.py``
+and the ``configuration_base`` value ``training-v2``), the table ``training_memory_merges`` (S5 kept it as
 the session's Episodic Memory record, written at Stop), "corpus training" (Phase 4's
 corpus-mode training), "training population" (a Fast population of runs) and "LLM training text"
 (the corpora Training Mode is meant to learn from, in the project's own definition).
@@ -34,6 +35,7 @@ ALLOWED = re.compile(
     r"Training[ -][Mm]ode|training[ -]mode|training_mode|TRAINING_MODE|TrainingMode|trainingMode"
     r"|[Tt]raining episodes?|training_memory_merges|[Cc]orpus[ -]training|training\s+(?:#\s*)?population"
     r"|pre-training|test_no_training_entity_name|LLM training text"
+    r"|training_base|training-v2"
 )
 FORBIDDEN = re.compile(r"training", re.IGNORECASE)
 

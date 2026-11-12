@@ -28,7 +28,7 @@ license change was authorised by Dr. Marshall directly (see
 > end-to-end. Episodic Memory (Metacat-Mode learning) shapes the runs that inherit it: a run
 > declines an answer already held for the same problem and rules, so repeating a
 > problem across Metacat Mode's [episodic runs](#persistence-modes-and-episodic-runs)
-> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 6,635 test cases covering the engine, the API, and the
+> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 6,720 test cases covering the engine, the API, and the
 > help/config system, run on both the CPU and the GPU numeric backends. Underneath the seven components sits an execution
 > substrate — three [persistence modes](#persistence-modes-and-episodic-runs),
 > a [GPU numeric substrate](#the-numeric-substrate), and
@@ -94,9 +94,13 @@ machine-learning platform:
   Training-Mode learning changes it through three learning sources (the in-worker learner seam, the
   external route and the Admin view). See
   [The configuration, the journal and the change API](#the-configuration-the-journal-and-the-change-api).
-- **Not built:** v2.0's two ideas (see [The v2.0 milestone](#the-v20-milestone)): the in-worker
-  learner itself (Petacat provides the seam it will use, a call to the change API after each run),
-  and multi-turn runs.
+- **First increment of v2.0, built:** on the Training Mode Base Configuration, v2.0 (the default base of a new
+  session), a symbol with no Slipnet node gets one, inside the run, and the run answers with it. The in-worker
+  learner submits the node through the change API, so it is kept in the session's configuration. See
+  [The v2.0 milestone](#the-v20-milestone).
+- **Not built:** the rest of v2.0's two ideas (see [The v2.0 milestone](#the-v20-milestone)): consolidation,
+  `adjacent`, and multi-turn runs. The after-run seam (`set_after_run`, a call to the change API after each run) stays,
+  beside the in-worker learner.
 
 A Training Mode Session never reads or writes Metacat Mode's Episodic Memory, Slipnet or configuration.
 
@@ -142,8 +146,19 @@ one or more turns. Metacat Mode's runs stay single-turn.
 
 What exists is the ground: any UTF-8 text as input in Training Mode (Metacat Mode reads problems through Metacat's input parser), the configuration in the
 database, the one change API and journal, and a Training Mode Session that runs its own evolving
-configuration. Neither idea is built yet: not the in-worker learner (only its seam), and not
-multi-turn runs.
+configuration. The first increment of the first idea is built. On the **Training Mode Base Configuration,
+v2.0** (`training_base/v2.0/`, the default base of a new Training Mode Session), a bottom-up `symbol-scout`
+codelet notices a Letter object whose symbol has no letter-category description, and `symbol-builder` makes
+a Slipnet node for the symbol (`plato-cp-<hex code point>`, connected to nothing) in the run's own Slipnet
+with the `apply_ops` builtin (`add_node` only). The ordinary description codelets then perceive each
+occurrence, one object at a time, and the run answers with the symbol: `1->1; 1->?` and `😀->😀; 😀->?` give
+no answer on a `global` session and answer with the symbol on the v2.0 Base. The run's outcome carries the
+op as `proposals`, and the **in-worker learner** submits them through the change API (source `learner`,
+actor `learner:in-worker`, one op per row, `rebase` and `skip`), so a node that several parallel runs
+made is one row and the session's later runs perceive the symbol at once. That is the first Training-Mode
+learning. In the v2.0 Base, Episodic Memory no longer refuses an answer it already holds. Not built yet:
+consolidation (`noticings`), the `adjacent` link type, the speculative executor's support for created nodes
+(`apply_ops` is a barrier there, and no session reaches the speculative executor), and multi-turn runs.
 
 [metacat]: http://science.slc.edu/~jmarshall/metacat/
 [marshall]: http://science.slc.edu/~jmarshall/
@@ -476,7 +491,7 @@ Petacat has two test suites:
   plugin against the serial runs it claims to equal), `lockstep` (Petacat's decision
   traces against Metacat's), and `e2e` (full HTTP
   stack against a running database). All eight run in a single command against
-  the local Postgres — 6,635 cases, which includes the numeric matrix's second
+  the local Postgres — 6,720 cases, which includes the numeric matrix's second
   pass over the 1161 backend-sensitive tests. See
   [TESTING.md](TESTING.md) for the layer breakdown, the numeric backend matrix,
   the session ceiling, the unit-test rules, determinism requirements, test-double
@@ -1119,7 +1134,7 @@ Training-Mode learning source. They change only through a committed development 
 a fidelity bug, or removes a row that nothing reads, and names the rows it touches. See [`seed_data/README.md`](seed_data/README.md).
 
 From the command line, `.venv/bin/python -m server.config status | diff | reset-to-standard --yes |
-restore-selected --row TABLE KEY_JSON | verify-journal` (each with `--configuration ID` and `--json`)
+restore-selected --row TABLE KEY_JSON | verify-journal` (each with `--configuration ID` and `--json`; `status` and `diff` also take `--against training-v2` to compare with the v2.0 Base instead of the Standard)
 reports on and repairs a configuration without the UI.
 
 ### Which configuration a run uses
@@ -1128,10 +1143,20 @@ reports on and repairs a configuration without the UI.
   server swaps in the new configuration as soon as the write commits); a run already started keeps
   the configuration it began with, and records its `config_hash`.
 - **A Training Mode Session** has a configuration of its own, a row beside the global one. It starts
-  as the session's **Starting Conceptual State**: a copy, taken once at creation, of the global
-  configuration (the default), of the Metacat Standard Configuration, or of another session's
-  configuration (`settings.configuration_base` of `"global"`, `"standard"` or `{"session_id": n}`), plus
-  any creation overrides (`settings.parameters`, applied as one creation entry). From then on it is the session's
+  as the session's **Starting Conceptual State**: the **Training Mode Base Configuration, v2.0** (the
+  default; the "v2.0 Base", `settings.configuration_base` of `"training-v2"`), or a copy, taken once at creation, of the
+  global configuration (`"global"`), of the Metacat Standard Configuration (`"standard"`), or of another
+  session's configuration (`{"session_id": n}`), plus any creation overrides (`settings.parameters`, applied
+  as one creation entry). The v2.0 Base is not a copy: it is the Metacat Standard Configuration plus an
+  ordered change-API batch in `training_base/v2.0/` (`delta.json` and `codelets/*.py`, see its README),
+  resolved over the current Standard each time a session is created. The batch is the session's creation entry
+  (revision 1), so its journal shows exactly what v2.0 adds, and its note records the Standard's `config_hash`
+  and the delta's hash. A Standard change that breaks the batch fails loudly. The v2.0 Base adds the symbol
+  codelets: in a Training Mode Session, a symbol with no Slipnet node gets one, inside the run, and the
+  run answers with it; the in-worker learner submits the node through the change API (source `learner`, actor
+  `learner:in-worker`), so every later run of the session perceives that symbol at once. In the v2.0 Base
+  Episodic Memory no longer refuses an answer it already holds, so a repeated problem keeps answering. Metacat
+  Mode never reads `training_base/`. From then on it is the session's
   alone. The global configuration and a session's never read each other, and a session's configuration
   never touches Metacat Mode.
 - Each configuration is **frozen** or not; a frozen one is skipped by edits that choose "all".
@@ -1145,7 +1170,7 @@ operation.
 
 - **Operations.** Generic operations (`insert`, `update`, `delete` on a row, addressed by its natural
   key) and 30 convenience operations that expand into them (`add_node`, `remove_node`, `rename_node`,
-  `rename_enum_value`, `merge_nodes`, `add_link`, `set_param`, `adjust_param`, `set_coefficient`,
+  `rename_enum_value`, `merge_nodes`, `add_link`, `add_param`, `set_param`, `adjust_param`, `set_coefficient`,
   `set_codelet_body`, `move_layout`, `rebind_role` and others). A row states every column the configuration
   holds no default for: a slipnet link states `fixed_length` (`fixed` in `add_link` and in `add_node`'s
   `links`), and a posting rule states `posting_formula`, `count_formula` and `condition`. Nothing fills them
@@ -1375,7 +1400,7 @@ Every Training Mode Session has its own configuration, from its Starting Concept
 | `seed_start` | 1 | First seed |
 | `max_codelets` | `engine_params.default_max_codelets` (20,000 in the Metacat Standard Configuration; 1 to 200,000) | A run that reaches it gives up (`*CAP*`). Bulk work has this one default: the Swarm's `max_steps` takes it too |
 | `parameters` | none | Engine parameter overrides, validated like `POST /api/runs`; folded once into the Starting Conceptual State as a creation entry |
-| `configuration_base` | `"global"` | The base the Starting Conceptual State is copied from: `"global"`, `"standard"` (the Metacat Standard Configuration) or `{"session_id": n}` |
+| `configuration_base` | `"training-v2"` | The base of the Starting Conceptual State: `"training-v2"` (the Training Mode Base Configuration, v2.0: the Standard plus `training_base/v2.0/`), or a copy of `"global"`, of `"standard"` (the Metacat Standard Configuration) or of `{"session_id": n}` |
 | `backend` | resolved at creation | The numeric backend |
 
 **The error policy can be edited at any time but Starting and Stopping** (`PATCH /api/training-mode/sessions/{id}`). There is no policy for a configuration change (`on_config_change` is removed, and a field of that name is a 400): nothing pauses, adopts or rebases, and the next run starts under the session's configuration current then and records its `config_hash`:

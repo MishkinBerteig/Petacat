@@ -163,6 +163,13 @@ Every doc, UI string, help topic, plan and decision must keep the distinction pe
   its base plus any creation overrides. In testing it is often a replica of the Metacat Standard
   Configuration (the seed files). Training-Mode learning may change any aspect of it. The term
   replaces "innate".
+- **The Training Mode Base Configuration, v2.0** ("the v2.0 Base", `configuration_base` `"training-v2"`) is the
+  default base of a new Training Mode Session: the Metacat Standard Configuration plus the ordered change-API
+  batch in `training_base/v2.0/` (`delta.json`, `codelets/*.py`, a README), resolved over the current Standard each
+  time a session is created and journaled as the session's creation entry. It is not a Starting Conceptual State
+  (that is a base plus a session's overrides). Metacat Mode never reads it. v2.0 is built into it in increments,
+  listed in its README. Today a symbol with no Slipnet node gets one inside the run (`apply_ops`), and the in-worker
+  learner keeps it in the session's configuration.
 - **Run mode** is how runs execute: single-threaded, or multi-core (the speculative executor
   within a run, the swarm across runs). It is orthogonal to the two modes and must be viable
   in both. It is not the persistence mode (Fast, Normal or Audit).

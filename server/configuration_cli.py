@@ -23,11 +23,14 @@ ACTOR = "cli"
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m server.config",
-        description="Compare and reset a configuration against the Metacat Standard Configuration.",
+        description="Compare and reset a configuration against the Metacat Standard Configuration (compare also against the v2.0 Base).",
     )
     parser.add_argument("--configuration", type=int, default=GLOBAL_CONFIGURATION_ID,
                         help="configuration id (default: the global configuration, 1)")
     parser.add_argument("--json", action="store_true", help="print the result as JSON")
+    parser.add_argument("--against", choices=("standard", "training-v2"), default="standard",
+                        help="what status and diff compare with: the Metacat Standard Configuration "
+                             "(default) or the Training Mode Base Configuration, v2.0")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("status", help="revision, hashes and how many rows differ from the standard")
     sub.add_parser("diff", help="rows added, removed or changed against the standard")
@@ -44,7 +47,7 @@ def _text(command: str, result: dict[str, Any]) -> str:
     if command == "status":
         return "\n".join(f"{k}: {v}" for k, v in result.items())
     if command == "diff":
-        lines = [f"{result['count']} row(s) differ from the Metacat Standard Configuration "
+        lines = [f"{result['count']} row(s) differ from the {result.get('against_name', 'Metacat Standard Configuration')} "
                  f"({result['added']} added, {result['removed']} removed, "
                  f"{result['changed']} changed)"]
         for row in result["rows"]:
@@ -66,6 +69,16 @@ async def _run(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
     try:
         async with async_session_factory() as session:
             cid = args.configuration
+            if args.command in ("status", "diff") and args.against != "standard":
+                from server.services import configuration_compare as compare
+
+                got = await compare.compare(session, cid, args.against)
+                got["against"], got["against_name"] = args.against, got["b"]["name"]
+                if args.command == "diff":
+                    return got, 0
+                return {"configuration_id": cid, "against": args.against,
+                        "against_name": got["b"]["name"], "differs_rows": got["count"],
+                        "equals_against": got["same"]}, 0
             if args.command == "status":
                 return await admin.status(session, cid), 0
             if args.command == "diff":

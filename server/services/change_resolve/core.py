@@ -1281,6 +1281,21 @@ def _param_equal(row: Mapping, expect: Any) -> bool:
     return ok and cur == expect and isinstance(cur, bool) == isinstance(expect, bool)
 
 
+#: The value types ``add_param`` takes: a new parameter is a number.
+_ADD_PARAM_TYPES = ("int", "float", "rational")
+
+
+def _h_add_param(r: _Run, i: int, op: dict) -> None:
+    """A new numeric ``engine_params`` row.  Refuses a name that exists (use ``set_param``)
+    and a ``value_type`` that is not ``int``, ``float`` or ``rational``.  It is an ``insert``, so
+    its before-image is "no row" and undo, restore and ``config_at`` take it away again."""
+    if op["value_type"] not in _ADD_PARAM_TYPES:
+        raise r.fail(MALFORMED, f"add_param takes a numeric value_type {list(_ADD_PARAM_TYPES)}, "
+                                f"not {op['value_type']!r}", i, "value_type", PARAMS)
+    r.do_insert(i, PARAMS, {"name": op["name"], "value": checks.format_param(op["to"], op["value_type"]),
+                            "value_type": op["value_type"]})
+
+
 def _h_set_param(r: _Run, i: int, op: dict) -> None:
     table = _param_table(op["op"])
     row = r.row(table, {"name": op["name"]})
@@ -1531,6 +1546,7 @@ _HANDLERS: dict[str, Callable] = {
     "merge_nodes": _h_merge_nodes,
     "add_link": _h_add_link,
     "remove_link": _h_remove_link,
+    "add_param": _h_add_param,
     "set_param": _h_set_param,
     "set_coefficient": _h_set_param,
     "adjust_param": _h_adjust_param,

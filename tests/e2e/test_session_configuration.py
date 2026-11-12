@@ -158,7 +158,9 @@ async def journal_count(engine, configuration_id: int) -> int:
 
 async def create_with(client, **settings) -> dict:
     """A Stopped session with one problem; ``settings`` as the request carries them."""
-    body = {"name": "s3", "settings": {"seeds_per_problem": 2, "max_codelets": 300, **settings},
+    # These tests mean the global configuration unless a test names another base.
+    body = {"name": "s3", "settings": {"seeds_per_problem": 2, "max_codelets": 300,
+                                       "configuration_base": "global", **settings},
             "problems": [problem(0)]}
     resp = await client.post("/api/training-mode/sessions", json=body)
     assert resp.status_code == 201, resp.text
@@ -187,7 +189,12 @@ async def test_creation_from_each_base(app_client, sessions, test_engine):
         async with factory() as db:
             await ChangeService.apply(db, {"source": "admin", "actor": "t", "base_mode": "rebase",
                                            "ops": [set_param(int(changed))]})
-        default = await create_with(app_client)
+        # no base named: the v2.0 Base (the default), which is not a copy of the global configuration
+        unnamed = (await app_client.post("/api/training-mode/sessions", json={"name": "unnamed"})).json()["session"]
+        assert unnamed["settings"]["configuration_base"] == "training-v2"
+        assert unnamed["configuration"]["hash"] != (await app_client.get(
+            "/api/configurations/1")).json()["config_hash"]
+        default = await create_with(app_client)  # the helper names the global configuration
         assert default["settings"]["configuration_base"] == "global"
         explicit = await create_with(app_client, configuration_base="global")
         standard = await create_with(app_client, configuration_base="standard")

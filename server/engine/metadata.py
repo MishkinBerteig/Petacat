@@ -387,6 +387,18 @@ class MetadataProvider:
 
         return replace(self, params={**self.params, **overrides})
 
+    def with_node_spec(self, spec: SlipnodeSpec) -> MetadataProvider:
+        """A view of this metadata that also holds *spec*, for the run that made the node.
+
+        The same shallow copy as :meth:`with_overrides`: only ``slipnet_node_specs`` is
+        rebuilt, so the provider other runs share is never written.  A run that creates
+        several nodes takes one view (``EngineContext.add_node_spec``) and then adds to the
+        view's own dict.
+        """
+        from dataclasses import replace
+
+        return replace(self, slipnet_node_specs={**self.slipnet_node_specs, spec.name: spec})
+
     def get_urgency(self, name: str) -> int:
         return self.urgency_levels[name]
 
