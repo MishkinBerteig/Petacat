@@ -163,6 +163,21 @@ def compile_descriptor_predicate(
 _NO_RELATIONS: dict[str, Any] = {}
 
 
+def association_from_length(length: int | float) -> float:
+    """The degree of association a link length gives, clipped to 0 to 100.
+
+    ``100 - length``, a length of 0 or less giving 100 and a length of 100 or more giving 0.  This is
+    the one place a length becomes an association: spreading activation, concept-mapping strength and
+    slippability, the probability of a slippage and a label concept's own association all read it
+    (plan section 4.12: "association clips to 0 to 100 at the read").  The stored length is not
+    clipped, so a link a Training Mode Session shortened past 0 (``consolidator``'s ``adjacent``
+    links) keeps its length and gives association 100, and one lengthened past 100 gives 0.  Every
+    length the Metacat Standard Configuration holds lies in 0 to 100, so the clip never binds there.
+    The result is always a float.
+    """
+    return min(100.0, max(0.0, 100.0 - length))
+
+
 class SlipnetNode:
     """A concept node in the Slipnet."""
 
@@ -507,12 +522,12 @@ class SlipnetNode:
         asked.
         """
         if self.intrinsic_link_length is None:
-            return max(0.0, 100.0 - constants().link_length_unset)
+            return association_from_length(constants().link_length_unset)
         if self.fully_active():
             shrunk = self.shrunk_link_length()
             if shrunk is not None:
-                return max(0.0, 100.0 - shrunk)
-        return max(0.0, 100.0 - self.intrinsic_link_length)
+                return association_from_length(shrunk)
+        return association_from_length(self.intrinsic_link_length)
 
     def get_similar_property_links(
         self,
@@ -904,16 +919,16 @@ class SlipnetLink:
     def intrinsic_degree_of_association(self) -> float:
         """Scheme: slipnet.ss:330-333. Always uses intrinsic length, never shrunk."""
         if self.fixed_length:
-            return max(0.0, 100.0 - self._fixed_link_length)  # type: ignore
+            return association_from_length(self._fixed_link_length)  # type: ignore
         if self.label_node is not None:
             if self.label_node.intrinsic_link_length is not None:
-                return max(0.0, 100.0 - self.label_node.intrinsic_link_length)
+                return association_from_length(self.label_node.intrinsic_link_length)
         # An unset length — see ``link_length``.
-        return max(0.0, 100.0 - constants().link_length_unset)
+        return association_from_length(constants().link_length_unset)
 
     def degree_of_association(self) -> float:
         """Scheme: slipnet.ss:334-339. Dynamic — uses shrunk length when label is fully active."""
-        return max(0.0, 100.0 - self.link_length())
+        return association_from_length(self.link_length())
 
     def __repr__(self) -> str:
         label = f", label={self.label_node.short_name}" if self.label_node else ""

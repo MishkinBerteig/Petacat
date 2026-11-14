@@ -141,12 +141,12 @@ outside the matrix take it too and the run is entirely what it says it is.
 
 ```
 ============================= petacat test matrix ==============================
-  cpu  numpy    float64    1263 tests
-  gpu  mlx      float32    1263 tests
+  cpu  numpy    float64    1293 tests
+  gpu  mlx      float32    1293 tests
   whole suite requested: the full matrix is required of this run
 
   unit          2092 collected   2092 run   2092 passed      0 failed      0 skipped  complete
-  seed_unit     1994 collected   1994 run   1994 passed      0 failed      0 skipped  complete
+  seed_unit     2054 collected   2054 run   2054 passed      0 failed      0 skipped  complete
   module        1087 collected   1087 run   1087 passed      0 failed      0 skipped  complete
   architecture   113 collected    113 run    113 passed      0 failed      0 skipped  complete
   integration    368 collected    368 run    368 passed      0 failed      0 skipped  complete
@@ -170,8 +170,8 @@ single file or node id. Such a run names what narrowed it, names the roles it
 exercised, and exits on whether its tests passed:
 
 ```
-  cpu  numpy    float64      1263 tests
-  gpu  mlx      float32     1263 tests
+  cpu  numpy    float64      1293 tests
+  gpu  mlx      float32     1293 tests
   cpu  numpy: no selected test ran on it
   narrowed by -k 'mlx': this run reports the roles it exercised and is not held to the full matrix
 ```
@@ -225,7 +225,7 @@ that allowance.
 | Layer | Directory | Scope | May depend on | Cases |
 |-------|-----------|-------|---------------|-------|
 | **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 2092 |
-| **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 1994 |
+| **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 2054 |
 | **module** | `tests/module/` | Several real components assembled and driven | Real engine objects and `seed_data/*.json`; no DB, no HTTP | 1087 |
 | **architecture** | `tests/architecture/` | How the source tree is allowed to depend on itself | The repository's source, `seed_data/*.json`, child interpreters | 113 |
 | **integration** | `tests/integration/` | Agreement between the repository's artifacts, and the harness's own rules | Real `seed_data/*.json`, the ORM declarations, the generated client files, the documentation, a real pytest session | 368 |
@@ -234,7 +234,7 @@ that allowance.
 | **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 716 |
 
 Those counts are cases, so they include the second pass the numeric matrix makes
-over the 1263 backend-sensitive tests.
+over the 1293 backend-sensitive tests.
 
 One line decides each layer. Read them as a question about what a new test's
 subject is, and write the test where the answer lands:
@@ -267,7 +267,7 @@ first**, then move up toward the API and GUI.
 
 All eight layers run in one command — the
 [required command](#the-required-command) — and, since Petacat runs natively, all
-eight actually run: **6,978 cases**, every one of them executed. A layer that is
+eight actually run: **7,038 cases**, every one of them executed. A layer that is
 normally skipped is not a layer that is normally green, and none of these is.
 
 Wall-clock time depends heavily on the machine and on what else it is doing. The
@@ -556,6 +556,7 @@ changing what it records.
 | `test_g9_any_configuration.py` | 8 | Gate G9 complete: every node removed with its cascade, random node subsets, the a-d/w-z alphabet, a gapped ladder and no alphabet successor, on discovery and justify demos, with Episodic Memory carried in from a full-configuration run and a small Swarm; only the run-start error may stop a run, and a symbol with no node is never perceived (an exhaustive sweep runs under the `slow` marker) |
 | `test_codelet_body_lookups.py` | 16 | The Metacat Standard Configuration's codelet bodies and descriptor predicates name no node and build no node name (an AST lint, so comments quoting Scheme are allowed); the body builtins `role`, `relation` and `letter_node`, `descriptor_support` by node identity, and the predicate helper `letter_glyph`, each with its absent case |
 | `test_role_identity.py` | 13 | Role identity (gate G5): the role-to-literal table against the Metacat Standard Configuration, the engine's ordered constants and `role_identity_today.json`; and, since EN3, every role resolved through `slipnet.roles` is the node (or codelet type) the old literal finds, the ordered roles equal the old tuples, and the ladder and alphabet (the nodes with a `numeric_value` or a `glyph`) equal the old lists |
+| `test_association_clip.py` | 5 | Association is a link length clipped to 0 to 100 where it is read (`association_from_length`): the function, the exhaustive check that under the Standard every link and label reads what `max(0.0, 100.0 - length)` read (value and type), and the far-out test (links at -500, -0.125 or 250 run as the same links at 0 or 100) on `off`, `python`, `numpy`, `mlx-cpu` and `mlx` |
 | `test_plain_links.py` | 13 | A link type a configuration creates is live: a plain link is in `SlipnetNode.plain_links`, last in `outgoing_links`, and Standard's lists are empty and ordered as before; it spreads by its fixed length on `off`, `python`, `numpy`, `mlx-cpu` and `mlx`, and the backends agree over several cycles; `links_of`; a run restored from a snapshot continues exactly, and `_find_link` finds a plain link; the `Absent` token has an empty plain list and `bond_category.adjacent` is absent under the Standard |
 | `test_propose_ops.py` | 17 | `propose_ops` and `noticings` (numeric matrix): ops recorded in call order as data, `add_node` refused, an identical op once, repeated `adjust` ops on one `(table, key, field)` summed in the first one (80 steps of -0.125 are exactly -10), nothing in the run changed and no random number drawn; `noticings` reads the configuration as the run started it; the same seed gives the same run, proposals included, on `off`, `python` and `numpy` |
 | `test_consolidator.py` | 14 | The `consolidator` body (numeric matrix), one run of it on a hand-built Workspace of the v2.0 Base with the nodes of `1`, `2` and `3`: a node the Workspace does not hold fizzles with no proposal; a lone symbol counts and writes no link; an `adjacent` bond between two single symbols proposes the pair's link in reading order from either end, labelled by `plato-adjacent`, at 90 plus one step with an `adjust` of one step; a pair seen from both ends, or twice in the Workspace, counts twice; the bonds are walked in the Workspace's order and no random number is drawn; a bond with a group at an end, a bond whose end has no letter-category description, a `successor` or `sameness` bond and a bond of a symbol to itself propose nothing; `category` and `instance` links appear only at or past `consolidation_threshold` and only when missing; the threshold and the lengths are read from parameters; landed in a live configuration, the link is 90 at the first noticing and one step shorter at each later one, and nothing else is written |

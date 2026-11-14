@@ -28,7 +28,7 @@ license change was authorised by Dr. Marshall directly (see
 > end-to-end. Episodic Memory (Metacat-Mode learning) shapes the runs that inherit it: a run
 > declines an answer already held for the same problem and rules, so repeating a
 > problem across Metacat Mode's [episodic runs](#persistence-modes-and-episodic-runs)
-> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 6,978 test cases covering the engine, the API, and the
+> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 7,038 test cases covering the engine, the API, and the
 > help/config system, run on both the CPU and the GPU numeric backends. Underneath the seven components sits an execution
 > substrate — three [persistence modes](#persistence-modes-and-episodic-runs),
 > a [GPU numeric substrate](#the-numeric-substrate), and
@@ -182,7 +182,7 @@ Workspace: it proposes one more `noticings`; for each built `adjacent` bond betw
 `adjacent` link (labelled by `plato-adjacent`, fixed length, from the left symbol to the right one) at `adjacent_link_length` 90 at the
 first noticing and `adjacent_link_step` 0.125 shorter at each later one; and, once the node's `noticings` reach
 `consolidation_threshold` (40), its `category` and `instance` links to the letter category where they are missing. A bond with a group
-at an end writes nothing. Nothing changes in the run that proposes it, so everything acts from the next run. The lengths have no floor.
+at an end writes nothing. Nothing changes in the run that proposes it, so everything acts from the next run. The lengths have no floor, and the association read from a length is clipped to 0 to 100 (`association_from_length`), so a length of 0 or less reads as association 100.
 Not built yet: the speculative executor's support for created nodes
 (`apply_ops` is a barrier there, and no session reaches the speculative executor), and multi-turn runs.
 
@@ -517,8 +517,8 @@ Petacat has two test suites:
   plugin against the serial runs it claims to equal), `lockstep` (Petacat's decision
   traces against Metacat's), and `e2e` (full HTTP
   stack against a running database). All eight run in a single command against
-  the local Postgres — 6,978 cases, which includes the numeric matrix's second
-  pass over the 1263 backend-sensitive tests. See
+  the local Postgres — 7,038 cases, which includes the numeric matrix's second
+  pass over the 1293 backend-sensitive tests. See
   [TESTING.md](TESTING.md) for the layer breakdown, the numeric backend matrix,
   the session ceiling, the unit-test rules, determinism requirements, test-double
   conventions, how to run the suite under the free-threaded interpreter, and what

@@ -239,7 +239,7 @@ REASONS: dict[str, str] = {
     'PCT_COMPLEMENT': (
         "100 - x is the complement of a 0-100 percent value (unhappiness from strength, the temperature's inverse); the scale's top is a unit fact (ruling 1)"),
     'PCT_COMPLEMENT_FLOOR': (
-        'max(0.0, 100.0 - length) is the degree of association as the complement of a link length on the 0-100 scale, floored at zero'),
+        'min(100.0, max(0.0, 100.0 - length)) is the degree of association as the complement of a link length on the 0-100 scale, clipped to 0 to 100'),
     'PCT_DIV': (
         'x / 100 converts a 0-100 percent value to a fraction; a different divisor would change the unit, not the value'),
     'PCT_MUL': (
@@ -856,13 +856,11 @@ ENTRIES: dict[tuple[str, str, str], list[tuple[int, str, str]]] = {
     ('server/engine/serialization.py', 'serialize_themespace_state', '0.0'): [(1, 'UNIT', 'ZERO_FLOOR')],
     ('server/engine/serialization.py', 'theme_display_labels', '1'): [(1, 'UNIT', 'LEN_ONE')],
     # ---- server/engine/slipnet.py
+    ('server/engine/slipnet.py', 'association_from_length', '0.0'): [(1, 'UNIT', 'PCT_COMPLEMENT_FLOOR')],
+    ('server/engine/slipnet.py', 'association_from_length', '100.0'): [(2, 'UNIT', 'PCT_COMPLEMENT')],
     ('server/engine/slipnet.py', 'Alphabet.unit_length_node', '1'): [(1, 'UNIT', 'ZERO_FLOOR')],
     ('server/engine/slipnet.py', 'Slipnet.__repr__', '0'): [(1, 'UNIT', 'ZERO_TEST')],
     ('server/engine/slipnet.py', 'Slipnet.spread_activation', '0.0'): [(1, 'UNIT', 'ZERO_FLOOR'), (1, 'UNIT', 'ZERO_INIT')],
-    ('server/engine/slipnet.py', 'SlipnetLink.degree_of_association', '0.0'): [(1, 'UNIT', 'PCT_COMPLEMENT_FLOOR')],
-    ('server/engine/slipnet.py', 'SlipnetLink.degree_of_association', '100.0'): [(1, 'UNIT', 'PCT_COMPLEMENT')],
-    ('server/engine/slipnet.py', 'SlipnetLink.intrinsic_degree_of_association', '0.0'): [(3, 'UNIT', 'PCT_COMPLEMENT_FLOOR')],
-    ('server/engine/slipnet.py', 'SlipnetLink.intrinsic_degree_of_association', '100.0'): [(3, 'UNIT', 'PCT_COMPLEMENT')],
     ('server/engine/slipnet.py', 'SlipnetNode.__init__', '0.0'): [(3, 'UNIT', 'ZERO_INIT')],
     ('server/engine/slipnet.py', 'SlipnetNode._related_through', '1'): [(1, 'UNIT', 'LEN_ONE')],
     ('server/engine/slipnet.py', 'SlipnetNode.apply_slippages', '100.0'): [(1, 'UNIT', 'PCT_DIV')],
@@ -872,8 +870,6 @@ ENTRIES: dict[tuple[str, str, str], list[tuple[int, str, str]]] = {
     ('server/engine/slipnet.py', 'SlipnetNode.compute_rate_of_decay', '100.0'): [(2, 'UNIT', 'PCT_DIV'), (2, 'UNIT', 'PCT_MUL')],
     ('server/engine/slipnet.py', 'SlipnetNode.decay', '100'): [(1, 'UNIT', 'EXACT_DECAY')],
     ('server/engine/slipnet.py', 'SlipnetNode.decay', '100.0'): [(1, 'UNIT', 'PCT_DIV')],
-    ('server/engine/slipnet.py', 'SlipnetNode.degree_of_assoc', '0.0'): [(3, 'UNIT', 'PCT_COMPLEMENT_FLOOR')],
-    ('server/engine/slipnet.py', 'SlipnetNode.degree_of_assoc', '100.0'): [(3, 'UNIT', 'PCT_COMPLEMENT')],
     ('server/engine/slipnet.py', 'SlipnetNode.get_similar_property_links', '100.0'): [(1, 'UNIT', 'PCT_DIV')],
     ('server/engine/slipnet.py', 'SlipnetNode.spread_activation_to_neighbors', '0'): [(2, 'UNIT', 'ZERO_TEST')],
     ('server/engine/slipnet.py', 'SlipnetNode.spread_activation_to_neighbors', '100'): [(1, 'UNIT', 'EXACT_DECAY')],

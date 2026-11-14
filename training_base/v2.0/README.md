@@ -96,4 +96,4 @@ On a letter problem the v2.0 Base is no longer the Standard run for run: two nei
 `c`) can now bond. An `adjacent` bond is weak (see the intrinsic link length above), so few are built.
 
 Not yet here: `slipnet_rounds_to_whole`, an `adjacent` group category, a floor on a link's length (a pair's link length has none: after enough
-noticings it is zero and then negative), anything for an `adjacent` bond with a group at an end, multi-turn runs.
+noticings it is zero and then negative; the association read from any length is clipped to 0 to 100, so a length of 0 or less reads as 100 and one of 100 or more as 0, and the stored length stays as it is), anything for an `adjacent` bond with a group at an end, multi-turn runs.
