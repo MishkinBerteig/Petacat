@@ -90,11 +90,14 @@ async def test_a_new_symbol_gets_one_node_and_the_runs_answer_with_it(recorded, 
     row = live.document.tables["slipnet_node_defs"][(node,)]
     assert (row["glyph"], row["short_name"], row["conceptual_depth"]) == (symbol, symbol, 10)
     learner = [c.pending for c in live.changes if c.pending.source == "learner"]
-    assert len(learner) == 1 and learner[0].actor == f"learner:{bs.IN_WORKER_LEARNER}"
-    assert [op["table"] for op in learner[0].resolved] == ["slipnet_node_defs"]
+    assert learner and all(e.actor == f"learner:{bs.IN_WORKER_LEARNER}" for e in learner)
+    # the first entry is the run that met the symbol: the node, and its trigger for `consolidator` (the rule's
+    # triggering list and the `top_down_slipnodes` parameter)
+    assert {op["table"] for op in learner[0].resolved} == {"slipnet_node_defs", "posting_rules", "engine_params"}
     assert live.diagnostics == []  # a duplicate is skipped cleanly, never refused
 
-    # Runs dispatched after the node landed start with the symbol perceived: they propose nothing.
+    # Runs dispatched after the node landed start with the symbol perceived: they make no node and propose no
+    # trigger.  Once the trigger has landed, `consolidator` counts the symbol (an `adjust` of its `noticings`).
     # (The session starts at revision 1, the creation batch that holds the Base's delta; the node
     # lands as revision 2.)
     outcomes = sorted(service.recording.outcomes, key=lambda o: o.seed)
@@ -102,9 +105,14 @@ async def test_a_new_symbol_gets_one_node_and_the_runs_answer_with_it(recorded, 
     assert any(o.proposals for o in outcomes)
     for o in outcomes:
         if by_revision[o.seed]["configuration_revision"] >= 2:
-            assert o.proposals == [] and o.answer == symbol, o.seed
+            assert o.answer == symbol, o.seed
+            assert not [p for p in o.proposals if p["op"] in ("add_node", "add_trigger")], o.seed
     if service.kind == "serial":  # one run at a time: only the first run met an unseen symbol
-        assert [bool(o.proposals) for o in outcomes] == [True] + [False] * 11
+        assert [any(p["op"] == "add_node" for p in o.proposals) for o in outcomes] == [True] + [False] * 11
+        assert outcomes[0].proposals[0]["op"] == "add_node"
+        # the configuration's count is what the runs proposed, added up
+        assert live.document.tables["slipnet_node_defs"][(node,)]["noticings"] == sum(
+            p["by"] for o in outcomes for p in o.proposals if p["op"] == "adjust" and p["field"] == "noticings")
     await stop(app_client, tid)
 
 

@@ -170,26 +170,38 @@ LETTER_PROBLEMS = read_problem_list(DATA / "fidelity_widen.txt")[:12]
 assert len(LETTER_PROBLEMS) == 12
 
 
+def _without_rules(base: MetadataProvider, *types: str) -> MetadataProvider:
+    rules = tuple(r for r in base.posting_rules if r.codelet_type not in types)
+    assert len(rules) == len(base.posting_rules) - len(types)
+    return dataclasses.replace(base, posting_rules=type(base.posting_rules)(rules))
+
+
+@pytest.fixture(scope="module")
+def base_without_consolidator(base) -> MetadataProvider:
+    """The v2.0 Base minus ``consolidator``'s posting rule: ``consolidator`` counts the noticings of the
+    symbols of every run (the seed letters are triggers), so it is taken out to ask about the symbol family alone."""
+    return _without_rules(base, "consolidator")
+
+
 @pytest.fixture(scope="module")
 def base_without_the_symbol_family(base) -> MetadataProvider:
-    """The v2.0 Base minus the symbol family's posting rule (its codelet types stay, unposted)."""
-    rules = tuple(r for r in base.posting_rules if r.codelet_type not in ("symbol-scout", "symbol-builder"))
-    assert len(rules) == len(base.posting_rules) - 1
-    return dataclasses.replace(base, posting_rules=type(base.posting_rules)(rules))
+    """The v2.0 Base minus the symbol family's posting rule and ``consolidator``'s (the codelet types stay, unposted)."""
+    return _without_rules(base, "symbol-scout", "consolidator")
 
 
 @pytest.mark.parametrize("problem", LETTER_PROBLEMS, ids=[" ".join(p) for p in LETTER_PROBLEMS])
 def test_with_no_unseen_symbol_the_symbol_family_posts_nothing_and_draws_nothing(
-        problem, base, base_without_the_symbol_family):
+        problem, base_without_consolidator, base_without_the_symbol_family):
     """The property this test used to state against the Standard, restated.  Increment 2 lets two
-    neighbours with no relation bond (``adjacent``), so the v2.0 Base no longer equals the Standard
-    on a letter problem (``test_adjacent_bonds_are_built_on_the_base_and_never_on_the_standard``).
-    What stays true is that the symbol family itself changes nothing when every symbol is perceived:
-    the v2.0 Base and the v2.0 Base without the symbol family's posting rule agree run for run in
-    codelets, answer, temperature and the number of random draws, with a fresh memory each run."""
+    neighbours with no relation bond (``adjacent``), and the third increment's ``consolidator`` posts on the
+    seed letters, so the v2.0 Base no longer equals the Standard on a letter problem
+    (``test_adjacent_bonds_are_built_on_the_base_and_never_on_the_standard``).  What stays true is that the
+    symbol family itself changes nothing when every symbol is perceived: the v2.0 Base without ``consolidator``
+    and the same without the symbol family's posting rule agree run for run in codelets, answer,
+    temperature and the number of random draws, with a fresh memory each run."""
     for seed in (1, 2, 3):
         _, without = run(base_without_the_symbol_family, problem, seed, steps=1500)
-        _, with_family = run(base, problem, seed, steps=1500)
+        _, with_family = run(base_without_consolidator, problem, seed, steps=1500)
         for key in ("status", "answer", "codelets", "temperature", "draws"):
             assert with_family[key] == without[key], (problem, seed, key)
         assert with_family["proposals"] == []

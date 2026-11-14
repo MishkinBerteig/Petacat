@@ -3,7 +3,7 @@
 The in-worker learner submits **every** op a run proposed (``propose_ops`` as well as ``apply_ops``) through
 ``finish_run`` as its batch, ``rebase`` and ``skip``, one op per row, journaled as ``learner:in-worker``.  A
 test configuration (``tests/support/proposing_configuration.py``) has a codelet whose body proposes the pair
-``plato-a`` to ``plato-b`` the way the ``consolidator`` body will: ``add_link`` at ``L + s`` and ``adjust``
+``plato-a`` to ``plato-b`` the way the ``consolidator`` body does: ``add_link`` at ``L + s`` and ``adjust``
 by ``-s``.  Whatever order the runs finish in, whichever route ran them, the link is ``L - s * (N - 1)``
 long after ``N`` noticings.
 """

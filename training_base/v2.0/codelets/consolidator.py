@@ -1,0 +1,65 @@
+# Consolidator (v2.0 Base only): one run is one noticing of a symbol.
+#
+# Posted top-down, with `args['slipnode']`, the node whose activation passed the gate.  The
+# node is noticed only if the Workspace holds the symbol (a Letter object whose letter-category
+# description is the node); a node raised past the gate by spreading activation alone is primed,
+# not noticed, and the codelet fizzles.  Everything is proposed with `propose_ops`, so nothing
+# changes in this run: the count and the links act from the next run.
+#
+# Parameters, each read only here: `adjacent_link_length` (L) and `adjacent_link_step` (s) for
+# the link of a pair of neighbours; `consolidation_threshold` (in noticings) from which a symbol
+# also gets its category and instance links, at `symbol_category_link_length` and
+# `symbol_instance_link_length`.
+from server.engine.workspace_objects import Letter
+
+node = args.get('slipnode')
+letter_category = role('dimension.letter_category')
+if not node or not letter_category:
+    fizzle()
+
+# Every symbol the Workspace holds, in the Workspace's own order.
+letters = [o for s in workspace.aggregate_strings for o in s.objects if isinstance(o, Letter)]
+if not any(o.get_descriptor_for(letter_category) is node for o in letters):
+    fizzle()
+
+# The noticing.
+propose_ops([{'op': 'adjust', 'table': 'slipnet_node_defs', 'key': {'name': node.name},
+              'field': 'noticings', 'by': 1}])
+
+# Each built `adjacent` bond between two single symbols, one end of which is this node.  A bond
+# with a group at either end, an end with no letter-category description, and a bond of a symbol
+# to itself propose nothing.  A pair is noticed from either end, so each end's run counts it.
+adjacent = role('bond_category.adjacent')
+if adjacent:
+    length = meta.get_param('adjacent_link_length')
+    step = meta.get_param('adjacent_link_step')
+    for s in workspace.aggregate_strings:
+        for bond in s.bonds:
+            if bond.bond_category is not adjacent:
+                continue
+            left, right = bond.left_object, bond.right_object
+            if not (isinstance(left, Letter) and isinstance(right, Letter)):
+                continue
+            first = left.get_descriptor_for(letter_category)
+            second = right.get_descriptor_for(letter_category)
+            if first is None or second is None or first is second:
+                continue
+            if first is not node and second is not node:
+                continue
+            propose_ops([
+                {'op': 'add_link', 'from': first.name, 'to': second.name, 'type': 'adjacent',
+                 'label': adjacent.name, 'fixed': True, 'length': length + step},
+                {'op': 'adjust', 'table': 'slipnet_link_defs',
+                 'key': {'from_node': first.name, 'to_node': second.name, 'link_type': 'adjacent',
+                         'label_node': adjacent.name},
+                 'field': 'link_length', 'by': -step},
+            ])
+
+# At or past the threshold: the links a letter has to its dimension, if this run's Slipnet lacks them.
+if noticings(node) >= meta.get_param('consolidation_threshold'):
+    if not any(link.to_node is letter_category for link in links_of(node, 'category')):
+        propose_ops([{'op': 'add_link', 'from': node.name, 'to': letter_category.name, 'type': 'category',
+                      'fixed': True, 'length': meta.get_param('symbol_category_link_length')}])
+    if not any(link.to_node is node for link in links_of(letter_category, 'instance')):
+        propose_ops([{'op': 'add_link', 'from': letter_category.name, 'to': node.name, 'type': 'instance',
+                      'fixed': True, 'length': meta.get_param('symbol_instance_link_length')}])

@@ -28,7 +28,7 @@ license change was authorised by Dr. Marshall directly (see
 > end-to-end. Episodic Memory (Metacat-Mode learning) shapes the runs that inherit it: a run
 > declines an answer already held for the same problem and rules, so repeating a
 > problem across Metacat Mode's [episodic runs](#persistence-modes-and-episodic-runs)
-> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 6,933 test cases covering the engine, the API, and the
+> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 6,978 test cases covering the engine, the API, and the
 > help/config system, run on both the CPU and the GPU numeric backends. Underneath the seven components sits an execution
 > substrate — three [persistence modes](#persistence-modes-and-episodic-runs),
 > a [GPU numeric substrate](#the-numeric-substrate), and
@@ -98,11 +98,11 @@ machine-learning platform:
   session), a symbol with no Slipnet node gets one, inside the run, and the run answers with it. The in-worker
   learner submits the node through the change API, so it is kept in the session's configuration. See
   [The v2.0 milestone](#the-v20-milestone).
-- **Third increment of v2.0, mechanisms built:** a body can propose any change-API op for the session's configuration
-  (`propose_ops`), the in-worker learner submits every one of them, a link length can be a fraction, and each Slipnet node
-  holds a `noticings` count. See [The v2.0 milestone](#the-v20-milestone).
-- **Not built:** the rest of v2.0's two ideas (see [The v2.0 milestone](#the-v20-milestone)): the `consolidator` codelet,
-  the `adjacent` links themselves, and multi-turn runs. The after-run seam (`set_after_run`, a call to the change API after each run) stays,
+- **Third increment of v2.0, built:** a body can propose any change-API op for the session's configuration
+  (`propose_ops`), the in-worker learner submits every one of them, a link length can be a fraction, each Slipnet node holds a
+  `noticings` count, and the v2.0 Base's `consolidator` codelet uses all of it: a symbol is noticed, counted, and connected to
+  the symbols it was seen beside. See [The v2.0 milestone](#the-v20-milestone).
+- **Not built:** the rest of v2.0's two ideas (see [The v2.0 milestone](#the-v20-milestone)): multi-turn runs. The after-run seam (`set_after_run`, a call to the change API after each run) stays,
   beside the in-worker learner.
 
 A Training Mode Session never reads or writes Metacat Mode's Episodic Memory, Slipnet or configuration.
@@ -164,17 +164,26 @@ the `adjacent` bond: `link_types` is a configuration table the change API addres
 `remove_link_type`; the 17 enum tables are the engine's vocabulary), a link whose type has no behaviour is a
 **plain** link that spreads activation by its fixed length and that a codelet reads with `links_of(node, type)`,
 and on the v2.0 Base two neighbours with no known relation can bond as `plato-adjacent` (`a` and `c`, `1` and `2`). An
-`adjacent` bond is weak, and nothing yet writes an `adjacent` link into the Slipnet. `plato-adjacent`'s conceptual depth is 45,
-just below `successor`'s and `predecessor`'s 50, because adjacency is the lowest-depth link concept. The third increment builds the
-mechanisms that consolidation needs, with no codelet that uses them yet. `propose_ops(ops)` records change-API ops in the run's
+`adjacent` bond is weak, and the second increment wrote no `adjacent` link into the Slipnet (the third increment's
+`consolidator` does). `plato-adjacent`'s conceptual depth is 45,
+just below `successor`'s and `predecessor`'s 50, because adjacency is the lowest-depth link concept. The third increment builds
+what consolidation needs, and `consolidator` itself. `propose_ops(ops)` records change-API ops in the run's
 `proposals` (it changes nothing in the run, refuses `add_node`, records an identical op once and adds repeated `adjust` ops on one
 `(table, key, field)` into one); the in-worker learner submits every proposal, not only the nodes, with `rebase` and `skip`, so a
 duplicate `add_link` or `add_link_type` from a second run is skipped and an `adjust` from every run applies. A link length is a
 number, whole or a fraction (`add_link` and `adjust` take 89.875; a whole value is stored and printed as an integer, so the Metacat
 Standard Configuration's hash and JSON do not change because of it), and every stored number must be finite: `nan`, `inf`, `1e999` and
 `10**400` are refused on every route, and under `skip` only that op is dropped. `slipnet_node_defs.noticings` is a whole number on each
-node (default 0, no range; the Admin view shows it), and the `noticings(node)` builtin reads it as the run started. Not built yet: the
-`consolidator` codelet, the `adjacent` links themselves, the speculative executor's support for created nodes
+node (default 0, no range; the Admin view shows it), and the `noticings(node)` builtin reads it as the run started, for the
+`consolidator` body alone. On the v2.0 Base, `consolidator` is a top-down codelet posted whenever a symbol node's activation
+passes the gate (urgency half its activation, rounded; the 26 letters are triggers, and `symbol-builder` proposes each new node as a
+trigger, effective from the next run). One run of it is one noticing of that node, and it needs the symbol to be in the
+Workspace: it proposes one more `noticings`; for each built `adjacent` bond between this symbol and another single symbol, the pair's
+`adjacent` link (labelled by `plato-adjacent`, fixed length, from the left symbol to the right one) at `adjacent_link_length` 90 at the
+first noticing and `adjacent_link_step` 0.125 shorter at each later one; and, once the node's `noticings` reach
+`consolidation_threshold` (40), its `category` and `instance` links to the letter category where they are missing. A bond with a group
+at an end writes nothing. Nothing changes in the run that proposes it, so everything acts from the next run. The lengths have no floor.
+Not built yet: the speculative executor's support for created nodes
 (`apply_ops` is a barrier there, and no session reaches the speculative executor), and multi-turn runs.
 
 [metacat]: http://science.slc.edu/~jmarshall/metacat/
@@ -508,8 +517,8 @@ Petacat has two test suites:
   plugin against the serial runs it claims to equal), `lockstep` (Petacat's decision
   traces against Metacat's), and `e2e` (full HTTP
   stack against a running database). All eight run in a single command against
-  the local Postgres — 6,933 cases, which includes the numeric matrix's second
-  pass over the 1243 backend-sensitive tests. See
+  the local Postgres — 6,978 cases, which includes the numeric matrix's second
+  pass over the 1263 backend-sensitive tests. See
   [TESTING.md](TESTING.md) for the layer breakdown, the numeric backend matrix,
   the session ceiling, the unit-test rules, determinism requirements, test-double
   conventions, how to run the suite under the free-threaded interpreter, and what

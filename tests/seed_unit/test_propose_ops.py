@@ -224,9 +224,11 @@ propose_ops([
 
 
 def noticer_provider():
-    """A test configuration: the v2.0 Base plus a codelet type whose body proposes a link and counts."""
+    """A test configuration: the v2.0 Base, without ``consolidator``'s posting rule, plus a codelet type whose body
+    proposes a link and counts."""
     doc = tb.resolve_base().document
     ops = [
+        {"op": "remove_posting_rule", "rule_key": "consolidator"},
         {"op": "add_codelet_type", "name": "noticer", "fields": {
             "family": "description", "phase": "scout", "description": "a test body", "execute_body": NOTICER}},
         {"op": "add_posting_rule", "rule_key": "noticer", "fields": {

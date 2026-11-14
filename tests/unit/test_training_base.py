@@ -37,13 +37,15 @@ def test_it_resolves_over_the_standard_and_adds_what_the_readme_says():
     assert (rule["direction"], rule["urgency_level"], rule["posting_formula"], rule["count_values"],
             rule["condition"]) == ("bottom_up", "low", "1.0", {"fixed": 1}, "num_unperceived_symbols > 0")
     order = [k[0] for k in doc.tables["posting_rules"]]
-    assert order[-2:] == ["breaker", "symbol-scout"]
+    assert order[-3:] == ["breaker", "symbol-scout", "consolidator"]
     assert tb.resolve_base().delta_hash == base.delta_hash  # stable
 
 
-def test_the_symbol_builder_makes_no_trigger_and_no_link():
+def test_the_symbol_builder_proposes_the_new_node_as_a_trigger_and_no_link():
     body = tb.resolve_base().document.tables["codelet_type_defs"][("symbol-builder",)]["execute_body"]
-    assert "add_trigger" not in body and "add_link" not in body and "plato-cp-%04x" in body
+    assert "add_link" not in body and "plato-cp-%04x" in body
+    assert "propose_ops([{'op': 'add_trigger', 'rule_key': 'consolidator', 'node': node.name}])" in body
+    assert body.index("apply_ops(") < body.index("add_trigger")  # the node exists before it is proposed as a trigger
 
 
 def test_the_standard_is_not_changed_by_resolving():
@@ -192,3 +194,39 @@ def test_the_delta_records_the_standard_bodys_sha256_for_the_bond_scout():
     ops = {o.get("name"): o for o in tb.load_delta() if o["op"] == "set_codelet_body"}
     assert ops["bottom-up-bond-scout"]["standard_sha256"] == hashlib.sha256(
         standard_body("bottom-up-bond-scout").encode("utf-8")).hexdigest()
+
+
+# -- increment 3: ``consolidator`` ----------------------------------------------------------------------------
+
+
+def test_consolidator_is_a_meta_codelet_with_one_top_down_rule_and_the_26_letters_as_triggers():
+    doc = tb.resolve_base().document
+    row = doc.tables["codelet_type_defs"][("consolidator",)]
+    assert (row["family"], row["phase"]) == ("meta", "other") and row["execute_body"].strip()
+    assert ("consolidator",) not in reference_document().tables["codelet_type_defs"]
+    rule = doc.tables["posting_rules"][("consolidator",)]
+    assert (rule["direction"], rule["urgency_formula"], rule["posting_formula"], rule["count_formula"],
+            rule["count_values"], rule["condition"]) == (
+        "top_down", "round(activation / 2)", "1.0", "fixed", {"fixed": 1}, "always")
+    letters = [f"plato-{c}" for c in "abcdefghijklmnopqrstuvwxyz"]
+    assert list(rule["triggering_slipnodes"]) == letters
+    top_down = json.loads(doc.tables["engine_params"][("top_down_slipnodes",)]["value"])
+    assert top_down[-26:] == letters and len(set(top_down)) == len(top_down)
+    # no other rule fires for a letter: each seed top-down rule names its own triggers
+    for key, other in doc.tables["posting_rules"].items():
+        if other["direction"] == "top_down" and key != ("consolidator",):
+            assert other["triggering_slipnodes"] and not set(other["triggering_slipnodes"]) & set(letters), key
+
+
+def test_the_five_consolidator_parameters_are_in_the_base_only():
+    doc, std = tb.resolve_base().document, reference_document()
+    expected = {"consolidation_threshold": ("40", "int"), "adjacent_link_length": ("90", "int"),
+                "adjacent_link_step": ("0.125", "float"), "symbol_category_link_length": ("20", "int"),
+                "symbol_instance_link_length": ("97", "int")}
+    for name, (value, kind) in expected.items():
+        row = doc.tables["engine_params"][(name,)]
+        assert (row["value"], row["value_type"]) == (value, kind) and (name,) not in std.tables["engine_params"]
+    assert expected["symbol_category_link_length"][0] == str(
+        std.tables["slipnet_link_defs"][("plato-a", "plato-letter-category", "category", "")]["link_length"])
+    assert expected["symbol_instance_link_length"][0] == str(
+        std.tables["slipnet_link_defs"][("plato-letter-category", "plato-a", "instance", "")]["link_length"])

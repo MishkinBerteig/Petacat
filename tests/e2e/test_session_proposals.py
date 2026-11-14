@@ -49,7 +49,8 @@ async def test_every_proposal_reaches_the_sessions_configuration_and_the_routes_
         try:
             tid = await make_session(app_client, 6)
             installed = await app_client.post(f"/api/training-mode/sessions/{tid}/changes", json={
-                "base_version": "head", "ops": pc.noticer_ops(pc.ALL_BODY)})
+                "base_version": "head",
+                "ops": [{"op": "remove_posting_rule", "rule_key": "consolidator"}, *pc.noticer_ops(pc.ALL_BODY)]})
             assert installed.status_code == 200 and installed.json()["ok"], installed.text
             assert (await app_client.post(f"/api/training-mode/sessions/{tid}/start")).status_code == 200
             await until_state(app_client, tid, "finished", timeout=300)

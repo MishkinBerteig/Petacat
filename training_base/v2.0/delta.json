@@ -7,7 +7,7 @@
    "name": "adjacent",
    "behaviour": "lateral",
    "display_label": "Adjacent",
-   "description": "Two symbols seen side by side. The lateral behaviour, so concept mappings between letters read it. The v2.0 Base only. Nothing writes a link of this type yet."
+   "description": "Two symbols seen side by side. The lateral behaviour, so concept mappings between letters read it. The v2.0 Base only. consolidator writes a link of this type for every pair of single symbols that an adjacent bond joined in the Workspace, labelled by plato-adjacent."
   },
   {
    "op": "add_node",
@@ -74,6 +74,36 @@
    "value_type": "int"
   },
   {
+   "op": "add_param",
+   "name": "consolidation_threshold",
+   "to": 40,
+   "value_type": "int"
+  },
+  {
+   "op": "add_param",
+   "name": "adjacent_link_length",
+   "to": 90,
+   "value_type": "int"
+  },
+  {
+   "op": "add_param",
+   "name": "adjacent_link_step",
+   "to": 0.125,
+   "value_type": "float"
+  },
+  {
+   "op": "add_param",
+   "name": "symbol_category_link_length",
+   "to": 20,
+   "value_type": "int"
+  },
+  {
+   "op": "add_param",
+   "name": "symbol_instance_link_length",
+   "to": 97,
+   "value_type": "int"
+  },
+  {
    "op": "add_codelet_type",
    "name": "symbol-scout",
    "fields": {
@@ -93,11 +123,25 @@
    "fields": {
     "family": "description",
     "phase": "builder",
-    "description": "Makes the Slipnet node for a symbol that has none, connected to nothing, with apply_ops, binds the object to it and proposes the ordinary description. One add_node row per code point. The v2.0 Base only.",
+    "description": "Makes the Slipnet node for a symbol that has none, connected to nothing, with apply_ops, binds the object to it and proposes the ordinary description, and proposes the node as a trigger of consolidator's posting rule (effective from the next run). One add_node row per code point. The v2.0 Base only.",
     "source_file": null,
     "source_line": null,
     "execute_body": {
      "$file": "codelets/symbol-builder.py"
+    }
+   }
+  },
+  {
+   "op": "add_codelet_type",
+   "name": "consolidator",
+   "fields": {
+    "family": "meta",
+    "phase": "other",
+    "description": "One run is one noticing of the symbol node that triggered it. If the Workspace holds the symbol it proposes one more noticing, an adjacent link (adjacent_link_length, shortened by adjacent_link_step at every later noticing) for each adjacent bond between it and another single symbol, and, once its noticings reach consolidation_threshold, its category and instance links to the letter category (at symbol_category_link_length and symbol_instance_link_length) where they are missing. The v2.0 Base only.",
+    "source_file": null,
+    "source_line": null,
+    "execute_body": {
+     "$file": "codelets/consolidator.py"
     }
    }
   },
@@ -115,6 +159,153 @@
     },
     "condition": "num_unperceived_symbols > 0"
    }
+  },
+  {
+   "op": "add_posting_rule",
+   "rule_key": "consolidator",
+   "fields": {
+    "codelet_type": "consolidator",
+    "direction": "top_down",
+    "urgency_level": null,
+    "urgency_formula": "round(activation / 2)",
+    "posting_formula": "1.0",
+    "count_formula": "fixed",
+    "count_values": {
+     "fixed": 1
+    },
+    "condition": "always",
+    "triggering_slipnodes": []
+   }
+  },
+  {
+   "op": "add_trigger",
+   "rule_key": "consolidator",
+   "node": "plato-a"
+  },
+  {
+   "op": "add_trigger",
+   "rule_key": "consolidator",
+   "node": "plato-b"
+  },
+  {
+   "op": "add_trigger",
+   "rule_key": "consolidator",
+   "node": "plato-c"
+  },
+  {
+   "op": "add_trigger",
+   "rule_key": "consolidator",
+   "node": "plato-d"
+  },
+  {
+   "op": "add_trigger",
+   "rule_key": "consolidator",
+   "node": "plato-e"
+  },
+  {
+   "op": "add_trigger",
+   "rule_key": "consolidator",
+   "node": "plato-f"
+  },
+  {
+   "op": "add_trigger",
+   "rule_key": "consolidator",
+   "node": "plato-g"
+  },
+  {
+   "op": "add_trigger",
+   "rule_key": "consolidator",
+   "node": "plato-h"
+  },
+  {
+   "op": "add_trigger",
+   "rule_key": "consolidator",
+   "node": "plato-i"
+  },
+  {
+   "op": "add_trigger",
+   "rule_key": "consolidator",
+   "node": "plato-j"
+  },
+  {
+   "op": "add_trigger",
+   "rule_key": "consolidator",
+   "node": "plato-k"
+  },
+  {
+   "op": "add_trigger",
+   "rule_key": "consolidator",
+   "node": "plato-l"
+  },
+  {
+   "op": "add_trigger",
+   "rule_key": "consolidator",
+   "node": "plato-m"
+  },
+  {
+   "op": "add_trigger",
+   "rule_key": "consolidator",
+   "node": "plato-n"
+  },
+  {
+   "op": "add_trigger",
+   "rule_key": "consolidator",
+   "node": "plato-o"
+  },
+  {
+   "op": "add_trigger",
+   "rule_key": "consolidator",
+   "node": "plato-p"
+  },
+  {
+   "op": "add_trigger",
+   "rule_key": "consolidator",
+   "node": "plato-q"
+  },
+  {
+   "op": "add_trigger",
+   "rule_key": "consolidator",
+   "node": "plato-r"
+  },
+  {
+   "op": "add_trigger",
+   "rule_key": "consolidator",
+   "node": "plato-s"
+  },
+  {
+   "op": "add_trigger",
+   "rule_key": "consolidator",
+   "node": "plato-t"
+  },
+  {
+   "op": "add_trigger",
+   "rule_key": "consolidator",
+   "node": "plato-u"
+  },
+  {
+   "op": "add_trigger",
+   "rule_key": "consolidator",
+   "node": "plato-v"
+  },
+  {
+   "op": "add_trigger",
+   "rule_key": "consolidator",
+   "node": "plato-w"
+  },
+  {
+   "op": "add_trigger",
+   "rule_key": "consolidator",
+   "node": "plato-x"
+  },
+  {
+   "op": "add_trigger",
+   "rule_key": "consolidator",
+   "node": "plato-y"
+  },
+  {
+   "op": "add_trigger",
+   "rule_key": "consolidator",
+   "node": "plato-z"
   },
   {
    "op": "set_codelet_body",

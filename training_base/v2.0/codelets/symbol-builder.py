@@ -3,7 +3,8 @@
 # The node is connected to nothing.  Its glyph and short name are the character, which is all
 # that perceiving the symbol needs: sameness bonds, groups of the symbol and answers that keep
 # the symbol all work.  Every relation to another symbol is learned later, or never.  This
-# codelet proposes no trigger and no link.
+# codelet proposes no link.  It proposes the node as a trigger of `consolidator`'s posting rule,
+# so from the next run the symbol is noticed, and consolidator is what connects it.
 from server.engine.workspace_objects import Letter
 
 obj = args.get('obj')
@@ -37,6 +38,8 @@ if not node:
     node = letter_node(ch)  # apply_ops rebuilt this run's alphabet
     if not node:
         fizzle()
+    # Effective from the next run.  A second run that makes the same node proposes the same op.
+    propose_ops([{'op': 'add_trigger', 'rule_key': 'consolidator', 'node': node.name}])
 
 obj.letter_category = node
 propose_description(obj, letter_category, node)

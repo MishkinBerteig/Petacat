@@ -171,8 +171,10 @@ Every doc, UI string, help topic, plan and decision must keep the distinction pe
   listed in its README. Today a symbol with no Slipnet node gets one inside the run (`apply_ops`), and the in-worker
   learner keeps it in the session's configuration. A body can also propose any other change-API op for the next run with
   `propose_ops`, which the learner submits too; a link length can be a fraction; and each Slipnet node holds a whole-number
-  `noticings` count that only the `noticings` builtin reads. Two neighbours with no known relation can bond as `adjacent`
-  (below).
+  `noticings` count that only the `noticings` builtin reads, and only the `consolidator` codelet calls. Each run of the
+  `consolidator` codelet is one noticing of a symbol: it adds 1 to the count and writes the `adjacent` links of the pairs of symbols it sees bonded, and, from
+  `consolidation_threshold` noticings on, the symbol's `category` and `instance` links. Two neighbours with no known
+  relation can bond as `adjacent` (below).
 - **Link type behaviour** is what the engine does with a link of a type: `category`, `instance`, `property`, `lateral`
   or `slip`. The engine names behaviours, never a link type. `link_types` is configuration that the change API
   addresses (`add_link_type`, `remove_link_type`), not one of the 17 enum tables, so a configuration may hold link
@@ -180,7 +182,7 @@ Every doc, UI string, help topic, plan and decision must keep the distinction pe
   codelet reads them with `links_of(node, type)`.
 - **`adjacent`** exists only in the v2.0 Base. It is a link type (behaviour `lateral`) and a bond category
   (`plato-adjacent`, conceptual depth 45, the lowest of the link concepts): two neighbours that no link relates, such as `a` and `c` or `1` and `2`, can still bond. It makes
-  bonds only, never groups. Nothing writes an `adjacent` link into the Slipnet yet.
+  bonds only, never groups. `consolidator` writes an `adjacent` link into the Slipnet for each pair of single symbols such a bond joined (labelled by `plato-adjacent`, length 90 at the pair's first noticing and 0.125 shorter at each later one); a bond with a group at an end writes nothing.
 - **Run mode** is how runs execute: single-threaded, or multi-core (the speculative executor
   within a run, the swarm across runs). It is orthogonal to the two modes and must be viable
   in both. It is not the persistence mode (Fast, Normal or Audit).

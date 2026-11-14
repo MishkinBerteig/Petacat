@@ -1,12 +1,13 @@
 """Test configurations whose codelet bodies call ``propose_ops``: the v2.0 Base plus one codelet type.
 
-The v2.0 Base has no codelet that proposes a link, a link type or a count (``consolidator`` is a later
-increment), so the tests of what a run proposes use a test configuration: the Base, one extra codelet
+The v2.0 Base's ``consolidator`` proposes a count and links of its own for the symbols a run holds, so the tests of
+what a run proposes through ``propose_ops`` use a test configuration, which keeps ``consolidator`` out of the way
+(its posting rule is removed): the Base, one extra codelet
 type ``noticer`` and a bottom-up posting rule that posts it once in every update cycle, so it runs many
 times in a run (a different number of times for each seed).
 
 ``PAIR_BODY`` expresses a noticing of the pair ``plato-a`` to ``plato-b`` the way the ``consolidator``
-body will: ``add_link`` of the pair at length ``L + s`` (``L`` = 90, ``s`` = 0.125, both exact in binary)
+body does: ``add_link`` of the pair at length ``L + s`` (``L`` = 90, ``s`` = 0.125, both exact in binary)
 and ``adjust`` of that link's length by ``-s``.  So after ``N`` noticings, in any order and spread over
 any runs, the link is ``L - s * (N - 1)`` long.
 """
@@ -58,9 +59,10 @@ def noticer_ops(body: str) -> list[dict[str, Any]]:
 
 
 def noticer_document(body: str = PAIR_BODY, *more: dict[str, Any]) -> cd.ConfigDocument:
-    """The v2.0 Base with the test codelet type (and any *more* ops) applied."""
+    """The v2.0 Base without ``consolidator``'s posting rule, with the test codelet type (and any *more* ops) applied."""
     doc = tb.resolve_base().document
-    resolved, _ = resolve(doc, {"ops": [*noticer_ops(body), *more]})
+    resolved, _ = resolve(doc, {"ops": [{"op": "remove_posting_rule", "rule_key": "consolidator"},
+                                        *noticer_ops(body), *more]})
     return cd.apply_resolved(doc, resolved)
 
 
