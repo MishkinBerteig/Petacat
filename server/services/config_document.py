@@ -496,6 +496,7 @@ def rows_from_standard_files(seed_dir: str) -> dict[str, list[dict[str, Any]]]:
             "full_name": n.get("full_name"),
             "cm_short_name": n.get("cm_short_name"),
             "article_an": n.get("article_an"),
+            "noticings": n.get("noticings", 0),
         }
         for pos, n in enumerate(load("slipnet_nodes.json"))
     ]

@@ -867,7 +867,7 @@ class SlipnetLink:
         to_node: SlipnetNode,
         link_type: str,
         label_node: SlipnetNode | None = None,
-        fixed_link_length: int | None = None,
+        fixed_link_length: int | float | None = None,
     ) -> None:
         self.from_node = from_node
         self.to_node = to_node
@@ -876,7 +876,7 @@ class SlipnetLink:
         self.fixed_length = fixed_link_length is not None
         self._fixed_link_length = fixed_link_length
 
-    def link_length(self) -> int:
+    def link_length(self) -> int | float:
         """Current link length. Dynamic links use label node's intrinsic length
         (or shrunk length if fully active).
 

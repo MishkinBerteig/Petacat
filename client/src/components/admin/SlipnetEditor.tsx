@@ -24,12 +24,15 @@ interface NodeDef {
   short_name: string
   conceptual_depth: number
   description?: string
+  /** How many times the node has been noticed (a whole number, learned; shown, not edited here). */
+  noticings?: number
 }
 
 const COLUMNS: ColumnDef[] = [
   { key: 'name', label: 'Name', type: 'readonly', width: '30%' },
   { key: 'short_name', label: 'Short', type: 'text', width: '15%' },
   { key: 'conceptual_depth', label: 'Depth', type: 'number', width: '10%' },
+  { key: 'noticings', label: 'Noticings', type: 'readonly', width: '9%' },
   { key: 'description', label: 'Description', type: 'text' },
 ]
 

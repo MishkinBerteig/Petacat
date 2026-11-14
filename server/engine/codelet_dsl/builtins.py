@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import copy
 import logging
+import math
 
 from typing import TYPE_CHECKING, Any
 
@@ -85,6 +86,8 @@ def get_builtins() -> dict[str, Any]:
         "relation": relation,
         "letter_node": letter_node,
         "apply_ops": apply_ops,
+        "propose_ops": propose_ops,
+        "noticings": noticings,
         "get_activation": get_activation,
         "fully_active": fully_active,
         "get_bond_category": get_bond_category,
@@ -2428,7 +2431,7 @@ def apply_ops(ctx: EngineContext, ops: list) -> None:
     """Apply ``add_node`` ops to **this run's own** Slipnet, and record them on the run.
 
     Each op is a change-API op dict: ``{"op": "add_node", "name": ..., "fields": {...}}``.
-    Any other op is refused by name (``ValueError``), and so is an ``add_node`` that carries
+    Any other op is refused by name (``ValueError``; :func:`propose_ops` records the others), and so is an ``add_node`` that carries
     ``links``, ``roles``, ``params``, ``layout`` or ``theme_dimension``: a node made inside a
     run is connected to nothing.  Everything is checked before anything is changed.
 
@@ -2471,6 +2474,83 @@ def apply_ops(ctx: EngineContext, ops: list) -> None:
         ctx.add_node_spec(spec)
         ctx.proposals.append(copy.deepcopy(op))
     _wrote_component(ctx, "slipnet_act")
+
+
+def _same_target(a: dict, b: dict) -> bool:
+    """Do two ``adjust`` ops name the same number?  The same ``table``, the same ``field`` and the
+    same ``key``, a key being a mapping of key columns to values with a ``None`` read as ``""``
+    (the change API addresses a row's NULL key part that way)."""
+    def key_of(op: dict) -> dict:
+        key = op.get("key")
+        return {k: ("" if v is None else v) for k, v in key.items()} if isinstance(key, dict) else {"": key}
+
+    return (a.get("table") == b.get("table") and a.get("field") == b.get("field")
+            and key_of(a) == key_of(b))
+
+
+def propose_ops(ctx: EngineContext, ops: list) -> None:
+    """Record change-API ops for the session's configuration, which they reach after the run.
+
+    Each op is a change-API op dict (``add_link``, ``adjust``, ``add_trigger``,
+    ``add_link_type`` and so on).  The ops are appended to ``ctx.proposals``, the list
+    :func:`apply_ops` writes, in call order.  Nothing in the run changes: not the Slipnet, not the
+    metadata view, not the Workspace.  What is recorded reaches the session's configuration when
+    the run ends (the in-worker learner submits it), so it acts from the next run.
+
+    * ``add_node`` is refused (``ValueError``): it goes through :func:`apply_ops`, which makes the
+      node in the run as well.  Any other op is accepted as data, and the change API checks it
+      when the learner submits it.
+    * An op identical to one already recorded is not recorded again.
+    * Repeated ``adjust`` ops on the same target are one op: the ``by`` values are added, in call
+      order, and the op stays where the first one was.  The same target is the same ``table``,
+      ``field`` and ``key`` (:func:`_same_target`).  This is how a count is kept without a
+      counter: ``n`` noticings give one ``adjust`` of ``n`` times the step.
+
+    It draws no random number and never writes the shared provider or anything another run can
+    see.
+    """
+    ops = list(ops)
+    for op in ops:
+        kind = op.get("op") if isinstance(op, dict) else None
+        if not isinstance(kind, str) or not kind:
+            raise ValueError("propose_ops: an op is a change-API op dict with an 'op'")
+        if kind == "add_node":
+            raise ValueError("propose_ops: add_node goes through apply_ops")
+    for op in ops:
+        if op["op"] == "adjust":
+            held = next((h for h in ctx.proposals if h.get("op") == "adjust" and _same_target(h, op)), None)
+            if held is not None:
+                try:
+                    total = held.get("by") + op.get("by")
+                    kept = math.isfinite(total)
+                except (TypeError, OverflowError):
+                    kept = False
+                if kept:
+                    held["by"] = total
+                    continue
+            # the first adjust of its target, or one that cannot be added to the held one (not a
+            # number, not finite): recorded as it is, and the change API refuses it
+            ctx.proposals.append(copy.deepcopy(op))
+            continue
+        if op not in ctx.proposals:
+            ctx.proposals.append(copy.deepcopy(op))
+
+
+def noticings(ctx: EngineContext, node: Any) -> int:
+    """How many times *node* had been noticed when this run started: the whole number in the
+    configuration's ``slipnet_node_defs.noticings`` (0 for a node the configuration gives none, a
+    node the run made, or an ``Absent`` token).
+
+    A read of the configuration, not of the run: ``propose_ops`` changes the count for the next run
+    only, so a body that adds one reads the same number however often it runs in this run.  *node*
+    is a node (from :func:`role` or :func:`get_node`) or a node's name.
+    """
+    none = int()  # no count: a whole number zero, spelt so that no literal sits in the engine
+    if not node:
+        return none
+    name = node if isinstance(node, str) else node.name
+    spec = ctx.meta.slipnet_node_specs.get(name)
+    return spec.noticings if spec is not None else none
 
 
 def get_activation(ctx: EngineContext, name: str) -> float:

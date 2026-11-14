@@ -314,6 +314,20 @@
    ],
    "why": "Slipnet.add_node on this run's own Slipnet: appends to slipnet.nodes, rebuilds slipnet.alphabet, invalidates the numeric layout, gives ctx.meta a view with the node's spec and appends to ctx.proposals. The speculative executor's guard class, node list and structure read for created nodes are not built, so it runs serialised under the commit token. Draws no random number; touches no Workspace structure."
   },
+  "propose_ops": {
+   "kind": "WRITE",
+   "reads": [],
+   "writes": [
+    "proposals"
+   ],
+   "why": "Appends deep copies of change-API op dicts to ctx.proposals (an identical op once; repeated adjust ops on one table, key and field summed into the first). ctx.proposals is not run state and no component names it, so it declares no component, but it is a WRITE: it runs in order under the commit token, never in a speculated prefix that could be discarded and run again. Never changes the Slipnet, the metadata view or the Workspace; draws no random number."
+  },
+  "noticings": {
+   "kind": "READ",
+   "reads": [],
+   "writes": [],
+   "why": "ctx.meta.slipnet_node_specs[name].noticings: the configuration as the run started it (the provider is immutable, and apply_ops gives ctx.meta a view that only adds specs, with noticings 0). No run state is read or written."
+  },
   "get_activation": {
    "kind": "READ",
    "reads": [

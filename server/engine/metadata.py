@@ -72,6 +72,10 @@ class SlipnodeSpec:
     full_name: str | None = None
     cm_short_name: str | None = None
     article_an: bool | None = None
+    #: How many times the node has been noticed (a whole number, 0 under the Metacat Standard
+    #: Configuration), as the configuration held it when the run started.  Only the
+    #: ``noticings`` builtin reads it.
+    noticings: int = field(default_factory=int)
 
 
 @dataclass(frozen=True)
@@ -80,7 +84,7 @@ class SlipnetLinkSpec:
     to_node: str
     link_type: str  # category, instance, property, lateral, lateral_sliplink
     label_node: str | None
-    link_length: int | None  # None means dynamic (determined by label node)
+    link_length: int | float | None  # None means dynamic (determined by label node); a fraction is allowed
     fixed_length: bool
 
 

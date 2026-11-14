@@ -109,7 +109,16 @@ GROUPS: list[tuple[str, str, str]] = [
         "edit (`add_trigger`, `remove_trigger`) also changes the parameter whose `refers_to` is "
         "`trigger_node_list` (`top_down_slipnodes` in the Metacat Standard Configuration): the "
         "node is added to it, or removed from it only when no rule still triggers the node. A "
-        "configuration that declares no such parameter leaves every parameter alone.",
+        "configuration that declares no such parameter leaves every parameter alone. "
+        "**Numbers.** A link length (`slipnet_link_defs.link_length`, and the `length` of `add_link`) "
+        "is a whole number or a fraction: `add_link` and `adjust` take 89.875, and a whole value is "
+        "stored, hashed and printed as an integer (`90`, never `90.0`), so the Metacat Standard "
+        "Configuration's JSON is what it always was. Every stored number is finite: a `nan`, an `inf`, "
+        "`1e999` or a whole number past float's range is refused on every route as `400 malformed`, "
+        "per op, so under `on_op_failure: skip` only that op is dropped. "
+        "`slipnet_node_defs.noticings` is a whole number on each node (default 0, no range): `adjust` "
+        "and the generic update take a whole number and refuse a fraction; the node list shows it and "
+        "the export carries it only when it is not 0.",
     ),
     ("/api/admin", "Configuration", "Metacat Mode: the editable copy of the seed data (the global configuration). A Training Mode Session copies it when created and never changes it. Demo problems are read through Metacat's input parser like a run (a 400 `Invalid input!` otherwise) and store what it read, with a random seed when none is given; `input-character-ranges` and `input-lowering-ranges` are the parser's rules."),
     ("/api/docs", "Help", "In-app help topics, the glossary and search."),

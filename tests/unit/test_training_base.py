@@ -130,12 +130,14 @@ def test_the_deltas_first_op_creates_the_adjacent_link_type_with_the_lateral_beh
     assert ("adjacent",) not in std.tables["link_types"] and ("adjacent",) in base.document.tables["link_types"]
 
 
-def test_plato_adjacent_is_an_instance_of_bond_category_and_copies_successors_properties():
+def test_plato_adjacent_is_an_instance_of_bond_category_and_copies_successors_properties_but_its_depth():
     doc = tb.resolve_base().document
     nodes, links = doc.tables["slipnet_node_defs"], doc.tables["slipnet_link_defs"]
     adjacent, successor = nodes[("plato-adjacent",)], nodes[("plato-successor",)]
     assert adjacent["short_name"] == "adjacent" and adjacent["plain_name"] == "adjacent"
-    assert adjacent["conceptual_depth"] == successor["conceptual_depth"] == 50
+    # adjacency is the lowest-depth link concept: 45, just below successor's and predecessor's 50
+    assert successor["conceptual_depth"] == nodes[("plato-predecessor",)]["conceptual_depth"] == 50
+    assert adjacent["conceptual_depth"] == 45
     assert adjacent["descriptor_predicate"] is None and adjacent["glyph"] is None and adjacent["numeric_value"] is None
     assert list(nodes)[-1] == ("plato-adjacent",) or ("plato-adjacent",) in nodes
     for frm, to, kind in (("plato-successor", "plato-bond-category", "category"),

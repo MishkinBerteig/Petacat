@@ -15,6 +15,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { CodeletEditor } from './CodeletEditor'
 import { DemoEditor } from './DemoEditor'
 import { SlipnetLinkEditor } from './SlipnetLinkEditor'
+import { SlipnetEditor } from './SlipnetEditor'
 import { ThemeDimensionEditor } from './ThemeDimensionEditor'
 import { PostingRuleEditor } from './PostingRuleEditor'
 import { InitialProgramEditor } from './InitialProgramEditor'
@@ -204,6 +205,66 @@ describe('EditableTable — an empty number box', () => {
 
     await waitFor(() => expect(calls).toHaveLength(1))
     expect(calls[0].body.link_length).toBe(0)
+  })
+})
+
+describe('SlipnetLinkEditor — a length can be a fraction', () => {
+  const link = {
+    id: 9, from_node: 'plato-a', to_node: 'plato-b', link_type: 'adjacent',
+    label_node: null, link_length: 89.875, fixed_length: true,
+  }
+
+  it('shows a fractional length as it is, never rounded', async () => {
+    serve([link])
+    render(<SlipnetLinkEditor />)
+    expect(await screen.findByText('89.875')).toBeInTheDocument()
+  })
+
+  it('submits the fraction typed, and the box takes one (step any)', async () => {
+    serve([link])
+    render(<SlipnetLinkEditor />)
+
+    await editCell('89.875', '89.75')
+
+    await waitFor(() => expect(calls).toHaveLength(1))
+    expect(calls[0]).toMatchObject({ method: 'PUT', url: '/api/admin/slipnet/links/9' })
+    expect(calls[0].body.link_length).toBe(89.75)
+  })
+
+  it('opens the cell in a box that takes a fraction (step any)', async () => {
+    serve([link])
+    render(<SlipnetLinkEditor />)
+    fireEvent.doubleClick(await screen.findByText('89.875'))
+    expect(await screen.findByRole('spinbutton')).toHaveAttribute('step', 'any')
+  })
+
+  it('creates a link with a fractional length', async () => {
+    serve([link])
+    render(<SlipnetLinkEditor />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /\+ Add/ }))
+    fireEvent.change(screen.getByLabelText('From'), { target: { value: 'plato-b' } })
+    fireEvent.change(screen.getByLabelText('To'), { target: { value: 'plato-c' } })
+    fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'adjacent' } })
+    fireEvent.change(screen.getByLabelText('Length'), { target: { value: '12.5' } })
+    expect(screen.getByLabelText('Length')).toHaveAttribute('step', 'any')
+    fireEvent.click(screen.getByRole('button', { name: /^Save$/ }))
+
+    await waitFor(() => expect(calls).toHaveLength(1))
+    expect(calls[0]).toMatchObject({ method: 'POST', url: '/api/admin/slipnet/links' })
+    expect(calls[0].body.link_length).toBe(12.5)
+  })
+})
+
+describe('SlipnetEditor — a node shows how often it has been noticed', () => {
+  it('lists the noticings column, read-only', async () => {
+    serve([
+      { name: 'plato-a', short_name: 'a', conceptual_depth: 10, description: '', noticings: 7 },
+      { name: 'plato-b', short_name: 'b', conceptual_depth: 10, description: '', noticings: 0 },
+    ])
+    render(<SlipnetEditor />)
+    expect(await screen.findByText('Noticings')).toBeInTheDocument()
+    expect(screen.getByText('7')).toBeInTheDocument()
   })
 })
 

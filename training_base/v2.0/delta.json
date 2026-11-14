@@ -14,7 +14,7 @@
    "name": "plato-adjacent",
    "fields": {
     "short_name": "adjacent",
-    "conceptual_depth": 50,
+    "conceptual_depth": 45,
     "plain_name": "adjacent",
     "description": "Represents the bond type of adjacency, the relation between two neighbouring objects that no link relates (for example a and c, or 1 and 2). An instance of bond-category, beside successor and sameness. Its intrinsic link length is long, so an adjacent bond is weak until one is built and the category becomes fully active. The v2.0 Base only."
    },

@@ -316,6 +316,7 @@ export function EditableTable<T extends Record<string, any>>({
                           onBlur={() => void saveEdit()}
                           onKeyDown={handleKeyDown}
                           type={col.type === 'number' ? 'number' : 'text'}
+                          step={col.type === 'number' ? 'any' : undefined}
                           style={{ width: '100%', fontSize: 11, padding: '1px 4px' }}
                         />
                       </td>
@@ -383,6 +384,7 @@ export function EditableTable<T extends Record<string, any>>({
                       value={newRow[col.key] ?? ''}
                       onChange={e => setNewRow(r => r ? { ...r, [col.key]: e.target.value } : r)}
                       type={col.type === 'number' ? 'number' : 'text'}
+                      step={col.type === 'number' ? 'any' : undefined}
                       placeholder={col.label}
                       aria-label={col.label}
                       style={{ width: '100%', fontSize: 11, padding: '1px 4px' }}

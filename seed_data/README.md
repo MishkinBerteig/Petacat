@@ -5,7 +5,7 @@ knowledge as Petacat ports it. It is not a mode and not a database. It is the st
 
 | File | Contents |
 |------|----------|
-| `slipnet_nodes.json`, `slipnet_links.json`, `slipnet_layout.json` | The Slipnet's concepts and links, and the grid positions for drawing it |
+| `slipnet_nodes.json`, `slipnet_links.json`, `slipnet_layout.json` | The Slipnet's concepts and links, and the grid positions for drawing it. A node's `noticings` count (a whole number, 0 for every node here) is not in the file: the table column defaults to 0. A link's `link_length` may be a whole number or a fraction in any configuration (the table column reads a whole value back as an integer), and the lengths here are all whole |
 | `codelet_types.json` | The codelet types, with their Python `execute_body` source |
 | `roles.json` | The roles the engine looks nodes and codelet types up by, including the policy sets (which dimensions behave a way) and the image operation each dimension performs: see [Policy roles](#policy-roles) |
 | `initial_program.json` | What a run starts with: the descriptions every letter is given and the concepts that start fully active: see [The initial-description program](#the-initial-description-program) |

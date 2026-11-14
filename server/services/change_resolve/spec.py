@@ -22,6 +22,7 @@ from sqlalchemy import Boolean, Float, Integer
 from sqlalchemy.dialects.postgresql import JSON, JSONB
 
 from server.engine.roles import CODELET_TYPE, NODE, ORDERED, ROLES
+from server.models.metadata import WholeAsInt
 from server.services.config_registry import ENUM_REGISTRY, REGISTRY, TableSpec as RegistrySpec
 from server.services.change_resolve.vocabulary import roles_by_table
 from server.services.configuration_input import (
@@ -151,7 +152,7 @@ def _column_type(column: Any, code: bool, name: str) -> str:
         return "json"
     if isinstance(t, Boolean):
         return "bool"
-    if isinstance(t, Float):
+    if isinstance(t, (Float, WholeAsInt)):
         return "float"
     if isinstance(t, Integer):
         return "int"

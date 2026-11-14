@@ -35,6 +35,7 @@ export interface SessionSlipnetNodeRow {
   short_name: string;
   conceptual_depth: number;
   description?: string;
+  noticings?: number;
 }
 
 export interface SessionSlipnetLinkRow {
@@ -42,6 +43,7 @@ export interface SessionSlipnetLinkRow {
   to_node: string;
   link_type: string;
   label_node: string | null;
+  /** A whole number or a fraction (89.875): shown as it is, never rounded. */
   link_length: number | null;
   fixed_length: boolean;
 }

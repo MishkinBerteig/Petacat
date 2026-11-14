@@ -55,6 +55,16 @@ row's ``behaviour`` is one of the engine's ``LINK_BEHAVIOURS`` or empty (a **pla
 type exists.  A link of a plain type must have a fixed length (``fixed_length`` true and a
 ``link_length``): without one it would read as length 0, which is full association.
 
+Numbers
+-------
+A link length (``slipnet_link_defs.link_length``, the ``length`` of ``add_link``) is a whole number or a
+fraction (a ``WholeAsInt`` column): ``add_link`` and ``adjust`` take 89.875, and a whole value is normalised to an
+``int`` at the door (``_Run.normalise``), so a configuration's hash and JSON print ``90``, never ``90.0``.  Every
+stored number is finite: a ``nan``, an ``inf`` or a whole number past float's range is refused **per op**
+(``_Run.shape``, ``_finite``), not in the batch's shape check, so under ``skip`` only that op is dropped.
+``slipnet_node_defs.noticings`` is a whole number with no range: ``adjust`` and the generic update refuse a
+fraction and a non-finite value.
+
 Parameters that name things
 ---------------------------
 ``engine_params.refers_to`` declares what a parameter's value names (``spec.REFERS_TO_KINDS``):
@@ -78,6 +88,7 @@ The report
 from __future__ import annotations
 
 import json
+import math
 import re
 from dataclasses import dataclass
 from fractions import Fraction
@@ -92,6 +103,7 @@ from server.engine.start_check import (
     REQUIRED_FORMULA_COEFFICIENTS,
     urgency_levels_read_by_bodies,
 )
+from server.models.metadata import WholeAsInt, whole_as_int
 from server.services.change_resolve import checks, vocabulary
 from server.services.change_resolve.errors import ChangeRefused
 from server.services.change_resolve.patch import PatchError, apply_patch, parse_pointer
@@ -147,6 +159,17 @@ _READ_PARAMS = frozenset(n for n, _ in REQUIRED_ENGINE_PARAMETERS)
 _READ_COEFFS = frozenset(n for n, _ in REQUIRED_FORMULA_COEFFICIENTS)
 _RANGES = {p.name: (p.minimum, p.maximum) for p in RUN_PARAMETERS
            if p.minimum is not None or p.maximum is not None}
+
+
+def _finite(v: Any) -> bool:
+    """False for a ``nan``, an ``inf`` and a whole number past float's range; true for any
+    other value, a non-number included.  Every number the configuration stores is finite."""
+    if isinstance(v, bool) or not isinstance(v, (int, float)):
+        return True
+    try:
+        return math.isfinite(v)
+    except OverflowError:
+        return False
 
 
 class _Fail(Exception):
@@ -304,6 +327,14 @@ class _Run:
         problems = checks._generic_problems(i, op)
         if problems:
             raise _Fail(problems[0])
+        # Every stored number is finite.  The check is here, per op, and not in the batch's
+        # shape check, so under ``skip`` only the op that carries one is dropped.
+        table = op.get("table")
+        for part in ("row", "fields"):
+            for name, value in (op.get(part) or {}).items():
+                if not _finite(value):
+                    raise self.fail(MALFORMED, f"{name!r} must be a finite number (not nan, inf or past "
+                                    "float's range)", i, f"{part}.{name}", table)
 
     def normalise(self, table: str, row: dict) -> dict:
         """A NULL part of a key is stored as NULL, not ``''``."""
@@ -311,6 +342,11 @@ class _Run:
         for c in spec.key:
             if row.get(c) == "" and spec.table.columns[c].nullable:
                 row[c] = None
+        for c in row:
+            # a whole number in a ``WholeAsInt`` column is stored as an ``int``, so the
+            # configuration's hash and JSON print it as they always did (90, never 90.0)
+            if c in spec.table.columns and isinstance(spec.table.columns[c].type, WholeAsInt):
+                row[c] = whole_as_int(row[c])
         return row
 
     def complete(self, table: str, row: dict) -> dict:
@@ -401,6 +437,9 @@ class _Run:
             p = check_param_value(row.get("value"), row.get("value_type"), op_index=i, table=table)
             if p is not None:
                 raise _Fail(p)
+            if row.get("value_type") == "float" and not _finite(parse_param_value(row["value"], "float")[1]):
+                raise self.fail(MALFORMED, "a float parameter must be a finite number (not nan or inf)",
+                                i, "value", table, [row.get("name")])
 
     # -- the generic writes -----------------------------------------------------------
 
@@ -1401,10 +1440,17 @@ def _adjusted_text(r: _Run, i: int, table: str, row: Mapping, by: Any) -> str:
     where = (i, "value", table, [row["name"]])
     if not ok or vt not in ("int", "float", "rational"):
         raise r.fail(MALFORMED, f"{row['name']!r} is {vt}, not a number", *where)
+    if not _finite(by):
+        raise r.fail(MALFORMED, "'by' must be a finite number (not nan, inf or past float's range)", *where)
     if vt == "rational":
         total = Fraction(cur) + Fraction(by).limit_denominator(10**12) if isinstance(by, float) else Fraction(cur) + by
         return checks.fraction_text(total)
-    total = cur + by
+    try:
+        total = cur + by
+    except OverflowError:
+        raise r.fail(MALFORMED, f"{row['name']!r} plus 'by' is past float's range", *where) from None
+    if not _finite(total):
+        raise r.fail(MALFORMED, f"{row['name']!r} would not be a finite number", *where)
     if vt == "int":
         if total != int(total):
             raise r.fail(MALFORMED, f"{row['name']!r} is an integer; {total} is not", *where)
@@ -1436,7 +1482,15 @@ def _h_adjust(r: _Run, i: int, op: dict) -> None:
     cur = row.get(field)
     if col.type not in ("int", "float") or not isinstance(cur, (int, float)) or isinstance(cur, bool):
         raise r.fail(MALFORMED, f"{table}.{field} is not a number", i, "field", table)
-    total = cur + op["by"]
+    if not _finite(op["by"]):
+        raise r.fail(MALFORMED, "'by' must be a finite number (not nan, inf or past float's range)",
+                     i, "by", table)
+    try:
+        total = cur + op["by"]
+    except OverflowError:
+        raise r.fail(MALFORMED, f"{table}.{field} plus 'by' is past float's range", i, "by", table) from None
+    if not _finite(total):
+        raise r.fail(MALFORMED, f"{table}.{field} would not be a finite number", i, "by", table)
     if col.type == "int":
         if total != int(total):
             raise r.fail(MALFORMED, f"{table}.{field} is an integer; {total} is not", i, "field", table)

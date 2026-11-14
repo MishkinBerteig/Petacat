@@ -175,6 +175,7 @@ def _field_slipnet_node_specs(tables: Mapping[str, Any]) -> dict[str, SlipnodeSp
             full_name=r.get("full_name"),
             cm_short_name=r.get("cm_short_name"),
             article_an=r.get("article_an"),
+            noticings=r.get("noticings", 0),
         )
         for r in _rows(tables["slipnet_node_defs"])
     }

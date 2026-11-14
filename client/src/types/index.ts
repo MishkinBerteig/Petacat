@@ -710,6 +710,8 @@ export interface SlipnetNodeDef {
   short_name: string;
   conceptual_depth: number;
   description?: string;
+  /** How many times the node has been noticed: a whole number, 0 under the Metacat Standard Configuration. */
+  noticings?: number;
 }
 
 // --- Layout ----------------------------------------------------------------

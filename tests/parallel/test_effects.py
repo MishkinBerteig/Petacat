@@ -389,3 +389,17 @@ def test_links_of_reads_only_the_static_topology_and_writes_nothing():
     adds nodes only, and is a BARRIER), so it declares no component read and no write."""
     entry = fx.load().builtins["links_of"]
     assert entry.kind == fx.READ and entry.reads == 0 and entry.writes == 0
+
+
+def test_propose_ops_is_a_write_that_runs_in_order_and_names_no_component():
+    """``propose_ops`` appends to ``ctx.proposals``, which is not run state and has no component.  It is a
+    WRITE, not a READ, so it runs in order under the commit token and never inside a speculated prefix that could
+    be discarded and run again (which would record an ``adjust`` twice)."""
+    entry = fx.load().builtins["propose_ops"]
+    assert entry.kind == fx.WRITE and entry.reads == 0 and entry.writes == 0
+    assert "propose_ops" in fx.load().builtins and "apply_ops" in fx.load().builtins
+
+
+def test_noticings_reads_only_the_configuration_the_run_started_with():
+    entry = fx.load().builtins["noticings"]
+    assert entry.kind == fx.READ and entry.reads == 0 and entry.writes == 0

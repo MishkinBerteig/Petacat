@@ -8,15 +8,42 @@ JSON files and can be edited via the admin panel.
 from __future__ import annotations
 
 from sqlalchemy import (
-    BigInteger, Boolean, Column, Float, ForeignKey, Index, Integer, Text,
+    BigInteger, Boolean, Column, Double, Float, ForeignKey, Index, Integer, Text,
     UniqueConstraint, column, func, select, table,
 )
 from sqlalchemy.dialects.postgresql import JSON, JSONB
 from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.types import TypeDecorator
 
 
 class Base(DeclarativeBase):
     pass
+
+
+class WholeAsInt(TypeDecorator):
+    """A ``double precision`` column that reads a whole value back as ``int``.
+
+    A number the configuration holds may be whole or a fraction (a link length of 89.875).  A
+    whole value stays an ``int`` when it is read, so the configuration's hash and its JSON are
+    byte-identical to what they were when the column was an ``Integer``: ``90`` stays ``90`` and
+    never becomes ``90.0``.  A fraction, or any float that is not whole, is read back as a float.
+    Every stored value is finite (the change API refuses the rest), so a ``nan`` or an ``inf``
+    that reaches the column anyway is read as it is.
+    """
+
+    impl = Double
+    cache_ok = True
+
+    def process_result_value(self, value, dialect):
+        return whole_as_int(value)
+
+
+def whole_as_int(value):
+    """``value`` as an ``int`` when it is a whole, finite number, otherwise unchanged."""
+    if isinstance(value, float) and value == value and value not in (float("inf"), float("-inf")) \
+            and value == int(value):
+        return int(value)
+    return value
 
 
 def _next_after_last(table_name: str, column_name: str = "sort_order"):
@@ -302,6 +329,10 @@ class SlipnetNodeDef(Base):
     full_name = Column(Text, nullable=True)
     cm_short_name = Column(Text, nullable=True)
     article_an = Column(Boolean, nullable=True)
+    #: How many times the node has been noticed: a whole number the learning sources add to, 0
+    #: for every node of the Metacat Standard Configuration.  Only the ``noticings`` builtin
+    #: reads it, for a codelet body that counts repetition (the v2.0 Base's ``consolidator``).
+    noticings = Column(BigInteger, nullable=False, default=0)
 
 
 class SlipnetLinkDef(Base):
@@ -324,7 +355,8 @@ class SlipnetLinkDef(Base):
     to_node = Column(Text, nullable=False, index=True)
     link_type = Column(Text, ForeignKey("link_types.name"), nullable=False)
     label_node = Column(Text, nullable=True)
-    link_length = Column(Integer, nullable=True)  # None = dynamic (from label node)
+    #: None = dynamic (from label node).  A whole number or a fraction (``WholeAsInt``).
+    link_length = Column(WholeAsInt, nullable=True)
     fixed_length = Column(Boolean, nullable=False)
 
 

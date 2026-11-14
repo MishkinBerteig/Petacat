@@ -253,6 +253,8 @@ def _expected_tables() -> dict[str, list[dict]]:
                 "full_name": n.get("full_name"),
                 "cm_short_name": n.get("cm_short_name"),
                 "article_an": n.get("article_an"),
+                # no seed file gives a count: the column's default, 0, for every node
+                "noticings": n.get("noticings", 0),
             }
             for i, n in enumerate(_file("slipnet_nodes.json"))
         ),

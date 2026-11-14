@@ -63,6 +63,7 @@ writers of one configuration take consecutive revisions.
 from __future__ import annotations
 
 import logging
+import math
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Mapping, Sequence
@@ -554,8 +555,27 @@ async def _lock_configuration(session: AsyncSession, configuration_id: int) -> d
     return dict(row)
 
 
+def _jsonable(value: Any) -> Any:
+    """*value* with every non-finite number written as text (``"NaN"``, ``"Infinity"``, ``"-Infinity"``).
+
+    The ops a source asked for are journaled as they were submitted, and the change API refuses a ``nan`` or an ``inf``
+    per op (under ``skip`` the batch's other ops still apply), so the batch that carried one is
+    still journaled.  A ``json`` column cannot hold the bare tokens ``NaN`` and ``Infinity``, so the
+    refused number is kept as the text it was.  Whole numbers past float's range are valid JSON and stay.
+    """
+    if isinstance(value, float) and not math.isfinite(value):
+        return "NaN" if value != value else ("Infinity" if value > 0 else "-Infinity")
+    if isinstance(value, Mapping):
+        return {k: _jsonable(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_jsonable(v) for v in value]
+    return value
+
+
 def _entry_values(configuration_id: int, revision: int, **fields: Any) -> dict:
-    return {"configuration_id": configuration_id, "revision": revision, **fields}
+    # every value passes through: what a source asked for may carry a refused non-finite number
+    return {"configuration_id": configuration_id, "revision": revision,
+            **{name: _jsonable(value) for name, value in fields.items()}}
 
 
 # ──────────────────────────────────────────────────────────────────

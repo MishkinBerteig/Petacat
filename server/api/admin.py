@@ -266,6 +266,9 @@ class SlipnetNodeResponse(BaseModel):
     conceptual_depth: int
     description: str
     descriptor_predicate: str | None = None
+    #: How many times the node has been noticed (a whole number; learned, so it is read here and
+    #: written by the change API's ``adjust``).
+    noticings: int = 0
 
 
 class SlipnetLinkRequest(BaseModel):
@@ -273,7 +276,8 @@ class SlipnetLinkRequest(BaseModel):
     to_node: str
     link_type: str
     label_node: str | None = None
-    link_length: int | None = None
+    #: A whole number or a fraction; the change API refuses one that is not finite.
+    link_length: int | float | None = None
     fixed_length: bool
 
 
@@ -283,7 +287,7 @@ class SlipnetLinkResponse(BaseModel):
     to_node: str
     link_type: str
     label_node: str | None
-    link_length: int | None
+    link_length: int | float | None
     fixed_length: bool
 
 
@@ -442,6 +446,7 @@ async def list_slipnet_nodes(session: AsyncSession = Depends(get_session)):
             conceptual_depth=r.conceptual_depth,
             description=r.description or "",
             descriptor_predicate=r.descriptor_predicate,
+            noticings=r.noticings or 0,
         )
         for r in rows
     ]
@@ -467,6 +472,7 @@ async def create_slipnet_node(
         conceptual_depth=node.conceptual_depth,
         description=node.description or "",
         descriptor_predicate=node.descriptor_predicate,
+        noticings=node.noticings or 0,
     )
 
 
@@ -490,6 +496,7 @@ async def update_slipnet_node(
         conceptual_depth=node.conceptual_depth,
         description=node.description or "",
         descriptor_predicate=node.descriptor_predicate,
+        noticings=node.noticings or 0,
     )
 
 
@@ -1811,6 +1818,9 @@ async def export_metadata(session: AsyncSession = Depends(get_session)):
                     for column in _NODE_OPTIONAL_COLUMNS
                     if getattr(r, column) is not None
                 },
+                # Only a node that has been noticed carries the count, so an export of the
+                # Metacat Standard Configuration is the bytes it always was.
+                **({"noticings": r.noticings} if r.noticings else {}),
             }
             for r in nodes_result.scalars().all()
         ],
