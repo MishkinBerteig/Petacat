@@ -16,7 +16,7 @@ knowledge as Petacat ports it. It is not a mode and not a database. It is the st
 | `posting_rules.json` | Which codelets are posted, and when; a rule's `urgency_level` names a tier of `urgency_levels` |
 | `commentary_templates.json` | The natural-language commentary and Verbose mode's message texts |
 | `demo_problems.json` | The pre-configured analogy problems |
-| `enums.json` | The 18 enum tables (bridge types, proposal levels, link types, clamp types, and the rest), with the `role` column that binds a row to the engine's vocabulary: see [The role vocabulary](#the-role-vocabulary). Three of them (`string_kinds`, `bridge_types`, `rule_types`) also define the four-string frame: see [The four-string frame](#the-four-string-frame) |
+| `enums.json` | The 17 enum tables (bridge types, proposal levels, clamp types, and the rest) and `link_types` (not an enum table: the change API addresses it, and a configuration may hold link types of its own), with the `role` column that binds a row to the engine's vocabulary: see [The role vocabulary](#the-role-vocabulary). Three of them (`string_kinds`, `bridge_types`, `rule_types`) also define the four-string frame: see [The four-string frame](#the-four-string-frame) |
 | `help_topics.en.json` | The help text. It is content, not configuration: the server syncs it into the database at every start, and `scripts/generate_help_docs.py` derives `HELP.md` and the client's `helpTopics.ts` from it |
 
 ## The role vocabulary
@@ -81,12 +81,17 @@ API protocol, which the client compares), `codelet_phases` (a grouping label) an
 so the change API advises against it).
 
 Seven tables have other columns than the common four (`name`, `display_label`, `sort_order`,
-`description`), all in `enums.json`:
+`description`), all in `enums.json` (`link_types` is the one of them that is not an enum table):
 
 - **`link_types.behaviour`** is what the engine does with a link of this type, one of `category`,
   `instance`, `property`, `lateral`, `slip` (`LINK_BEHAVIOURS`). Which type has which behaviour is
   configuration; the engine names behaviours and never a link type. Several types may share one behaviour.
-  A type that holds a behaviour is not deleted until the behaviour is unset.
+  A type with no behaviour is **plain**: its links sit in a sixth list, last in `outgoing_links`, spread
+  activation by their fixed length (a plain link must have one: without it a link reads as length 0, full
+  association) and mean what the codelets that read them (`links_of(node, type)`) make of them. The five
+  rows of the Standard all have a behaviour. A type is created with `add_link_type` and removed with
+  `remove_link_type` (refused while a link has it); `link_types` is addressed by the change API's generic
+  ops, `rename_enum_value` does not apply to it, and a type with a behaviour is deleted like any other.
 - **`codelet_families.serialised`** (boolean) says a codelet of this family runs alone under the
   free-running executor, because it reads and rewrites the whole Workspace (`meta` and `answer`).
 - **`clamp_types`** has, besides `role`: `codelet_background_level`, the name of an urgency level the clamp

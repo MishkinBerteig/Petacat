@@ -35,7 +35,9 @@ async def _rows(client, table) -> dict[str, dict]:
 @pytest.mark.asyncio
 async def test_the_list_endpoint_returns_the_available_roles_per_table(app_client):
     data = (await app_client.get("/api/admin/enums")).json()
-    assert sorted(data["tables"]) == sorted(ENUM_REGISTRY)
+    # link_types is not an enum table (it has its own tab and routes), but its behaviours are still listed
+    assert sorted(data["tables"]) == sorted(ENUM_REGISTRY) and len(data["tables"]) == 17
+    assert "link_types" not in data["tables"] and "link_types" not in data["columns"]
     roles = data["roles"]
     for table, entry in roles.items():
         if table == "link_types":
@@ -49,7 +51,6 @@ async def test_the_list_endpoint_returns_the_available_roles_per_table(app_clien
     assert extra["bridge_types"] == ["role", "from_string_kind", "to_string_kind", "orientation", "theme_type"]
     assert extra["string_kinds"] == ["role", "exists_at_start"]
     assert extra["rule_types"] == ["role", "bridge_type"]
-    assert extra["link_types"] == ["behaviour"]
     assert extra["codelet_families"] == ["serialised"]
     assert extra["progress_focuses"] == ["event_types"]
     assert extra["clamp_types"] == [
@@ -65,7 +66,8 @@ async def test_a_list_row_carries_every_column(app_client):
     assert rows["top"]["role"] == "bridge_type.top"
     clamps = await _rows(app_client, "clamp_types")
     assert set(next(iter(clamps.values()))) >= {"jootsing_factor", "progress_focus", "codelet_background_level"}
-    assert (await _rows(app_client, "link_types"))["lateral"]["behaviour"] == "lateral"
+    link_types = {t["name"]: t for t in (await app_client.get("/api/admin/link-types")).json()}
+    assert link_types["lateral"]["behaviour"] == "lateral"
 
 
 @pytest.mark.asyncio
@@ -104,8 +106,9 @@ async def test_a_bound_row_is_not_deleted_until_it_is_unbound(clean):
     resp = await clean.delete("/api/admin/enums/bridge_types/top")
     assert resp.status_code == 422 and "role_bound" in resp.json()["detail"]
     assert "top" in await _rows(clean, "bridge_types")
-    resp = await clean.delete("/api/admin/enums/link_types/lateral")
-    assert resp.status_code == 422 and "role_bound" in resp.json()["detail"]
+    # a link type is not an enum row: it is removed by its own route, and refused while links have it
+    resp = await clean.delete("/api/admin/link-types/lateral")
+    assert resp.status_code == 422 and "still has" in resp.json()["detail"]
     # unbind (role to null), then it is an ordinary row: the foreign keys still guard it
     resp = await clean.put("/api/admin/enums/bridge_types/vertical", json={"display_label": "Vertical", "role": None})
     assert resp.status_code == 200 and resp.json()["role"] is None
@@ -120,10 +123,12 @@ async def test_a_bound_row_is_not_deleted_until_it_is_unbound(clean):
 
 @pytest.mark.asyncio
 async def test_a_referenced_row_that_is_unbound_is_still_guarded(clean):
-    resp = await clean.put("/api/admin/enums/link_types/lateral", json={"display_label": "Lateral", "behaviour": None})
-    assert resp.status_code == 200
-    resp = await clean.delete("/api/admin/enums/link_types/lateral")
-    assert resp.status_code == 409  # 84 links still have the type
+    # a link type: it cannot become plain while links without a fixed length have it, and it is not
+    # removed while any link has it
+    resp = await clean.put("/api/admin/link-types/lateral", json={"behaviour": None})
+    assert resp.status_code == 422 and "fixed length" in resp.json()["detail"]
+    resp = await clean.delete("/api/admin/link-types/lateral")
+    assert resp.status_code == 422  # 84 links still have the type
 
 
 @pytest.mark.asyncio
@@ -158,13 +163,9 @@ async def test_a_rename_rewrites_every_column_that_names_the_row(clean):
     assert not any(r["direction"] == "bottom_up" for r in rules)
     assert sum(1 for c in report["cascaded"] if c["table"] == "posting_rules") == n
 
-    # a link type: 84 links are rewritten, and they keep their keys apart
+    # a link type is not an enum row: there is no rename route for it
     resp = await clean.post("/api/admin/enums/link_types/lateral/rename", json={"new_name": "lat"})
-    assert resp.status_code == 200, resp.text
-    links = (await clean.get("/api/admin/slipnet/links")).json()
-    assert not any(l["link_type"] == "lateral" for l in links)
-    assert sum(1 for l in links if l["link_type"] == "lat") == 84
-    assert (await _rows(clean, "link_types"))["lat"]["behaviour"] == "lateral"
+    assert resp.status_code == 404
 
     # a list column: the progress focus names event types
     event = (await _rows(clean, "progress_focuses"))

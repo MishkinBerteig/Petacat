@@ -42,6 +42,12 @@ const LINK_DASH: Record<string, string> = {
   slip: '6,3',
 };
 
+// A link whose type has no behaviour (a plain link) or whose type the run does not describe
+// has no entry above: it is drawn grey and dotted, so it reads as "a link the engine only
+// spreads activation along" and not as one of the five behaviours.
+const PLAIN_LINK_COLOR = '#888';
+const PLAIN_LINK_DASH = '2,3';
+
 function activationColor(activation: number): string {
   const t = Math.max(0, Math.min(100, activation)) / 100;
   const r = Math.round(21 + t * (255 - 21));
@@ -169,7 +175,7 @@ export function SlipnetGraphView({
   // A link type is shown unless its box was unticked.
   const [linkFilters, setLinkFilters] = useState<Record<string, boolean>>({});
   const { behaviourOf, linkTypes } = useLinkBehaviours();
-  const colourOf = (linkType: string) => LINK_COLORS[behaviourOf(linkType) ?? ''] ?? '#888';
+  const colourOf = (linkType: string) => LINK_COLORS[behaviourOf(linkType) ?? ''] ?? PLAIN_LINK_COLOR;
   // The run's link types, then any the drawn links use that the run does not describe.
   const filterTypes = useMemo(() => {
     const out = [...linkTypes];
@@ -473,7 +479,7 @@ export function SlipnetGraphView({
               stroke={labelFrozen ? 'cyan' : colourOf(link.link_type)}
               strokeWidth={strokeWidth}
               strokeOpacity={opacity}
-              strokeDasharray={LINK_DASH[behaviourOf(link.link_type) ?? ''] ?? ''}
+              strokeDasharray={LINK_DASH[behaviourOf(link.link_type) ?? ''] ?? (behaviourOf(link.link_type) ? '' : PLAIN_LINK_DASH)}
               filter={useGlow ? 'url(#link-glow)' : undefined}
               style={isSliplink && isFullyActive ? {
                 animation: 'slipnet-pulse 0.6s ease-in-out infinite alternate',

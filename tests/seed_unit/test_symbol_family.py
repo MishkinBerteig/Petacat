@@ -8,6 +8,7 @@ giving the same results on every numeric backend.
 
 from __future__ import annotations
 
+import contextlib
 import dataclasses
 from pathlib import Path
 
@@ -169,16 +170,120 @@ LETTER_PROBLEMS = read_problem_list(DATA / "fidelity_widen.txt")[:12]
 assert len(LETTER_PROBLEMS) == 12
 
 
+@pytest.fixture(scope="module")
+def base_without_the_symbol_family(base) -> MetadataProvider:
+    """The v2.0 Base minus the symbol family's posting rule (its codelet types stay, unposted)."""
+    rules = tuple(r for r in base.posting_rules if r.codelet_type not in ("symbol-scout", "symbol-builder"))
+    assert len(rules) == len(base.posting_rules) - 1
+    return dataclasses.replace(base, posting_rules=type(base.posting_rules)(rules))
+
+
 @pytest.mark.parametrize("problem", LETTER_PROBLEMS, ids=[" ".join(p) for p in LETTER_PROBLEMS])
-def test_on_letter_problems_the_base_and_the_standard_agree_run_for_run(problem, standard, base):
-    """With no unseen symbol the symbol family posts nothing and draws nothing: codelets, answer,
-    temperature and the number of random draws are the Standard's, with a fresh memory each run."""
+def test_with_no_unseen_symbol_the_symbol_family_posts_nothing_and_draws_nothing(
+        problem, base, base_without_the_symbol_family):
+    """The property this test used to state against the Standard, restated.  Increment 2 lets two
+    neighbours with no relation bond (``adjacent``), so the v2.0 Base no longer equals the Standard
+    on a letter problem (``test_adjacent_bonds_are_built_on_the_base_and_never_on_the_standard``).
+    What stays true is that the symbol family itself changes nothing when every symbol is perceived:
+    the v2.0 Base and the v2.0 Base without the symbol family's posting rule agree run for run in
+    codelets, answer, temperature and the number of random draws, with a fresh memory each run."""
     for seed in (1, 2, 3):
-        _, std = run(standard, problem, seed, steps=1500)
-        _, b = run(base, problem, seed, steps=1500)
+        _, without = run(base_without_the_symbol_family, problem, seed, steps=1500)
+        _, with_family = run(base, problem, seed, steps=1500)
         for key in ("status", "answer", "codelets", "temperature", "draws"):
-            assert b[key] == std[key], (problem, seed, key)
-        assert b["proposals"] == []
+            assert with_family[key] == without[key], (problem, seed, key)
+        assert with_family["proposals"] == []
+
+
+def test_on_the_standard_the_symbol_family_is_not_there_at_all(standard):
+    assert "symbol-scout" not in standard.codelet_specs
+    assert all(r.codelet_type != "symbol-scout" for r in standard.posting_rules)
+
+
+# -- adjacent bonds (increment 2) --------------------------------------------------------------------------------
+
+
+@contextlib.contextmanager
+def counting_bonds():
+    """Every bond added to a string during the block, by category name."""
+    from server.engine.workspace import WorkspaceString
+
+    seen: list[str] = []
+    original = WorkspaceString.add_bond
+
+    def add_bond(self, bond, **kw):
+        seen.append(bond.bond_category.name)
+        return original(self, bond, **kw)
+
+    WorkspaceString.add_bond = add_bond
+    try:
+        yield seen
+    finally:
+        WorkspaceString.add_bond = original
+
+
+ADJACENT = "plato-adjacent"
+
+
+#: An adjacent bond is weak by design (intrinsic length 90), so it is built rarely: on this problem
+#: seed 3 builds 25 of them in 3000 codelets, and the Standard builds none.
+ADJACENT_PROBLEM, ADJACENT_SEED, ADJACENT_STEPS = ("aceg", "acei", "bdfh"), 3, 3000
+
+
+def adjacent_bonds(meta, problem=ADJACENT_PROBLEM, seeds=(ADJACENT_SEED,), steps=ADJACENT_STEPS):
+    out = []
+    for seed in seeds:
+        with counting_bonds() as seen:
+            run(meta, problem, seed, steps=steps)
+        out.append(seen.count(ADJACENT))
+    return out
+
+
+def test_adjacent_bonds_are_built_on_the_base_and_never_on_the_standard(standard, base):
+    # a, c, e and g are neighbours with no link between them
+    assert adjacent_bonds(base)[0] > 0
+    assert adjacent_bonds(standard) == [0]
+    # the bonds the Standard builds on its own problems are never adjacent, on any seed tried
+    for problem in (("abc", "abd", "ace"), ("ace", "acf", "bdf")):
+        assert adjacent_bonds(standard, problem, seeds=(1, 2, 3), steps=1500) == [0, 0, 0], problem
+
+
+def test_the_scout_still_fizzles_where_the_role_is_unbound(base):
+    """With no ``bond_category.adjacent`` binding the Base's body fizzles at the same place as the
+    Standard's, so no adjacent bond is ever built."""
+    rows = tuple(r for r in base.node_roles if r.role != "bond_category.adjacent")
+    assert len(rows) == len(base.node_roles) - 1
+    unbound = dataclasses.replace(base, node_roles=type(base.node_roles)(rows))
+    assert adjacent_bonds(unbound) == [0]
+
+
+def test_both_group_scouts_fizzle_on_an_adjacent_bond_and_no_group_is_made_of_one(base):
+    """Bonds only: ``plato-adjacent`` has no group category, so a group scout that starts from an
+    adjacent bond reaches its ``grp_cat is None`` check and fizzles."""
+    ctx = fresh_ctx(base, ("ace", "acf", "bdf"))
+    adjacent = ctx.slipnet.nodes[ADJACENT]
+    assert adjacent.get_related_node(role_node(ctx, "dimension.group_category")) is None
+    for scout in ("top-down-group-scout:direction", "group-scout:whole-string"):
+        assert "grp_cat is None" in base.codelet_specs[scout].execute_body
+        assert "get_related_node(role('dimension.group_category'))" in base.codelet_specs[scout].execute_body
+    runner, _ = run(base, ADJACENT_PROBLEM, ADJACENT_SEED, steps=ADJACENT_STEPS)
+    strings = runner.ctx.workspace.all_strings
+    assert any(b.bond_category.name == ADJACENT for s in strings for b in s.bonds)  # adjacent bonds stand
+    assert not any(b.bond_category.name == ADJACENT
+                   for s in strings for g in s.groups for b in getattr(g, "bonds", ()))
+
+
+def role_node(ctx, name):
+    return ctx.slipnet.roles.get(name)
+
+
+def test_an_adjacent_bond_is_weak_until_its_category_is_fully_active(base):
+    ctx = fresh_ctx(base, ("ace", "acf", "bdf"))
+    adjacent, successor = ctx.slipnet.nodes[ADJACENT], ctx.slipnet.nodes["plato-successor"]
+    assert adjacent.intrinsic_link_length == 90 and successor.intrinsic_link_length == 60
+    assert adjacent.degree_of_assoc() == 10 and successor.degree_of_assoc() == 40
+    adjacent.activation = 100.0
+    assert adjacent.degree_of_assoc() > 10  # a fully active category shrinks its length
 
 
 # -- a run that creates a node, on every numeric backend (check 3) ------------------------------

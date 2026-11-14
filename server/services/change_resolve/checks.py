@@ -40,6 +40,8 @@ _ARGS: dict[str, dict[str, str]] = {
                  "from_node": "s", "to_node": "s", "link_type": "s", "label_node": "s",
                  "link_length": "i", "fixed_length": "b"},
     "remove_link": {"key": "o*"},
+    "add_link_type": {"name": "s*", "behaviour": "s", "display_label": "s", "description": "s"},
+    "remove_link_type": {"name": "s*"},
     "add_param": {"name": "s*", "to": "a*", "value_type": "s*"},
     "set_param": {"name": "s*", "to": "a*", "value_type": "s", "expect": "a"},
     "adjust_param": {"name": "s*", "by": "n*"},

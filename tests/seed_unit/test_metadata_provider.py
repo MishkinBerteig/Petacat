@@ -149,7 +149,8 @@ def test_loads_the_vocabulary_bindings(meta):
 
 def test_enum_tables_have_the_expected_counts():
     """Each enum table of the Metacat Standard Configuration (``enums.json``) has the expected
-    number of values, and the file has every enum table of the registry (18)."""
+    number of values, and the file has every enum table of the registry (17) and ``link_types``,
+    which the change API addresses and is no longer an enum table."""
     import json
     import os
 
@@ -157,7 +158,7 @@ def test_enum_tables_have_the_expected_counts():
 
     with open(os.path.join(SEED_DIR, "enums.json")) as f:
         enums = json.load(f)
-    assert set(enums) == set(ENUM_REGISTRY) and len(enums) == 18
+    assert set(enums) == set(ENUM_REGISTRY) | {"link_types"} and len(ENUM_REGISTRY) == 17 and len(enums) == 18
     assert len(enums["run_statuses"]) == 6
     # 7: the seven Temporal Trace event types of §4.4, which are all the Trace records
     # (bond, bridge, description and clamp-end types were never recorded and were removed).

@@ -16,10 +16,12 @@ per table:
   removal, and its report lists them.
 
 Adding an unbound row, or leaving a row unbound, is always allowed: the row is inert except
-that it becomes a valid value of the columns that reference its table.  The enum tables are
+that it becomes a valid value of the columns that reference its table.  The 17 enum tables are
 not addressable by generic ops in a batch (``schema`` lists the other tables); the Admin enum
 editor and the Database tab's enum path call these functions.  The resolver applies
-:func:`role_problem` to ``theme_relations`` (addressable) as well.
+:func:`role_problem` to ``theme_relations`` and ``link_types`` (both addressable) as well, but
+:func:`delete_problem` to ``theme_relations`` only: a link type is removed by ``remove_link_type``
+whatever its behaviour, once no link has its name.
 """
 
 from __future__ import annotations

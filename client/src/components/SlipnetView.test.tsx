@@ -135,4 +135,14 @@ describe('SlipnetNodeFocus — link types compared by behaviour', () => {
     render(<SlipnetNodeFocus nodeName="plato-a" onClose={() => {}} />)
     expect(await colourOf('mystery')).toBe('var(--text-secondary)')
   })
+
+  it('colours a plain type (one the run describes with no behaviour) in the neutral colour', async () => {
+    const payload = renamed({})
+    useVocabularyStore.getState().adopt({
+      ...payload, link_behaviours: { ...payload.link_behaviours, near: null },
+    })
+    vi.mocked(api.getSlipnetLinks).mockResolvedValueOnce([link('near')] as never)
+    render(<SlipnetNodeFocus nodeName="plato-a" onClose={() => {}} />)
+    expect(await colourOf('near')).toBe('var(--text-secondary)')
+  })
 })

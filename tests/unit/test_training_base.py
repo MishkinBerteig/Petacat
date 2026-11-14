@@ -115,3 +115,78 @@ def test_an_edit_to_a_codelet_file_changes_the_delta_hash(monkeypatch, tmp_path)
     scout = copy / "codelets" / "symbol-scout.py"
     scout.write_text(scout.read_text() + "\n# edited\n")
     assert tb.resolve_base().delta_hash != first
+
+
+# -- increment 2: ``adjacent`` ------------------------------------------------------------------------------
+
+
+def test_the_deltas_first_op_creates_the_adjacent_link_type_with_the_lateral_behaviour():
+    base = tb.resolve_base()
+    first = base.resolved[0]
+    assert first["op"] == "insert" and first["table"] == "link_types"
+    assert first["row"]["name"] == "adjacent" and first["row"]["behaviour"] == "lateral"
+    assert tb.load_delta()[0]["op"] == "add_link_type"
+    std = reference_document()
+    assert ("adjacent",) not in std.tables["link_types"] and ("adjacent",) in base.document.tables["link_types"]
+
+
+def test_plato_adjacent_is_an_instance_of_bond_category_and_copies_successors_properties():
+    doc = tb.resolve_base().document
+    nodes, links = doc.tables["slipnet_node_defs"], doc.tables["slipnet_link_defs"]
+    adjacent, successor = nodes[("plato-adjacent",)], nodes[("plato-successor",)]
+    assert adjacent["short_name"] == "adjacent" and adjacent["plain_name"] == "adjacent"
+    assert adjacent["conceptual_depth"] == successor["conceptual_depth"] == 50
+    assert adjacent["descriptor_predicate"] is None and adjacent["glyph"] is None and adjacent["numeric_value"] is None
+    assert list(nodes)[-1] == ("plato-adjacent",) or ("plato-adjacent",) in nodes
+    for frm, to, kind in (("plato-successor", "plato-bond-category", "category"),
+                          ("plato-bond-category", "plato-successor", "instance")):
+        mirror = links[(frm, to, kind, "")]
+        new = links[(frm.replace("successor", "adjacent"), to.replace("successor", "adjacent"), kind, "")]
+        assert (new["link_length"], new["fixed_length"]) == (mirror["link_length"], mirror["fixed_length"])
+    std = reference_document()
+    assert ("plato-adjacent",) not in std.tables["slipnet_node_defs"]
+
+
+def test_adjacent_has_a_long_intrinsic_link_length_a_theme_relation_and_a_role():
+    doc = tb.resolve_base().document
+    lengths = json.loads(doc.tables["engine_params"][("intrinsic_link_lengths",)]["value"])
+    std_lengths = json.loads(reference_document().tables["engine_params"][("intrinsic_link_lengths",)]["value"])
+    assert lengths["plato-adjacent"] == 90 and {k: v for k, v in lengths.items() if k != "plato-adjacent"} == std_lengths
+    relation = doc.tables["theme_relations"][("adjacent",)]
+    assert relation["node_name"] == "plato-adjacent" and relation["role"] is None and relation["abstractness"] is None
+    assert doc.tables["slipnet_node_roles"][("bond_category.adjacent", 0)]["node_name"] == "plato-adjacent"
+    std = reference_document()
+    assert ("adjacent",) not in std.tables["theme_relations"]
+    assert ("bond_category.adjacent", 0) not in std.tables["slipnet_node_roles"]
+
+
+def test_the_bond_scout_override_is_the_standard_body_with_only_the_fizzle_replaced():
+    doc = tb.resolve_base().document.tables["codelet_type_defs"]
+    body, seed = doc[("bottom-up-bond-scout",)]["execute_body"], standard_body("bottom-up-bond-scout")
+    assert "role('bond_category.adjacent')" in body and "role('bond_category.adjacent')" not in seed
+    old = ("if bond_cat is None:\n    if verbose:\n        say('no-bond-between-descriptors')\n    fizzle()\n")
+    assert old in seed
+    # everything before and after the replaced block is the Standard's, character for character
+    head, tail = seed.split(old)
+    assert body.startswith(head) and body.endswith(tail) and "choose_bond_facet(obj, neighbor)" in body
+    assert "incompatible_bond_candidates(obj, neighbor, bond_facet, bond_cat)" in body
+    # the fizzle stays, behind the role being absent
+    assert "if not bond_cat:" in body and "fizzle()" in body
+
+
+def test_a_changed_standard_bond_scout_body_fails_loudly():
+    std = reference_document()
+    tables = {t: dict(rows) for t, rows in std.tables.items()}
+    row = dict(tables["codelet_type_defs"][("bottom-up-bond-scout",)])
+    row["execute_body"] += "\n# a later Standard change\n"
+    tables["codelet_type_defs"][("bottom-up-bond-scout",)] = row
+    changed = cd.from_rows({t: list(rows.values()) for t, rows in tables.items()}, version=0)
+    with pytest.raises(tb.BaseOutOfDate) as info:
+        tb.resolve_base(standard=changed)
+    assert "bottom-up-bond-scout" in str(info.value) and "sha256" in str(info.value)
+
+
+def test_the_delta_records_the_standard_bodys_sha256_for_the_bond_scout():
+    ops = {o.get("name"): o for o in tb.load_delta() if o["op"] == "set_codelet_body"}
+    assert ops["bottom-up-bond-scout"]["standard_sha256"] == hashlib.sha256(
+        standard_body("bottom-up-bond-scout").encode("utf-8")).hexdigest()

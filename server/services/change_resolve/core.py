@@ -37,14 +37,23 @@ old name is the journal's story (``GET /api/journal/where-did-name-go``).
 Vocabulary rows (``rename_enum_value``)
 ---------------------------------------
 Renaming a row of an enum table (or of ``theme_relations``) rewrites every column that names
-it (``REFERENCES`` and ``ENUM_RENAME_EXTRA`` in ``spec.py``), keeps the row's ``role`` (its
-``behaviour``, for ``link_types``) and its place, and rewrites the commentary sections keyed by
+it (``REFERENCES`` and ``ENUM_RENAME_EXTRA`` in ``spec.py``), keeps the row's ``role`` and its place, and rewrites the commentary sections keyed by
 the table's names (``TEMPLATE_KEYED_BY``).  Bodies, predicates, formulas, parameters and
 templates that still spell the old name are listed as ``dangling``, exactly as ``rename_node``
-lists code.  The enum tables are not addressed by the generic ops (``schema`` does not list them);
+lists code.  The 17 enum tables are not addressed by the generic ops (``schema`` does not list them);
 the Admin enum editor's creates, updates and deletes follow the rules of ``vocabulary.py`` (a
 role is a name of the table's vocabulary and held by one row; a bound row is not deleted:
 ``422 role_bound``).
+
+Link types (``add_link_type``, ``remove_link_type``)
+----------------------------------------------------
+``link_types`` is not an enum table: the generic ops address it, ``rename_enum_value`` does not
+apply to it (a link type is replaced, not renamed: add the new one, move its links, remove the old
+one), and a configuration may hold link types of its own, a Training Mode Session's included.  A
+row's ``behaviour`` is one of the engine's ``LINK_BEHAVIOURS`` or empty (a **plain** link type).
+``add_link_type`` refuses a name that exists.  ``remove_link_type`` refuses while a link of that
+type exists.  A link of a plain type must have a fixed length (``fixed_length`` true and a
+``link_length``): without one it would read as length 0, which is full association.
 
 Parameters that name things
 ---------------------------
@@ -113,6 +122,7 @@ from server.services.configuration_input import (
 
 NODES = "slipnet_node_defs"
 LINKS = "slipnet_link_defs"
+LINK_TYPES = "link_types"
 LAYOUT = "slipnet_layout"
 THEME_DIMS = "theme_dimension_defs"
 THEME_RELS = "theme_relations"
@@ -354,6 +364,35 @@ class _Run:
             if found:
                 raise _Fail(checks.does_not_compile(i, table, c, key, language, found))
 
+    def _plain_link_problem(self, i: int, link: Mapping, link_type: str) -> _Fail | None:
+        if link.get("fixed_length") and link.get("link_length") is not None:
+            return None
+        key = [link.get("from_node"), link.get("to_node"), link_type, link.get("label_node") or ""]
+        return self.fail(
+            MALFORMED,
+            f"a link of type {link_type!r} needs a fixed length (fixed_length true and a link_length): "
+            f"the type has no behaviour, so the link is plain, and a plain link with no fixed length "
+            f"reads as length 0, which is full association", i, "fixed_length", LINKS, key)
+
+    def check_plain_link(self, i: int, link: Mapping) -> None:
+        """A link whose type has no behaviour (a plain link) has a fixed length.  A link whose type is
+        not in the configuration yet is not checked here: the reference check at the end of the batch
+        refuses it unless the batch creates the type, and a batch creates a type before its links."""
+        link_type = self.row(LINK_TYPES, {"name": link.get("link_type")})
+        if link_type is None or link_type.get("behaviour"):
+            return
+        problem = self._plain_link_problem(i, link, link_type["name"])
+        if problem is not None:
+            raise problem
+
+    def check_plain_type(self, i: int, link_type: Mapping) -> None:
+        """A link type that loses its behaviour while a link of that type has no fixed length."""
+        for link in self.rows(LINKS).values():
+            if link.get("link_type") == link_type["name"]:
+                problem = self._plain_link_problem(i, link, link_type["name"])
+                if problem is not None:
+                    raise problem
+
     def check_typed(self, i: int, table: str, row: Mapping) -> None:
         if table == PARAMS and row.get("refers_to") is not None and row["refers_to"] not in REFERS_TO_KINDS:
             raise self.fail(MALFORMED, f"refers_to must be one of {list(REFERS_TO_KINDS)} or null", i,
@@ -376,6 +415,8 @@ class _Run:
         self.check_role(i, table, row, None)
         self.check_code(i, table, row, LAYER_REGISTRY[table].code_columns)
         self.check_typed(i, table, row)
+        if table == LINKS:
+            self.check_plain_link(i, row)
         self.e_insert(i, table, row, reason=reason)
 
     def do_update(self, i: int, table: str, key: Mapping, fields: Mapping, *, expect: Mapping | None = None,
@@ -415,6 +456,10 @@ class _Run:
         self.check_code(i, table, new_row, [c for c in changed if c in spec.code_columns])
         if table in PARAM_TABLES and ({"value", "value_type", "refers_to"} & set(changed)):
             self.check_typed(i, table, new_row)
+        if table == LINKS and {"link_type", "link_length", "fixed_length"} & set(changed):
+            self.check_plain_link(i, new_row)
+        if table == LINK_TYPES and "behaviour" in changed and not new_row.get("behaviour"):
+            self.check_plain_type(i, new_row)
         self.e_update(i, table, key, {c: new_fields[c] for c in changed}, reason=reason)
 
     def patched(self, i, table, old, column, patch_ops, key):
@@ -1255,6 +1300,37 @@ def _h_merge_nodes(r: _Run, i: int, op: dict) -> None:
     _remove_node(r, i, r.row(NODES, {"name": drop}), scan=True)
 
 
+def _h_add_link_type(r: _Run, i: int, op: dict) -> None:
+    """A new ``link_types`` row.  ``behaviour`` is one of the engine's ``LINK_BEHAVIOURS`` or
+    absent (a **plain** link type: its links spread activation by their fixed length and mean
+    what the codelets that read them make of them).  Refuses a name that exists.  It is an
+    ``insert``, so its before-image is "no row" and undo, restore and ``config_at`` take it away
+    again.  Under ``on_op_failure: skip`` a refused op leaves the type uncreated."""
+    r.do_insert(i, LINK_TYPES, {
+        "name": op["name"],
+        "display_label": op.get("display_label") or op["name"],
+        "description": op.get("description", ""),
+        "behaviour": op.get("behaviour") or None,
+    })
+
+
+def _h_remove_link_type(r: _Run, i: int, op: dict) -> None:
+    """Remove a ``link_types`` row.  Refused while any link of that type exists (name them in
+    ``remove_link`` ops first, in the same batch if you like): a link is never left with a type
+    that is gone, and a removal never deletes links as a side effect."""
+    name = op["name"]
+    if r.row(LINK_TYPES, {"name": name}) is None:
+        raise r.missing(i, LINK_TYPES, {"name": name}, "name")
+    users = [lk for lk in r.rows(LINKS).values() if lk.get("link_type") == name]
+    if users:
+        raise r.fail(
+            UNKNOWN_REFERENCE,
+            f"link type {name!r} still has {len(users)} link(s), e.g. "
+            f"{users[0]['from_node']!r} to {users[0]['to_node']!r}; remove them first (remove_link)",
+            i, "name", LINK_TYPES, [name])
+    r.do_delete(i, LINK_TYPES, {"name": name})
+
+
 def _h_add_link(r: _Run, i: int, op: dict) -> None:
     row = _link_row({k: v for k, v in op.items() if k != "op"})
     for need in ("from_node", "to_node", "link_type"):
@@ -1546,6 +1622,8 @@ _HANDLERS: dict[str, Callable] = {
     "merge_nodes": _h_merge_nodes,
     "add_link": _h_add_link,
     "remove_link": _h_remove_link,
+    "add_link_type": _h_add_link_type,
+    "remove_link_type": _h_remove_link_type,
     "add_param": _h_add_param,
     "set_param": _h_set_param,
     "set_coefficient": _h_set_param,

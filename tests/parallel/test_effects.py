@@ -382,3 +382,10 @@ def test_apply_ops_is_a_barrier_so_the_speculative_executor_serialises_it():
     entry = fx.load().builtins["apply_ops"]
     assert entry.kind == fx.BARRIER
     assert entry.writes & fx.BIT["slipnet_act"] and entry.writes & fx.BIT["ctx"]
+
+
+def test_links_of_reads_only_the_static_topology_and_writes_nothing():
+    """``links_of`` filters a node's ``outgoing_links`` (links are never added during a run: ``apply_ops``
+    adds nodes only, and is a BARRIER), so it declares no component read and no write."""
+    entry = fx.load().builtins["links_of"]
+    assert entry.kind == fx.READ and entry.reads == 0 and entry.writes == 0

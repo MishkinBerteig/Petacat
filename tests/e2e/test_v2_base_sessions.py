@@ -232,3 +232,50 @@ async def test_the_admin_compare_reads_the_v2_base_like_the_standard(app_client)
     assert same["same"] is True
     refused = await app_client.get("/api/configurations/compare", params={"a": "standard", "b": "nonsense"})
     assert refused.status_code in (400, 404, 422)
+
+
+# -- increment 2: adjacent bonds in real sessions ---------------------------------------------------------------
+
+
+ADJACENT_PROBLEM = ("aceg", "acei", "bdfh")
+
+
+@pytest.mark.asyncio
+async def test_a_session_on_the_base_builds_adjacent_bonds_and_the_serial_child_and_the_swarm_agree(
+        app_client, test_engine):
+    """Neighbours with no relation are perceived as neighbours in a real session: the run's own
+    Workspace builds ``plato-adjacent`` bonds (seed 3 of this problem builds 25), the serial child and
+    the swarm give the same first run, and no ``adjacent`` link is ever written into the session's
+    configuration (only the link type and the node the Base creates are there)."""
+    from server.api.runs import get_run_service
+
+    meta = get_run_service().meta
+    firsts, documents = {}, {}
+    for kind, inner in (("serial", SerialExecutor()), ("swarm", SwarmExecutor(base=meta))):
+        async with test_engine.begin() as conn:
+            await conn.execute(text("DELETE FROM training_mode_sessions"))
+        executor = Recording(inner)
+        service = make_service(test_engine, meta, executor=executor)
+        await service.start()
+        bs.set_training_mode_session_service(service)
+        try:
+            made = await make(app_client, ADJACENT_PROBLEM, 6)
+            await app_client.post(f"/api/training-mode/sessions/{made['id']}/start")
+            await until_state(app_client, made["id"], "finished", timeout=300)
+            runs = await runs_of(app_client, made["id"], 1)
+            assert len(runs) == 6 and all(r["status"] == "answer_found" for r in runs)
+            firsts[kind] = min(executor.outcomes, key=lambda o: o.seed)
+            documents[kind] = await stored_document(test_engine, made["id"])
+            await stop(app_client, made["id"])
+        finally:
+            bs.set_training_mode_session_service(None)
+            await service.stop()
+            if kind == "serial":
+                inner.close()
+    assert outcome_fingerprint(firsts["serial"]) == outcome_fingerprint(firsts["swarm"])
+    for doc in documents.values():
+        assert ("adjacent",) in doc.tables["link_types"] and ("plato-adjacent",) in doc.tables["slipnet_node_defs"]
+        assert not [k for k, r in doc.tables["slipnet_link_defs"].items() if r["link_type"] == "adjacent"]
+        assert [k[0] for k in doc.tables["slipnet_node_defs"] if k[0].startswith("plato-cp-")] == []  # letters only
+    # the serial child and the swarm see the same configuration afterwards
+    assert cd.config_hash(documents["serial"]) == cd.config_hash(documents["swarm"])

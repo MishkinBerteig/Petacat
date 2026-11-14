@@ -66,6 +66,8 @@ ROLES: tuple[RoleSpec, ...] = (
         "direction.left", "direction.right",
         "object.letter", "object.group",
         "bond_category.sameness",
+        # A bond between two neighbours that no link relates (the v2.0 Base binds it; Standard does not).
+        "bond_category.adjacent",
         "group_category.sameness", "group_category.successor", "group_category.predecessor",
         "alphabet.first_marker", "alphabet.last_marker",
     )
@@ -148,6 +150,7 @@ class Absent:
     property_links: tuple = ()
     lateral_links: tuple = ()
     lateral_sliplinks: tuple = ()
+    plain_links: tuple = ()
     incoming_links: tuple = ()
     outgoing_links: tuple = ()
     intrinsic_link_length = None

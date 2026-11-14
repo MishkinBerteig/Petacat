@@ -16,18 +16,19 @@ def test_the_registry_has_every_addressable_table_and_no_enum_or_help_topic():
         "posting_rules", "codelet_pattern_defs", "engine_params", "formula_coefficients",
         "urgency_levels", "demo_problems", "commentary_templates",
         "initial_description_rules", "initial_activation_rules",
-        "input_character_ranges", "input_lowering_ranges",
+        "input_character_ranges", "input_lowering_ranges", "link_types",
     }
-    # The 13 enum lookup tables of the first vocabulary, and the five stage 4 added: the
+    # The 12 enum lookup tables of the first vocabulary (``link_types`` left them: it is addressable
+    # by the change API), and the five stage 4 added: the
     # string kinds, rule scopes and failure kinds the engine names, and the clamp types and
     # progress focuses it reads (all of them have a ``name`` key and the four enum columns).
     assert set(reg.ENUM_REGISTRY) == {
         "run_statuses", "event_types", "bridge_types", "bridge_orientations", "clause_types",
-        "rule_types", "theme_types", "proposal_levels", "link_types", "codelet_families",
+        "rule_types", "theme_types", "proposal_levels", "codelet_families",
         "codelet_phases", "posting_directions", "param_value_types",
         "string_kinds", "rule_scopes", "failure_kinds", "clamp_types", "progress_focuses",
     }
-    assert len(reg.ENUM_REGISTRY) == 18
+    assert len(reg.ENUM_REGISTRY) == 17
     assert "help_topics" not in reg.LAYER_REGISTRY
     assert set(reg.LAYER_REGISTRY) == set(reg.REGISTRY) | set(reg.ENUM_REGISTRY)
     assert set(reg.LAYER_REGISTRY) == set(reg.configuration_table_names())

@@ -10,11 +10,15 @@ Built by introspecting the models in ``server/models/metadata.py`` (the configur
   declaration here stops the application importing this module, so a table is never
   silently unaddressable.
 
-``REGISTRY`` is the tables the change API addresses by generic ops (the 18 enum tables, which
+``REGISTRY`` is the tables the change API addresses by generic ops (the 17 enum tables, which
 are the engine's vocabulary, are not among them; the change API's ``rename_enum_value`` is the
-one op that reads and writes them).  ``ENUM_REGISTRY`` is those 18 and ``LAYER_REGISTRY``
-is both: the journal layer (``server/services/journal.py``) writes all of them, because the
-Metacat Standard Configuration's first load and the Admin enum editor do.
+one op that reads and writes them).  ``link_types`` is addressed, though it has the four enum
+columns: the engine names what a link type *does* (its ``behaviour``) and never a link type, so
+a configuration may hold link types of its own, created by ``add_link_type`` and removed by
+``remove_link_type`` (the one change API every learning source uses).  ``ENUM_REGISTRY`` is the 17
+enum tables and ``LAYER_REGISTRY`` is both: the journal layer (``server/services/journal.py``)
+writes all of them, because the Metacat Standard Configuration's first load and the Admin enum
+editor do.
 
 Resolved ops (3.12.0) are plain dicts naming a table by its database name and a row by its
 natural key (``TableSpec.key``)::
@@ -40,6 +44,9 @@ NON_CONFIGURATION_TABLES = frozenset({"help_topics"})
 #: (``sort_order`` / ``ordinal``; ``()`` when the order is not behaviour).  A NULL in a key
 #: column is read as ``''`` (``slipnet_link_defs.label_node``).
 _NATURAL_KEYS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
+    # First, so a link type sorts before the links that name it (``TABLE_NAMES``).  It has the
+    # four enum columns but is addressed by the change API, so it is declared here.
+    "link_types": (("name",), ("sort_order",)),
     "slipnet_node_defs": (("name",), ("sort_order",)),
     "slipnet_link_defs": (("from_node", "to_node", "link_type", "label_node"), ("sort_order",)),
     "slipnet_layout": (("node_name",), ("sort_order",)),
@@ -206,7 +213,7 @@ def _build() -> tuple[dict[str, TableSpec], dict[str, TableSpec]]:
     registry: dict[str, TableSpec] = {}
     enums: dict[str, TableSpec] = {}
     for name, model in sorted(configuration_models().items()):
-        if _is_enum_table(model):
+        if name not in _NATURAL_KEYS and _is_enum_table(model):
             enums[name] = TableSpec(
                 name, model, ("name",), ("sort_order",), frozenset(), _json_columns(model)
             )
@@ -235,7 +242,7 @@ _registry, _enums = _build()
 #: The tables the change API addresses, by database table name.
 REGISTRY: Mapping[str, TableSpec] = MappingProxyType(_registry)
 
-#: The 18 enum lookup tables (the engine's vocabulary): written by the layer, not addressed
+#: The 17 enum lookup tables (the engine's vocabulary): written by the layer, not addressed
 #: by the change API's generic ops (``rename_enum_value`` renames a row of one).
 ENUM_REGISTRY: Mapping[str, TableSpec] = MappingProxyType(_enums)
 

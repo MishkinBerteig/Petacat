@@ -647,3 +647,43 @@ async def test_a_meta_edit_of_the_global_configuration_keeps_the_store_in_step(l
             assert (await store.provider(session, 1)).config_hash == cd.config_hash(await doc(loaded, 1, 1))
     finally:
         set_configuration_store(None)
+
+
+# ---------------------------------------------------------------------------
+# Link types belong to the configuration they were created in
+# ---------------------------------------------------------------------------
+
+
+async def test_a_created_link_type_belongs_to_its_session_and_config_at_and_reset_follow_it(loaded):
+    from server.services import configuration_admin as admin
+    from server.services import config_document as cd
+
+    sid, cid = await make_config(loaded, "Types", base="standard")
+    await apply(loaded, batch({"op": "add_link_type", "name": "near"}, configuration_id=cid,
+                              source="learner", actor="learner:t"))
+    await apply(loaded, batch({"op": "add_link", "from": "plato-a", "to": "plato-c", "type": "near",
+                               "fixed": True, "length": 20}, configuration_id=cid))
+    before, after_type, after_link = [await doc(loaded, cid, r) for r in (0, 1, 2)]
+    assert ("near",) not in before.tables["link_types"] and ("near",) in after_type.tables["link_types"]
+    assert ("plato-a", "plato-c", "near", "") in after_link.tables["slipnet_link_defs"]
+    assert {t.name: t.behaviour for t in cd.provider(after_link).link_types}["near"] is None
+    # the global configuration has no such type, and the session's type did not reach it
+    assert ("near",) not in (await doc(loaded, 1)).tables["link_types"]
+    async with _s(loaded) as session:
+        assert (await admin.verify_journal(session, cid))["ok"]
+        assert (await admin.diff(session, cid))["count"] == 2  # the type row and the link row
+        done = await admin.reset_to_standard(session, cid)  # deletes the link before the type
+        assert done["wrote"]
+        assert (await admin.status(session, cid))["equals_standard"]
+        assert (await admin.verify_journal(session, cid))["ok"]
+    assert ("near",) not in (await doc(loaded, cid)).tables["link_types"]
+
+
+async def test_a_link_type_with_links_cannot_be_removed_from_a_session_and_the_refusal_writes_nothing(loaded):
+    from server.services.configuration_writer import ChangeError
+
+    sid, cid = await make_config(loaded, "Types2", base="standard")
+    with pytest.raises(ChangeError) as caught:
+        await apply(loaded, batch({"op": "remove_link_type", "name": "lateral"}, configuration_id=cid))
+    assert caught.value.code == "unknown_reference"
+    assert ("lateral",) in (await doc(loaded, cid)).tables["link_types"]

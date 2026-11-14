@@ -148,9 +148,10 @@ def test_param_value_types_match_seed(enums_data):
 # ── Seed data structure ──
 
 def test_all_enum_tables_present(enums_data):
-    """Verify enums.json contains every enum table of the registry (the 13 of the first
+    """Verify enums.json contains every enum table of the registry (17: the 12 of the first
     vocabulary, and the string kinds, rule scopes, failure kinds, clamp types and progress
-    focuses stage 4 added: 18)."""
+    focuses stage 4 added) and ``link_types``, which the change API addresses and which is
+    therefore no longer an enum table (the file still holds its five Standard rows)."""
     from server.services.config_registry import ENUM_REGISTRY
 
     expected_tables = {
@@ -160,8 +161,8 @@ def test_all_enum_tables_present(enums_data):
         "posting_directions", "param_value_types",
         "string_kinds", "rule_scopes", "failure_kinds", "clamp_types", "progress_focuses",
     }
-    assert set(enums_data.keys()) == expected_tables == set(ENUM_REGISTRY)
-    assert len(expected_tables) == 18
+    assert set(enums_data.keys()) == expected_tables == set(ENUM_REGISTRY) | {"link_types"}
+    assert len(expected_tables) == 18 and len(ENUM_REGISTRY) == 17
 
 
 def test_enum_rows_have_required_fields(enums_data):

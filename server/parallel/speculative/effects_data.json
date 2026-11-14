@@ -336,6 +336,12 @@
    "writes": [],
    "why": "Walks from_desc.outgoing_links (static topology; the property builds a fresh list each call, slipnet.py:405) for a labelled link (builtins.py:2383-2391)."
   },
+  "links_of": {
+   "kind": "READ",
+   "reads": [],
+   "writes": [],
+   "why": "Filters node.outgoing_links by link_type (static topology: a run adds nodes, never links, and apply_ops is a BARRIER); returns a new list of the Slipnet's own link objects and mutates nothing."
+  },
   "object_has_description_type": {
    "kind": "READ",
    "reads": [

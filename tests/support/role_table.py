@@ -13,6 +13,10 @@ and ``tests/seed_unit/test_roles.py`` checks that the two agree.
 
 from __future__ import annotations
 
+#: Roles of the vocabulary that the Metacat Standard Configuration does not bind (they are single-node
+#: roles, but absent under the Standard): the Training Mode Base Configuration, v2.0, binds them.
+UNBOUND_UNDER_STANDARD: tuple[str, ...] = ("bond_category.adjacent",)
+
 SINGLE_ROLES: dict[str, str] = {
     "dimension.direction": "plato-direction-category",
     "dimension.group_category": "plato-group-category",

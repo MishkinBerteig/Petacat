@@ -45,6 +45,7 @@ from typing import Any
 from server.engine.hashing import HASH_EXCLUDED_FIELDS, _field_digest, combine
 from server.engine.metadata import MetadataProvider
 from server.services.metadata_service import (
+    ENUM_FILE_TABLE_MODELS,
     ENUM_TABLE_MODELS,
     PROVIDER_FIELD_COLUMNS,
     PROVIDER_FIELD_TABLES,
@@ -474,7 +475,7 @@ def rows_from_standard_files(seed_dir: str) -> dict[str, list[dict[str, Any]]]:
 
     rows: dict[str, list[dict[str, Any]]] = {}
     enums = load("enums.json")
-    for name in ENUM_TABLE_MODELS:
+    for name in ENUM_FILE_TABLE_MODELS:
         # Every column of the table: the file gives the four every enum table has and the
         # table's own (``role``, ``behaviour``, ``serialised`` ...); one it leaves out is NULL.
         columns = LAYER_REGISTRY[name].columns

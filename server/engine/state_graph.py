@@ -292,6 +292,7 @@ class _Reader:
             node.property_links,
             node.lateral_links,
             node.lateral_sliplinks,
+            node.plain_links,
         ):
             for link in group:
                 if link.to_node.name == to_name and link.link_type == link_type:

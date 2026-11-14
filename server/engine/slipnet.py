@@ -179,6 +179,7 @@ class SlipnetNode:
         "property_links",
         "lateral_links",
         "lateral_sliplinks",
+        "plain_links",
         "incoming_links",
         "intrinsic_link_length",
         "_decay_percent",
@@ -218,6 +219,11 @@ class SlipnetNode:
         self.property_links: list[SlipnetLink] = []
         self.lateral_links: list[SlipnetLink] = []
         self.lateral_sliplinks: list[SlipnetLink] = []
+        #: Links whose type has no behaviour (``link_types.behaviour`` empty): they spread
+        #: activation by their fixed length and mean what a codelet that reads them
+        #: (``links_of``) makes of them.  Last in :attr:`outgoing_links`.  Empty under the
+        #: Metacat Standard Configuration, where every link type has a behaviour.
+        self.plain_links: list[SlipnetLink] = []
         self.incoming_links: list[SlipnetLink] = []
         self.intrinsic_link_length: int | None = None
         #: The names of the roles this node holds (set by ``Slipnet.from_metadata``), for
@@ -461,6 +467,7 @@ class SlipnetNode:
             + self.property_links
             + self.lateral_links
             + self.lateral_sliplinks
+            + self.plain_links
         )
 
     # ------------------------------------------------------------------
@@ -1088,7 +1095,8 @@ class Slipnet:
 
         # Create links.  A link is attached by its type's behaviour (``meta.link_types``:
         # ``category``, ``instance``, ``property``, ``lateral``, ``slip``), never by the type's
-        # name; a type with no behaviour (or none the engine knows) is attached to no list.
+        # name; a type with no behaviour (or none the engine knows) makes a plain link, which
+        # goes in the sixth list, last in ``outgoing_links``.
         behaviour_of = {t.name: t.behaviour for t in meta.link_types}
         for link_spec in meta.slipnet_link_specs:
             from_node = slipnet.nodes.get(link_spec.from_node)
@@ -1120,6 +1128,8 @@ class Slipnet:
                 from_node.lateral_links.append(link)
             elif behaviour == "slip":
                 from_node.lateral_sliplinks.append(link)
+            else:
+                from_node.plain_links.append(link)
 
             to_node.incoming_links.append(link)
 

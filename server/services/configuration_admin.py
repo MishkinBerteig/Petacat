@@ -133,7 +133,8 @@ def _order(ops: list[dict[str, Any]]) -> list[dict[str, Any]]:
     set last, once the row that held it has gone.
     """
     position = {t: i for i, t in enumerate(cd.TABLE_NAMES)}
-    enum = set(ENUM_TABLE_MODELS)
+    # A link type is not an enum table, but links name it by foreign key, so it is ordered like one.
+    enum = {*ENUM_TABLE_MODELS, "link_types"}
     deletes = [o for o in ops if o["op"] == "delete" and o["table"] not in enum]
     enum_deletes = [o for o in ops if o["op"] == "delete" and o["table"] in enum]
     rest = [o for o in ops if o["op"] != "delete"]

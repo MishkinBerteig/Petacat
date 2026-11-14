@@ -31,8 +31,9 @@ def _next_after_last(table_name: str, column_name: str = "sort_order"):
 
 
 # ──────────────────────────────────────────────────────────────────
-# Enum lookup tables (18 tables; all have name, display_label, sort_order and description,
-# and some add columns: a role, a behaviour, a clamp type's factors ...)
+# Enum lookup tables (17 tables, and link_types, which has the same columns but is a
+# configuration table the change API addresses; all have name, display_label, sort_order and
+# description, and some add columns: a role, a behaviour, a clamp type's factors ...)
 # ──────────────────────────────────────────────────────────────────
 
 class RunStatusDef(Base):
@@ -140,7 +141,9 @@ class LinkTypeDef(Base):
     #: What the engine does with a link of this type: ``category``, ``instance``,
     #: ``property``, ``lateral`` or ``slip`` (``server/engine/roles.py``,
     #: ``LINK_BEHAVIOURS``).  Which type has which behaviour is configuration; the engine
-    #: names behaviours and never a link type.  NULL gives a link no behaviour.
+    #: names behaviours and never a link type.  NULL gives a link no behaviour: a **plain**
+    #: link, which spreads activation by its fixed length (``Slipnet.from_metadata`` puts it in
+    #: ``SlipnetNode.plain_links``) and means what the codelets that read it (``links_of``) make of it.
     behaviour = Column(Text, nullable=True)
 
 class CodeletFamilyDef(Base):

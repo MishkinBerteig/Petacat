@@ -55,7 +55,8 @@ BULK_SEED_FILES = (
 #: Metadata tables that are *not* derived from the bulk seed files.
 NON_DERIVED_TABLES = frozenset({"help_topics"})
 
-#: The enum lookup tables, and the model each one's rows become.
+#: The tables of ``enums.json``, and the model each one's rows become: the 17 enum lookup tables
+#: and ``link_types`` (which the change API addresses, so it is not an enum table).
 ENUM_MODELS: dict[str, str] = {
     "run_statuses": "RunStatusDef",
     "event_types": "EventTypeDef",

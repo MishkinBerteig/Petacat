@@ -12,7 +12,8 @@ write ``role('bridge_type.top')``.
 
 Test 1 is an AST walk of every module under those four trees (docstrings
 and bare string statements are exempt) for a string literal equal to the name of a row of a
-vocabulary table (``seed_data/enums.json`` and ``theme_relations.json``), to a link type, or to an
+vocabulary table (``seed_data/enums.json`` and ``theme_relations.json``), to a link type (the five of
+the Standard Configuration and the ones the v2.0 Base creates), or to an
 urgency level.  (``run_statuses`` is not scanned: ruling 13 keeps a run's lifecycle names as the
 engine's own, and the services compare through ``runner.STATUS_*``.)  A hit is allowed only if it is in ``ALLOWED`` below, with its reason.  The list is
 strict in both directions: a literal that is not listed fails, and an entry that is no longer hit
@@ -214,6 +215,12 @@ def vocabulary_names() -> dict[str, set[str]]:
         add("theme_relations", r["name"])
     for level in json.loads((SEED_DIR / "urgency_levels.json").read_text()):
         add("urgency_levels", level)
+    # The link types the v2.0 Base creates (``add_link_type``): a configuration names its link
+    # types, so the engine must not spell one of them either.
+    delta = json.loads((REPO_ROOT / "training_base" / "v2.0" / "delta.json").read_text())
+    for op in delta["ops"]:
+        if op["op"] == "add_link_type":
+            add("link_types (v2.0 Base)", op["name"])
     return names
 
 

@@ -80,7 +80,9 @@ from server.models.metadata import (
 )
 
 
-#: The enum lookup tables, and the model of each.
+#: The enum lookup tables (17), and the model of each.  ``link_types`` is not one: it is a
+#: configuration table the change API addresses (``config_registry``), loaded beside them
+#: (:data:`ENUM_FILE_TABLE_MODELS`).
 ENUM_TABLE_MODELS: dict[str, Any] = {
     "run_statuses": RunStatusDef,
     "event_types": EventTypeDef,
@@ -90,7 +92,6 @@ ENUM_TABLE_MODELS: dict[str, Any] = {
     "rule_types": RuleTypeDef,
     "theme_types": ThemeTypeDef,
     "proposal_levels": ProposalLevelDef,
-    "link_types": LinkTypeDef,
     "codelet_families": CodeletFamilyDef,
     "codelet_phases": CodeletPhaseDef,
     "posting_directions": PostingDirectionDef,
@@ -101,6 +102,10 @@ ENUM_TABLE_MODELS: dict[str, Any] = {
     "clamp_types": ClampTypeDef,
     "progress_focuses": ProgressFocusDef,
 }
+
+#: The tables the Metacat Standard Configuration's ``enums.json`` holds: the 17 enum tables and
+#: ``link_types``, which the change API addresses.
+ENUM_FILE_TABLE_MODELS: dict[str, Any] = {**ENUM_TABLE_MODELS, "link_types": LinkTypeDef}
 
 #: Each provider field, and the configuration tables it is built from.  A change to a table
 #: rebuilds only the fields that name it (``ConfigDocument``'s per-field rebuild).
@@ -531,7 +536,7 @@ async def load_rows_from_db(session: AsyncSession) -> dict[str, list[dict[str, A
         "initial_activation_rules": InitialActivationRule,
         "input_character_ranges": InputCharacterRange,
         "input_lowering_ranges": InputLoweringRange,
-        **ENUM_TABLE_MODELS,
+        **ENUM_FILE_TABLE_MODELS,
     }
     queries = {
         name: select(model).order_by(*LAYER_REGISTRY[name].order_by())

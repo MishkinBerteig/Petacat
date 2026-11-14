@@ -5,8 +5,8 @@ guards below are against accidents, not authorisation (R9: there is no authentic
 
 Every table is introspected from ``Base.metadata`` and put in one **class**:
 
-* ``configuration``: every table the journal layer writes (the registry and the 18 enum
-  tables).  An edit is a batch through the change API.
+* ``configuration``: every table the journal layer writes (the registry, ``link_types`` among
+  it, and the 17 enum tables).  An edit is a batch through the change API.
 * ``content``: ``help_topics``.  Written directly.
 * ``runtime``: runs, Metacat Mode's Episodic Memory rows and the like.  An edit needs expert
   mode and a typed confirmation (the table's name), and an active run's rows are refused.  An
@@ -21,8 +21,8 @@ Every table is introspected from ``Base.metadata`` and put in one **class**:
   ``episodic_memory_protected``).
 
 A configuration edit is a batch through :class:`ChangeService` (``source = admin``,
-``channel = admin_database``), so it is a journal entry like any other.  The 18 enum tables are
-not addressed by the change API; their edits are resolved ops written by the journal layer
+``channel = admin_database``), so it is a journal entry like any other.  The 17 enum tables are
+not addressed by the change API (``link_types`` is, like any other configuration table); their edits are resolved ops written by the journal layer
 (``write_immediate``), as the Admin enum editor does, and so under the same vocabulary rules
 (``change_resolve.vocabulary``: a ``role`` is one of the table's, held once, and a bound row is not
 deleted).
@@ -397,7 +397,7 @@ async def _enum_rows(session: AsyncSession, table: str) -> list[dict]:
 
 def _check_enum_op(table: str, op: dict, rows: list[dict]) -> None:
     """The vocabulary rules of the Admin enum editor, for an enum op of the row editor: a ``role``
-    (``behaviour`` for ``link_types``) is a name of the table's vocabulary and held by no other
+    is a name of the table's vocabulary and held by no other
     row (``role_taken``), and a bound row is not deleted (``role_bound``).  *rows* is the table as
     the earlier ops of the batch left it, and is updated to include this op."""
     from server.services.change_resolve.vocabulary import delete_problem, role_problem

@@ -13,6 +13,7 @@ import { PostingRuleEditor } from './PostingRuleEditor'
 import { CommentaryTemplateEditor } from './CommentaryTemplateEditor'
 import { SlipnetLayoutEditor } from './SlipnetLayoutEditor'
 import { SlipnetLinkEditor } from './SlipnetLinkEditor'
+import { LinkTypeEditor } from './LinkTypeEditor'
 import { HelpTopicEditor } from './HelpTopicEditor'
 import { UrgencyLevelEditor } from './UrgencyLevelEditor'
 import { FormulaCoefficientEditor } from './FormulaCoefficientEditor'
@@ -30,6 +31,7 @@ const TABS = [
   { key: 'configuration', label: 'Status and reset' },
   { key: 'slipnet', label: 'Slipnet Nodes' },
   { key: 'links', label: 'Slipnet Links' },
+  { key: 'link-types', label: 'Link Types' },
   { key: 'codelets', label: 'Codelet Types' },
   { key: 'params', label: 'Engine Params' },
   { key: 'urgency', label: 'Urgency Levels' },
@@ -288,6 +290,7 @@ export function AdminLayout({ editNodeName, onClearEditNode }: AdminLayoutProps)
               )}
               {activeTab === 'slipnet' && <SlipnetEditor configuration={openId} editNodeName={editNodeName} onClearEditNode={onClearEditNode} />}
               {activeTab === 'links' && <SlipnetLinkEditor configuration={openId} />}
+              {activeTab === 'link-types' && <LinkTypeEditor configuration={openId} />}
               {activeTab === 'codelets' && <CodeletEditor configuration={openId} />}
               {activeTab === 'params' && <ParamsEditor configuration={openId} />}
               {activeTab === 'urgency' && <UrgencyLevelEditor configuration={openId} />}

@@ -80,7 +80,7 @@ def bad_references(doc):
 
 def test_the_renameable_tables_are_the_enum_tables_and_the_theme_relations():
     assert set(RENAMEABLE_TABLES) == set(ENUM_REGISTRY) | {"theme_relations"}
-    assert len(ENUM_REGISTRY) == 18
+    assert len(ENUM_REGISTRY) == 17 and "link_types" not in RENAMEABLE_TABLES
 
 
 @pytest.mark.parametrize("table", RENAMEABLE_TABLES)
@@ -127,13 +127,21 @@ def test_a_renamed_posting_direction_is_written_into_every_rule_that_has_it(cfg)
     assert list(after["posting_rules"]) == list(cfg.tables["posting_rules"])
 
 
-def test_a_renamed_link_type_rewrites_the_links_and_keeps_their_keys_distinct(cfg):
-    ops, _ = run(cfg, rename("link_types", "lateral", "lat"))
+def test_a_link_type_is_replaced_not_renamed_and_the_moved_links_keep_their_order(cfg):
+    """``link_types`` left the enum tables: ``rename_enum_value`` does not apply to it.  The same
+    result by hand: add the new type, move each link to it, remove the old type."""
+    assert refused(cfg, rename("link_types", "lateral", "lat")).kind == "malformed"
+    moves = [{"op": "update", "table": "slipnet_link_defs",
+              "key": {c: r[c] or "" for c in ("from_node", "to_node", "link_type", "label_node")},
+              "fields": {"link_type": "lat"}}
+             for r in cfg.tables["slipnet_link_defs"].values() if r["link_type"] == "lateral"]
+    ops, _ = run(cfg, {"op": "add_link_type", "name": "lat", "behaviour": "lateral"}, *moves,
+                 {"op": "remove_link_type", "name": "lateral"})
     after = cd.apply_resolved(cfg, ops).tables
     lateral = [r for r in cfg.tables["slipnet_link_defs"].values() if r["link_type"] == "lateral"]
     assert len(lateral) == 84
     assert sum(1 for r in after["slipnet_link_defs"].values() if r["link_type"] == "lat") == 84
-    assert after["link_types"][("lat",)]["behaviour"] == "lateral"
+    assert after["link_types"][("lat",)]["behaviour"] == "lateral" and ("lateral",) not in after["link_types"]
     assert [r["from_node"] for r in cfg.tables["slipnet_link_defs"].values()] == \
         [r["from_node"] for r in after["slipnet_link_defs"].values()]
 
@@ -235,7 +243,7 @@ def test_a_rename_that_cannot_be_made_is_refused(cfg):
 
 
 def test_the_generic_ops_still_do_not_address_an_enum_table(cfg):
-    assert refused(cfg, {"op": "delete", "table": "link_types", "key": {"name": "category"}}).kind == "malformed"
+    assert refused(cfg, {"op": "delete", "table": "proposal_levels", "key": {"name": "built"}}).kind == "malformed"
 
 
 def test_a_batch_may_rename_and_then_use_the_new_name(cfg):

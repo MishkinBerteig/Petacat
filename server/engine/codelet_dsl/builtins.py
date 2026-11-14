@@ -88,6 +88,7 @@ def get_builtins() -> dict[str, Any]:
         "get_activation": get_activation,
         "fully_active": fully_active,
         "get_bond_category": get_bond_category,
+        "links_of": links_of,
         "object_has_description_type": object_has_description_type,
         "possible_descriptor": possible_descriptor,
         "descriptor_support": descriptor_support,
@@ -2503,6 +2504,20 @@ def get_bond_category(ctx: EngineContext, from_desc: Any, to_desc: Any) -> Any:
         if link.to_node is to_desc and link.label_node is not None:
             return link.label_node
     return None
+
+
+def links_of(ctx: EngineContext, node: Any, link_type: str) -> list:
+    """The outgoing links of *node* whose type is named *link_type*, in ``outgoing_links`` order.
+
+    A list of the Slipnet's own link objects, so a body can read ``link.to_node``,
+    ``link.label_node``, ``link.link_length()`` and ``link.link_type``, and name the link in a
+    later change (``from_node``, ``to_node``, ``link_type``, ``label_node``).  The list is new
+    on every call and empty when the node has no link of that type, the type does not exist, or
+    *node* is an ``Absent`` token.  *link_type* is data (a link type's name, which a
+    configuration may create), never a name the engine knows.  Reads only the Slipnet's
+    topology, which a run does not change.
+    """
+    return [link for link in node.outgoing_links if link.link_type == link_type]
 
 
 # ── Workspace queries ──

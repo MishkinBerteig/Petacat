@@ -274,4 +274,28 @@ describe('SlipnetGraphView — link types compared by behaviour', () => {
     await waitFor(() => expect(document.querySelector('.graph-node')).toBeTruthy())
     expect(lines().length).toBe(0)
   })
+
+  it('draws a link of a plain type, and of a type the run does not describe, grey and dotted', async () => {
+    const payload = renamed({})
+    useVocabularyStore.getState().adopt({
+      ...payload, link_behaviours: { ...payload.link_behaviours, near: null },
+    })
+    handler = async (url) => {
+      if (url.endsWith('/api/admin/export')) return reply(EXPORT)
+      if (url.endsWith('/api/admin/slipnet/links')) {
+        return reply([
+          { ...LINKS[0], link_type: 'near', fixed_length: true },
+          { ...LINKS[0], id: 2, link_type: 'mystery' },
+        ])
+      }
+      return refusal(404, 'Not Found', `nothing serves ${url}`)
+    }
+    render(<SlipnetGraphView />)
+    await waitFor(() => expect(document.querySelector('.graph-node')).toBeTruthy())
+    const dotted = Array.from(document.querySelectorAll('line, path')).filter(
+      (e) => e.getAttribute('stroke') === '#888' && e.getAttribute('stroke-dasharray') === '2,3',
+    )
+    expect(dotted.length).toBe(2)
+    expect(lines().length).toBe(0)
+  })
 })

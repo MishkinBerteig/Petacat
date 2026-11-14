@@ -166,7 +166,7 @@ MALFORMED = [
     ("bad source", {"ops": [], "source": "someone"}),
     ("unknown op", {"ops": [{"op": "upsert", "table": "demo_problems"}]}),
     ("unknown table", {"ops": [{"op": "delete", "table": "runs", "key": {"id": 1}}]}),
-    ("enum table not addressable", {"ops": [{"op": "delete", "table": "link_types", "key": {"name": "category"}}]}),
+    ("enum table not addressable", {"ops": [{"op": "delete", "table": "codelet_phases", "key": {"name": "scout"}}]}),
     ("unknown field", {"ops": [ins("slipnet_node_defs", **node(colour="red"))]}),
     ("missing field", {"ops": [ins("slipnet_node_defs", name="x1", short_name="x")]}),
     ("wrong type", {"ops": [ins("slipnet_node_defs", **node(conceptual_depth="deep"))]}),

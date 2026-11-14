@@ -47,6 +47,7 @@ interface Spec {
 const SPECS: Record<string, Spec> = {
   '/admin/slipnet/nodes': { table: 'slipnet_node_defs' },
   '/admin/slipnet/links': { table: 'slipnet_link_defs', surrogate: true },
+  '/admin/link-types': { table: 'link_types' },
   '/admin/codelets': { table: 'codelet_type_defs' },
   '/admin/params': { table: 'engine_params' },
   '/admin/urgency-levels': { table: 'urgency_levels' },

@@ -28,7 +28,7 @@ license change was authorised by Dr. Marshall directly (see
 > end-to-end. Episodic Memory (Metacat-Mode learning) shapes the runs that inherit it: a run
 > declines an answer already held for the same problem and rules, so repeating a
 > problem across Metacat Mode's [episodic runs](#persistence-modes-and-episodic-runs)
-> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 6,720 test cases covering the engine, the API, and the
+> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 6,813 test cases covering the engine, the API, and the
 > help/config system, run on both the CPU and the GPU numeric backends. Underneath the seven components sits an execution
 > substrate — three [persistence modes](#persistence-modes-and-episodic-runs),
 > a [GPU numeric substrate](#the-numeric-substrate), and
@@ -156,8 +156,13 @@ no answer on a `global` session and answer with the symbol on the v2.0 Base. The
 op as `proposals`, and the **in-worker learner** submits them through the change API (source `learner`,
 actor `learner:in-worker`, one op per row, `rebase` and `skip`), so a node that several parallel runs
 made is one row and the session's later runs perceive the symbol at once. That is the first Training-Mode
-learning. In the v2.0 Base, Episodic Memory no longer refuses an answer it already holds. Not built yet:
-consolidation (`noticings`), the `adjacent` link type, the speculative executor's support for created nodes
+learning. In the v2.0 Base, Episodic Memory no longer refuses an answer it already holds. The second increment adds link types a configuration creates and
+the `adjacent` bond: `link_types` is a configuration table the change API addresses (`add_link_type`,
+`remove_link_type`; the 17 enum tables are the engine's vocabulary), a link whose type has no behaviour is a
+**plain** link that spreads activation by its fixed length and that a codelet reads with `links_of(node, type)`,
+and on the v2.0 Base two neighbours with no known relation can bond as `plato-adjacent` (`a` and `c`, `1` and `2`). An
+`adjacent` bond is weak, and nothing yet writes an `adjacent` link into the Slipnet. Not built yet:
+consolidation (`noticings`), the `adjacent` links themselves, the speculative executor's support for created nodes
 (`apply_ops` is a barrier there, and no session reaches the speculative executor), and multi-turn runs.
 
 [metacat]: http://science.slc.edu/~jmarshall/metacat/
@@ -182,8 +187,8 @@ start-up. Codelet behaviour is expressed as Python source strings, compiled once
 configuration and executed via `exec()` in a sandboxed namespace.
 
 Edit a configuration through the Admin view (the hamburger menu's **Configurations (Metacat Mode and
-Training Mode)**): fifteen tables have an editor tab that creates, updates and deletes their rows
-(the Slipnet nodes and links, codelet types, engine parameters, urgency levels, formula coefficients,
+Training Mode)**): sixteen tables have an editor tab that creates, updates and deletes their rows
+(the Slipnet nodes and links, link types, codelet types, engine parameters, urgency levels, formula coefficients,
 demo problems, enum tables, theme dimensions, posting rules, the initial-description and initial-activation
 rules, commentary templates, Slipnet layout and help topics). Every save goes through the change API and the next run created picks it up. The codelet
 patterns, the roles and the theme relations have no tab and are changed through the change API. The
@@ -491,8 +496,8 @@ Petacat has two test suites:
   plugin against the serial runs it claims to equal), `lockstep` (Petacat's decision
   traces against Metacat's), and `e2e` (full HTTP
   stack against a running database). All eight run in a single command against
-  the local Postgres — 6,720 cases, which includes the numeric matrix's second
-  pass over the 1161 backend-sensitive tests. See
+  the local Postgres — 6,813 cases, which includes the numeric matrix's second
+  pass over the 1210 backend-sensitive tests. See
   [TESTING.md](TESTING.md) for the layer breakdown, the numeric backend matrix,
   the session ceiling, the unit-test rules, determinism requirements, test-double
   conventions, how to run the suite under the free-threaded interpreter, and what
@@ -1169,14 +1174,14 @@ for a session's, the external route). `GET /api/configurations/{id}/schema` list
 operation.
 
 - **Operations.** Generic operations (`insert`, `update`, `delete` on a row, addressed by its natural
-  key) and 30 convenience operations that expand into them (`add_node`, `remove_node`, `rename_node`,
-  `rename_enum_value`, `merge_nodes`, `add_link`, `add_param`, `set_param`, `adjust_param`, `set_coefficient`,
+  key) and 33 convenience operations that expand into them (`add_node`, `remove_node`, `rename_node`,
+  `rename_enum_value`, `merge_nodes`, `add_link`, `add_link_type`, `remove_link_type`, `add_param`, `set_param`, `adjust_param`, `set_coefficient`,
   `set_codelet_body`, `move_layout`, `rebind_role` and others). A row states every column the configuration
   holds no default for: a slipnet link states `fixed_length` (`fixed` in `add_link` and in `add_node`'s
   `links`), and a posting rule states `posting_formula`, `count_formula` and `condition`. Nothing fills them
   in, and the Admin routes and the model refuse a row that leaves one out.
 - **The vocabulary.** An enum-table row binds one of the engine's concepts by holding its name in a `role`
-  column (`behaviour` for link types), and the engine compares against the bound row's name, never a
+  column, and the engine compares against the bound row's name, never a
   literal (`seed_data/README.md`, "The role vocabulary"). `rename_enum_value` renames such a row (or a theme
   relation) and rewrites every column that names it (`posting_rules.direction`, a codelet type's family and
   phase, a link's type, a parameter's `value_type`, a clamp type's progress focus, a progress focus's event
@@ -1813,7 +1818,7 @@ files are not read again (see [`seed_data/README.md`](seed_data/README.md) and
 | `demo_problems.json` | 41 pre-configured analogy problems |
 | `posting_rules.json` | Codelet posting rules |
 | `commentary_templates.json` | Natural-language output templates, and Verbose mode's 200-odd message texts (`verbose_messages`) |
-| `enums.json` | The 18 enum tables (bridge types, proposal levels, link types, clamp types, …), with the `role` column that binds a row to the engine's vocabulary, and, in `string_kinds`, `bridge_types` and `rule_types`, the one definition of the four-string frame (which bridge joins which strings; see `seed_data/README.md`) |
+| `enums.json` | The 17 enum tables (bridge types, proposal levels, clamp types, …) and `link_types` (which the change API addresses, so it is not an enum table), with the `role` column that binds a row to the engine's vocabulary, and, in `string_kinds`, `bridge_types` and `rule_types`, the one definition of the four-string frame (which bridge joins which strings; see `seed_data/README.md`) |
 | `roles.json` | The roles the engine looks Slipnet nodes and codelet types up by (64 node-role rows, 5 codelet-type-role rows), including the sets of dimensions that behave one way and the image operation each dimension performs |
 | `initial_program.json` | The initial-description program: the descriptions every letter is given before the first codelet (18 rules: 6 for the letters, 10 for every new group, 2 for a translated string, each subject applied in order) and the concepts that start fully active (1 rule) |
 | `input_parser.json` | Metacat's input parser, which Metacat Mode reads every problem through: 713 ranges of characters that are letters (alphabetic) or digits (numeric) and 156 ranges that say how a character is lowered, both generated from Metacat's own Chez Scheme by `scripts/generate_input_parser_seed.py`. The letters a string may hold are the Slipnet's letter nodes, and the largest seed is the engine parameter `largest_seed` (4294967295). A Training Mode Session does not read them |

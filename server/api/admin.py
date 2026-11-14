@@ -36,6 +36,7 @@ from server.models.metadata import (
     InputCharacterRange,
     InputLoweringRange,
     InitialDescriptionRule,
+    LinkTypeDef,
     PostingRule,
     SlipnetLayoutPos,
     SlipnetLinkDef,
@@ -332,6 +333,36 @@ class UrgencyLevelUpdateRequest(BaseModel):
 class UrgencyLevelResponse(BaseModel):
     name: str
     value: int
+
+
+class LinkTypeRequest(BaseModel):
+    """A new link type (the change API's ``add_link_type``)."""
+
+    name: str
+    #: Shown in the editors; omitted, the name.
+    display_label: str | None = None
+    description: str = ""
+    #: What the engine does with a link of this type: one of ``category``, ``instance``,
+    #: ``property``, ``lateral`` or ``slip``; omitted or null, none (a *plain* link type).
+    behaviour: str | None = None
+
+
+class LinkTypeUpdateRequest(BaseModel):
+    """The columns of a link type to change; a column the body leaves out is left alone, and
+    ``"behaviour": null`` makes the type plain."""
+
+    display_label: str | None = None
+    sort_order: int | None = None
+    description: str | None = None
+    behaviour: str | None = None
+
+
+class LinkTypeResponse(BaseModel):
+    name: str
+    display_label: str
+    sort_order: int
+    description: str
+    behaviour: str | None = None
 
 
 class FormulaCoefficientUpdateRequest(BaseModel):
@@ -769,6 +800,76 @@ async def delete_urgency_level(
     """Delete an urgency level."""
     key = await _existing(session, UrgencyLevel, name, f"Urgency level '{name}' not found")
     await _delete(session, UrgencyLevel, key)
+    return {"deleted": name}
+
+
+# ------------------------------------------------------------------
+# Link types
+# ------------------------------------------------------------------
+
+
+def _link_type_response(row: Any) -> LinkTypeResponse:
+    return LinkTypeResponse(
+        name=row.name, display_label=row.display_label or row.name, sort_order=row.sort_order or 0,
+        description=row.description or "", behaviour=row.behaviour or None)
+
+
+@router.get("/link-types", response_model=list[LinkTypeResponse])
+async def list_link_types(session: AsyncSession = Depends(get_session)):
+    """List the link types of the global configuration, in their order.
+
+    A link type is a configuration table, not an enum table: a configuration holds the types its
+    links name, and a Training Mode Session's may hold types of its own (the change API's
+    ``add_link_type``).  A type with no ``behaviour`` is plain: its links spread activation by
+    their fixed length and mean what the codelets that read them make of them.
+    """
+    result = await session.execute(select(LinkTypeDef).order_by(*LAYER_REGISTRY["link_types"].order_by()))
+    return [_link_type_response(r) for r in result.scalars().all()]
+
+
+@router.post("/link-types", response_model=LinkTypeResponse, status_code=201)
+async def create_link_type(
+    req: LinkTypeRequest,
+    session: AsyncSession = Depends(get_session),
+):
+    """Create a link type (``add_link_type``): refused when the name exists or the behaviour is
+    not one of the engine's."""
+    op: dict[str, Any] = {"op": "add_link_type", "name": req.name, "description": req.description}
+    if req.display_label:
+        op["display_label"] = req.display_label
+    if req.behaviour:
+        op["behaviour"] = req.behaviour
+    await _apply(session, [op])
+    row = await _result_row(session, LinkTypeDef, {"name": req.name}, {
+        "display_label": req.display_label or req.name, "sort_order": 0,
+        "description": req.description, "behaviour": req.behaviour or None})
+    return _link_type_response(row)
+
+
+@router.put("/link-types/{name}", response_model=LinkTypeResponse)
+async def update_link_type(
+    name: str,
+    req: LinkTypeUpdateRequest,
+    session: AsyncSession = Depends(get_session),
+):
+    """Change a link type's label, order, description or behaviour.  A type made plain is refused
+    while a link of that type has no fixed length."""
+    key = await _existing(session, LinkTypeDef, name, f"Link type '{name}' not found")
+    values = {c: getattr(req, c) for c in req.model_fields_set}
+    if "behaviour" in values:
+        values["behaviour"] = values["behaviour"] or None
+    row = await _update(session, LinkTypeDef, key, values)
+    return _link_type_response(row)
+
+
+@router.delete("/link-types/{name}")
+async def delete_link_type(
+    name: str,
+    session: AsyncSession = Depends(get_session),
+):
+    """Remove a link type (``remove_link_type``): refused while any link has it."""
+    await _existing(session, LinkTypeDef, name, f"Link type '{name}' not found")
+    await _apply(session, [{"op": "remove_link_type", "name": name}])
     return {"deleted": name}
 
 
@@ -2126,7 +2227,7 @@ async def list_enum_tables():
     """List all enum table names, with what an editor needs about each.
 
     ``roles`` gives, for each table whose rows the engine names, the column that holds the
-    binding (``role``; ``behaviour`` for ``link_types``) and the names that column may hold
+    binding (``role``) and the names that column may hold
     (the engine's vocabulary for the table, ``server/engine/roles.py``); ``columns`` gives the
     columns of each table beyond the four every enum table has.
     """
@@ -2216,8 +2317,8 @@ async def delete_enum_value(
 ):
     """Delete an enum value.
 
-    Refused with ``422 role_bound`` while the row holds a ``role`` (or, for ``link_types``, a
-    ``behaviour``): unbind it first by setting the column to null.  Refused with 409 while
+    Refused with ``422 role_bound`` while the row holds a ``role``: unbind it first by setting
+    the column to null.  Refused with 409 while
     another row refers to it.
     """
     model = _get_enum_model(table)

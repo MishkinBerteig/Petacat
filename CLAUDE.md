@@ -169,7 +169,16 @@ Every doc, UI string, help topic, plan and decision must keep the distinction pe
   time a session is created and journaled as the session's creation entry. It is not a Starting Conceptual State
   (that is a base plus a session's overrides). Metacat Mode never reads it. v2.0 is built into it in increments,
   listed in its README. Today a symbol with no Slipnet node gets one inside the run (`apply_ops`), and the in-worker
-  learner keeps it in the session's configuration.
+  learner keeps it in the session's configuration. Two neighbours with no known relation can bond as `adjacent`
+  (below).
+- **Link type behaviour** is what the engine does with a link of a type: `category`, `instance`, `property`, `lateral`
+  or `slip`. The engine names behaviours, never a link type. `link_types` is configuration that the change API
+  addresses (`add_link_type`, `remove_link_type`), not one of the 17 enum tables, so a configuration may hold link
+  types of its own. A type with no behaviour is **plain**: its links spread activation by their fixed length, and a
+  codelet reads them with `links_of(node, type)`.
+- **`adjacent`** exists only in the v2.0 Base. It is a link type (behaviour `lateral`) and a bond category
+  (`plato-adjacent`): two neighbours that no link relates, such as `a` and `c` or `1` and `2`, can still bond. It makes
+  bonds only, never groups. Nothing writes an `adjacent` link into the Slipnet yet.
 - **Run mode** is how runs execute: single-threaded, or multi-core (the speculative executor
   within a run, the swarm across runs). It is orthogonal to the two modes and must be viable
   in both. It is not the persistence mode (Fast, Normal or Audit).

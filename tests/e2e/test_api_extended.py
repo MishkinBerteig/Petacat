@@ -959,10 +959,10 @@ async def test_admin_list_enum_tables(app_client):
     resp = await app_client.get("/api/admin/enums")
     assert resp.status_code == 200
     data = resp.json()
-    # Every enum table of the registry: the 13 of the first vocabulary and the 5 stage 4 added.
+    # Every enum table of the registry: the 12 of the first vocabulary and the 5 stage 4 added (link_types is not one).
     from server.services.config_registry import ENUM_REGISTRY
 
-    assert sorted(data["tables"]) == sorted(ENUM_REGISTRY) and len(data["tables"]) == 18
+    assert sorted(data["tables"]) == sorted(ENUM_REGISTRY) and len(data["tables"]) == 17
     assert "run_statuses" in data["tables"]
     assert "event_types" in data["tables"]
 

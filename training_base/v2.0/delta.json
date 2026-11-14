@@ -3,6 +3,71 @@
  "title": "The Training Mode Base Configuration, v2.0",
  "ops": [
   {
+   "op": "add_link_type",
+   "name": "adjacent",
+   "behaviour": "lateral",
+   "display_label": "Adjacent",
+   "description": "Two symbols seen side by side. The lateral behaviour, so concept mappings between letters read it. The v2.0 Base only. Nothing writes a link of this type yet."
+  },
+  {
+   "op": "add_node",
+   "name": "plato-adjacent",
+   "fields": {
+    "short_name": "adjacent",
+    "conceptual_depth": 50,
+    "plain_name": "adjacent",
+    "description": "Represents the bond type of adjacency, the relation between two neighbouring objects that no link relates (for example a and c, or 1 and 2). An instance of bond-category, beside successor and sameness. Its intrinsic link length is long, so an adjacent bond is weak until one is built and the category becomes fully active. The v2.0 Base only."
+   },
+   "links": [
+    {
+     "to": "plato-bond-category",
+     "type": "category",
+     "length": 30,
+     "fixed": true
+    },
+    {
+     "from": "plato-bond-category",
+     "type": "instance",
+     "length": 100,
+     "fixed": true
+    }
+   ],
+   "roles": [
+    "bond_category.adjacent"
+   ],
+   "layout": {
+    "grid_row": 1,
+    "grid_col": 13
+   }
+  },
+  {
+   "op": "update",
+   "table": "engine_params",
+   "key": {
+    "name": "intrinsic_link_lengths"
+   },
+   "patch": {
+    "value": [
+     {
+      "op": "add",
+      "path": "/plato-adjacent",
+      "value": 90
+     }
+    ]
+   }
+  },
+  {
+   "op": "insert",
+   "table": "theme_relations",
+   "row": {
+    "name": "adjacent",
+    "node_name": "plato-adjacent",
+    "abstractness": null,
+    "description": "Neighbours that no other relation names. Abstractness is the node's conceptual depth. The v2.0 Base only.",
+    "role": null
+   }
+  },
+  {
    "op": "add_param",
    "name": "new_node_conceptual_depth",
    "to": 10,
@@ -66,6 +131,14 @@
     "$file": "codelets/answer-finder.py"
    },
    "standard_sha256": "c73b005876f7f561a0d9edc4509e857ff90f0567615f38f108f06a72d6b20ba1"
+  },
+  {
+   "op": "set_codelet_body",
+   "name": "bottom-up-bond-scout",
+   "source": {
+    "$file": "codelets/bottom-up-bond-scout.py"
+   },
+   "standard_sha256": "e2ba52755e2689e50b180b77cca1005fae7d22835b27ca733f64f0e4c560cf3e"
   }
  ]
 }

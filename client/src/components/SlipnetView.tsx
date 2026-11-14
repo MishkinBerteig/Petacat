@@ -28,6 +28,9 @@ const LINK_BEHAVIOUR_COLORS: Record<string, string> = {
   slip: '#ff6b8a',
 };
 
+// The colour of a link whose type has no behaviour (a plain link) or that the run does not describe.
+const PLAIN_LINK_COLOR = 'var(--text-secondary)';
+
 function activationColor(activation: number): string {
   const t = Math.max(0, Math.min(100, activation)) / 100;
   const r = Math.round(21 + t * (255 - 21));
@@ -294,7 +297,7 @@ export function SlipnetNodeFocus({ nodeName, onClose }: FocusProps) {
                   </td>
                   <td style={{ padding: '3px 6px' }}>
                     <span style={{
-                      color: LINK_BEHAVIOUR_COLORS[behaviourOf(conn.linkType) ?? ''] ?? 'var(--text-secondary)',
+                      color: LINK_BEHAVIOUR_COLORS[behaviourOf(conn.linkType) ?? ''] ?? PLAIN_LINK_COLOR,
                       fontFamily: 'var(--font-mono)',
                     }}>
                       {conn.linkType}

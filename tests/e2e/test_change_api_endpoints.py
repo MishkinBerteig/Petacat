@@ -208,7 +208,7 @@ async def test_the_schema_lists_the_registry_the_ops_and_the_batch_shape(app_cli
     assert resp.status_code == 200, resp.text
     schema = resp.json()
     names = {t["name"] for t in schema["tables"]}
-    assert len(names) == 19
+    assert len(names) == 20 and "link_types" in names
     assert {"slipnet_node_defs", "engine_params", "posting_rules"} <= names
     assert not any("episod" in t or "journal" in t or t == "configurations" for t in names)
     node_table = next(t for t in schema["tables"] if t["name"] == "slipnet_node_defs")

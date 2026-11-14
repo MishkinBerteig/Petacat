@@ -25,7 +25,8 @@ from server.engine.start_check import (
     require_run_start,
 )
 from tests.support import reduced_configurations as rc
-from tests.support.role_table import CODELET_ROLES, ORDERED_ROLES, SINGLE_ROLES, role_attr
+from tests.support.role_table import (
+    CODELET_ROLES, ORDERED_ROLES, SINGLE_ROLES, UNBOUND_UNDER_STANDARD, role_attr)
 from tests.support.standard_configuration import bare_slipnet
 
 SEED_DIR = Path(__file__).resolve().parents[2] / "seed_data"
@@ -48,14 +49,14 @@ def slipnet(meta):
 
 def test_vocabulary_agrees_with_the_role_table_and_the_standard_configuration() -> None:
     ours = {s.name: (s.target_kind, s.cardinality) for s in R.ROLES}
-    expected = {r: (R.NODE, R.ONE) for r in SINGLE_ROLES}
+    expected = {r: (R.NODE, R.ONE) for r in (*SINGLE_ROLES, *UNBOUND_UNDER_STANDARD)}
     expected.update({r: (R.NODE, R.ORDERED) for r in ORDERED_ROLES})
     expected.update({r: (R.CODELET_TYPE, R.ONE) for r in CODELET_ROLES})
     assert ours == expected
-    assert len(R.ROLES) == 49
+    assert len(R.ROLES) == 50
     data = json.loads((SEED_DIR / "roles.json").read_text())
     bound = {b["role"] for b in data["node_roles"]} | {b["role"] for b in data["codelet_roles"]}
-    assert bound == set(ours)
+    assert bound == set(ours) - set(UNBOUND_UNDER_STANDARD)
     assert all(s.attr == role_attr(s.name) for s in R.ROLES)
     assert len({s.attr for s in R.ROLES}) == len(R.ROLES)
 
@@ -123,7 +124,9 @@ def test_every_role_of_the_standard_configuration_is_bound(slipnet) -> None:
     for name, value in slipnet.roles.items():
         assert value is not None
         spec = R.ROLE_BY_NAME[name]
-        if spec.cardinality == R.ORDERED:
+        if name in UNBOUND_UNDER_STANDARD:
+            assert value is R.absent(name) and not value  # the v2.0 Base binds it, the Standard does not
+        elif spec.cardinality == R.ORDERED:
             assert len(value) > 0 and all(value)
         else:
             assert value, f"{name} is absent under the Metacat Standard Configuration"
