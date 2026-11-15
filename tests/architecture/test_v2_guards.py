@@ -25,7 +25,7 @@ ROOT = Path(__file__).resolve().parents[2]
 #: The engine tree nothing may change without re-basing this: the last commit that changed
 #: ``server/engine/`` (now v2.0's second increment).  Engine work moves this commit on purpose, in a
 #: follow-up commit that also adds the engine commit's subject to the set below.
-ENGINE_BASELINE = "1393f6b"
+ENGINE_BASELINE = "e9c587d"
 #: The only commits that touched the engine between EN11's close-out (``0ce7f5d``) and the
 #: baseline; all are allowed engine work.
 ENGINE_COMMITS_AFTER_EN11 = {
@@ -54,6 +54,9 @@ ENGINE_COMMITS_AFTER_EN11 = {
     "Patched Metacat no longer crashes on a group image with no start letter or a rule change with nothing left to describe, and Metacat Mode follows",
     "A Training Mode Session perceives a symbol it has never seen",
     "Link types a configuration can create, and neighbours that bond as adjacent in the v2.0 Base",
+    "A run proposes changes for the next run, and a link length can be a fraction",
+    "Association read from a link length is clipped to 0 to 100",
+    "A pair's adjacent link approaches 0 asymptotically, through a multiplying change-API op",
 }
 
 
