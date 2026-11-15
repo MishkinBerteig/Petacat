@@ -182,7 +182,7 @@ Every doc, UI string, help topic, plan and decision must keep the distinction pe
   codelet reads them with `links_of(node, type)`.
 - **`adjacent`** exists only in the v2.0 Base. It is a link type (behaviour `lateral`) and a bond category
   (`plato-adjacent`, conceptual depth 45, the lowest of the link concepts): two neighbours that no link relates, such as `a` and `c` or `1` and `2`, can still bond. It makes
-  bonds only, never groups. `consolidator` writes an `adjacent` link into the Slipnet for each pair of single symbols such a bond joined (labelled by `plato-adjacent`, length 90 at the pair's first noticing and 0.125 shorter at each later one); a bond with a group at an end writes nothing.
+  bonds only, never groups. `consolidator` writes an `adjacent` link into the Slipnet for each pair of single symbols such a bond joined (labelled by `plato-adjacent`, length 90 at the pair's first noticing, and each later noticing multiplies it by `1 - s / 90`, with the first step `s` = 1/16, so the length approaches 0 and never reaches it); a bond with a group at an end writes nothing.
 - **Run mode** is how runs execute: single-threaded, or multi-core (the speculative executor
   within a run, the swarm across runs). It is orthogonal to the two modes and must be viable
   in both. It is not the persistence mode (Fast, Normal or Audit).

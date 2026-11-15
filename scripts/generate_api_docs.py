@@ -116,6 +116,12 @@ GROUPS: list[tuple[str, str, str]] = [
         "Configuration's JSON is what it always was. Every stored number is finite: a `nan`, an `inf`, "
         "`1e999` or a whole number past float's range is refused on every route as `400 malformed`, "
         "per op, so under `on_op_failure: skip` only that op is dropped. "
+        "`scale` (`{\"op\": \"scale\", \"table\", \"key\", \"field\", \"factor\"}`) is the multiplying partner of "
+        "`adjust`, addressed the same way: it multiplies a number by `factor`, and refuses a field that is "
+        "not a number, a `factor` or a result that is not finite, and, in a whole-number column, a result "
+        "that is not whole (a whole result in a link length is stored as an integer). It is journaled by "
+        "before-image, so undo, restore and `config_at` work. Factors commute, so the scales of runs that "
+        "started under one configuration compose in any order. "
         "`slipnet_node_defs.noticings` is a whole number on each node (default 0, no range): `adjust` "
         "and the generic update take a whole number and refuse a fraction; the node list shows it and "
         "the export carries it only when it is not 0.",

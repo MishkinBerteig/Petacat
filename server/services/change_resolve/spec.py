@@ -221,7 +221,7 @@ CONVENIENCE_OPS = (
     "add_node", "remove_node", "rename_node", "merge_nodes", "add_link", "remove_link",
     "add_link_type", "remove_link_type", "add_param", "set_param", "adjust_param", "set_coefficient",
     "adjust_coefficient", "set_urgency_level",
-    "adjust", "list_add", "list_remove", "reorder", "move_layout", "add_trigger",
+    "adjust", "scale", "list_add", "list_remove", "reorder", "move_layout", "add_trigger",
     "remove_trigger", "rebind_role", "unbind_role", "add_codelet_type", "remove_codelet_type",
     "set_codelet_body", "set_predicate", "set_formula", "set_template", "add_posting_rule",
     "remove_posting_rule", "add_demo_problem", "rename_enum_value",

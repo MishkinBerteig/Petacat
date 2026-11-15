@@ -49,6 +49,7 @@ _ARGS: dict[str, dict[str, str]] = {
     "adjust_coefficient": {"name": "s*", "by": "n*"},
     "set_urgency_level": {"name": "s*", "to": "i*", "expect": "i"},
     "adjust": {"table": "s*", "key": "o*", "field": "s*", "by": "n*"},
+    "scale": {"table": "s*", "key": "o*", "field": "s*", "factor": "n*"},
     "list_add": {"table": "s*", "key": "o*", "field": "s*", "value": "a*"},
     "list_remove": {"table": "s*", "key": "o*", "field": "s*", "value": "a*"},
     "reorder": {"table": "s*", "key": "o*", "before": "o"},

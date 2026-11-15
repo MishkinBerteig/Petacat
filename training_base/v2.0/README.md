@@ -25,7 +25,7 @@ that key before the change API sees the op. A Standard change that breaks any ot
 
 1. A symbol with no Slipnet node gets one in the run (`symbol-scout`, `symbol-builder`, `new_node_conceptual_depth`, the `rule-scout` and `answer-finder` overrides).
 2. Link types a configuration creates, and `adjacent` (the link type, `plato-adjacent`, the `bottom-up-bond-scout` override).
-3. A session keeps what it saw side by side: `propose_ops`, `noticings`, fractional link lengths, `plato-adjacent` at depth 45 (stage A); `consolidator`, its rule, its triggers and its five parameters (stage B).
+3. A session keeps what it saw side by side: `propose_ops`, `noticings`, fractional link lengths, `plato-adjacent` at depth 45 (stage A); `consolidator`, its rule, its triggers and its five parameters (stage B); the association read from a link length clipped to 0 to 100 (stage C); a pair's `adjacent` link that approaches 0 asymptotically, through the change API's multiplying op `scale` (stage D).
 
 ## What v2.0 adds so far
 
@@ -38,7 +38,7 @@ that key before the change API sees the op. A Standard change that breaks any ot
 | `add_param new_node_conceptual_depth` 10 | the depth a node made for a new symbol starts at (letters are 10) |
 | `add_codelet_type symbol-scout` | family `description`, phase `scout`: finds a Letter object with no letter-category description |
 | `add_codelet_type symbol-builder` | family `description`, phase `builder`: makes node `plato-cp-<hex code point>` (connected to nothing) with `apply_ops`, and proposes it as a trigger of `consolidator`'s rule (`add_trigger`, so it acts from the next run) |
-| `add_param consolidation_threshold` 40, `adjacent_link_length` 90, `adjacent_link_step` 0.125, `symbol_category_link_length` 20, `symbol_instance_link_length` 97 | the five numbers only the `consolidator` body reads (engine parameters have no description column, so they are described here). The threshold is in noticings; the two lengths are the ones the seed's letters have for `category` and `instance`; the length and step are the pair's `adjacent` link (below). The step is exact in binary |
+| `add_param consolidation_threshold` 40, `adjacent_link_length` 90, `adjacent_link_step` 0.0625, `symbol_category_link_length` 20, `symbol_instance_link_length` 97 | the five numbers only the `consolidator` body reads (engine parameters have no description column, so they are described here). The threshold is in noticings; the two lengths are the ones the seed's letters have for `category` and `instance`; the length and step are the pair's `adjacent` link (below): the step is the size of its first step, at the length, and each later step is in proportion to the length left. The step, 1/16, is exact in binary |
 | `add_codelet_type consolidator` | family `meta`, phase `other`, top-down. One run is one noticing of the node in `args['slipnode']` (see below) |
 | `add_posting_rule symbol-scout` | bottom-up, after `breaker`, urgency `low`, probability `1.0`, count 1, condition `num_unperceived_symbols > 0`; it draws no random number when every symbol is perceived |
 | `add_posting_rule consolidator` + 26 `add_trigger` | top-down, urgency `round(activation / 2)`, posting probability `1.0`, count 1, condition `always`: it posts every time a trigger node's activation passes the gate (50), so that repeats register. Its triggering list is the 26 letters (`add_trigger` also adds them to `top_down_slipnodes`; each seed top-down rule names its own triggers, so none of them fires for a letter), and `symbol-builder` adds each new node. A rule with an empty triggering list would fire for every node in `top_down_slipnodes`, so the rule has none |
@@ -78,22 +78,31 @@ Two builtins, both for a body in a Training Mode Session; under the Metacat Stan
   changes nothing in the run (not the Slipnet, not the metadata view, not the Workspace). What it records reaches the
   session's configuration when the run ends, so it acts from the next run. It refuses `add_node` (that goes through
   `apply_ops`); any other op is data, and the change API checks it when the learner submits it. Within one run an identical op
-  is recorded once, and repeated `adjust` ops on the same target are one op, kept where the first one was, with their `by`
-  values added. "The same target" is the same `table`, `field` and `key` (a NULL key part, such as a link's missing label, is
+  is recorded once, repeated `adjust` ops on the same target are one op, kept where the first one was, with their `by`
+  values added, and repeated `scale` ops on the same target are one op in the same way, with their `factor` values multiplied
+  (a `scale` never combines with an `adjust`). "The same target" is the same `table`, `field` and `key` (a NULL key part, such as a link's missing label, is
   read as `""`).
 - `noticings(node)` reads the whole number in `slipnet_node_defs.noticings` as the configuration held it when the run started
   (0 for a node the run made). A count the run proposes does not change what the run reads.
 
 **A noticing of a pair of symbols** is the same two ops every time, so that every noticing counts from the first one, in any
-number of runs, in any order: `add_link` of the pair's `adjacent` link at length `L + s`, and `adjust` of that link's length
-by `-s` (`L` = `adjacent_link_length` 90 and `s` = `adjacent_link_step` 0.125). Within a run
-the identical `add_link` is recorded once and the `adjust` ops add up to `-s * n`. Across runs the first run's `add_link`
-creates the link, the others' are skipped as duplicates, and every `adjust` applies, so after `N` noticings the link is
-`L - s * (N - 1)` long: 90 after the first. A link length can be a fraction (89.875) and a whole one stays an `int`, so a
-configuration's hash and JSON print `90`, never `90.0`.
+number of runs, in any order. With `L` = `adjacent_link_length` 90 and `s` = `adjacent_link_step` 1/16, the body works out
+`r = 1 - s / L` and proposes `add_link` of the pair's `adjacent` link at length `L / r` and `scale` of that link's length by `r`
+(the change API's multiplying op: `{'op': 'scale', 'table', 'key', 'field', 'factor'}`, addressed as `adjust` is; it refuses
+a field that is not a number, a factor or a result that is not finite, and a fraction in a whole-number column). Within a run
+the identical `add_link` is recorded once and the `scale` factors multiply into one, `r` to the power of the number of noticings.
+Across runs the first run's `add_link` creates the link, the others' are skipped as duplicates, and every `scale` applies. The
+first noticing leaves the link at `(L / r) * r`, which is exactly 90 for these values (a whole number, stored as an `int`);
+after that each noticing multiplies it by `r`, so after `N` noticings the link is `L * r ** (N - 1)` long: its first step is
+`s` (90 to 89.9375) and the steps shrink in proportion to the length. The length approaches 0 and never reaches it (after 50
+runs of `123->123; 123->?`, about 100 noticings of each pair per run, it is still positive). A multiplication is used instead
+of an `adjust` of a value worked out from the length a run saw, because the runs of a swarm start under one configuration, and
+such an `adjust` would overshoot; factors commute, so the runs compose in any order. Float multiplication in a different order
+can differ in the last bits (the tests allow a relative error of 1e-12). A link length can be a fraction (89.9375) and a whole
+one stays an `int`, so a configuration's hash and JSON print `90`, never `90.0`.
 
 On a letter problem the v2.0 Base is no longer the Standard run for run: two neighbours with no link between them (`a` and
 `c`) can now bond. An `adjacent` bond is weak (see the intrinsic link length above), so few are built.
 
-Not yet here: `slipnet_rounds_to_whole`, an `adjacent` group category, a floor on a link's length (a pair's link length has none: after enough
-noticings it is zero and then negative; the association read from any length is clipped to 0 to 100, so a length of 0 or less reads as 100 and one of 100 or more as 0, and the stored length stays as it is), anything for an `adjacent` bond with a group at an end, multi-turn runs.
+Not yet here: `slipnet_rounds_to_whole`, an `adjacent` group category, a floor on a stored link length (a pair's link has none, though
+its asymptotic length does not reach 0; the association read from any length is clipped to 0 to 100, so a length of 0 or less reads as 100 and one of 100 or more as 0, and the stored length stays as it is), anything for an `adjacent` bond with a group at an end, multi-turn runs.

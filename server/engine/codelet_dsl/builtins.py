@@ -2477,7 +2477,7 @@ def apply_ops(ctx: EngineContext, ops: list) -> None:
 
 
 def _same_target(a: dict, b: dict) -> bool:
-    """Do two ``adjust`` ops name the same number?  The same ``table``, the same ``field`` and the
+    """Do two ``adjust`` ops, or two ``scale`` ops, name the same number?  The same ``table``, the same ``field`` and the
     same ``key``, a key being a mapping of key columns to values with a ``None`` read as ``""``
     (the change API addresses a row's NULL key part that way)."""
     def key_of(op: dict) -> dict:
@@ -2505,6 +2505,10 @@ def propose_ops(ctx: EngineContext, ops: list) -> None:
       order, and the op stays where the first one was.  The same target is the same ``table``,
       ``field`` and ``key`` (:func:`_same_target`).  This is how a count is kept without a
       counter: ``n`` noticings give one ``adjust`` of ``n`` times the step.
+    * Repeated ``scale`` ops on the same target are one op in the same way: the ``factor`` values
+      are multiplied, in call order, and the op stays where the first one was (``n`` noticings
+      give one ``scale`` by the ``n``-th power of the factor).  An identical ``scale`` counts each
+      time.  A ``scale`` is never combined with an ``adjust``: they are different ops.
 
     It draws no random number and never writes the shared provider or anything another run can
     see.
@@ -2530,6 +2534,21 @@ def propose_ops(ctx: EngineContext, ops: list) -> None:
                     continue
             # the first adjust of its target, or one that cannot be added to the held one (not a
             # number, not finite): recorded as it is, and the change API refuses it
+            ctx.proposals.append(copy.deepcopy(op))
+            continue
+        if op["op"] == "scale":
+            held = next((h for h in ctx.proposals if h.get("op") == "scale" and _same_target(h, op)), None)
+            if held is not None:
+                try:
+                    product = held.get("factor") * op.get("factor")
+                    kept = math.isfinite(product)
+                except (TypeError, OverflowError):
+                    kept = False
+                if kept:
+                    held["factor"] = product
+                    continue
+            # the first scale of its target, or one that cannot be multiplied into the held one
+            # (not a number, not finite): recorded as it is, and the change API refuses it
             ctx.proposals.append(copy.deepcopy(op))
             continue
         if op not in ctx.proposals:

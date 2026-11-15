@@ -4,7 +4,7 @@ Through the real service, on the serial child and on the swarm, with a test conf
 calls ``propose_ops`` (``tests/support/proposing_configuration.py``, installed through the session's change
 API before the session starts).  Every op reaches the session's configuration through the in-worker learner
 (actor ``learner:in-worker``), a duplicate from a later run is skipped cleanly, the pair's link is
-``90 - 0.125 * (N - 1)`` long after ``N`` noticings, and the serial child and the swarm give the same first run.
+``90 * r ** (N - 1)`` long after ``N`` noticings, with ``r = 1 - (1/16) / 90``, and the serial child and the swarm give the same first run.
 """
 
 from __future__ import annotations
@@ -67,12 +67,10 @@ async def test_every_proposal_reaches_the_sessions_configuration_and_the_routes_
             assert [k for k in tables["slipnet_link_defs"] if k[:3] == ("plato-b", "plato-c", "near")] == [
                 ("plato-b", "plato-c", "near", "")]
             assert "plato-b" in tables["posting_rules"][("top-down-description-scout",)]["triggering_slipnodes"]
-            # the pair's link: L - s * (N - 1) after N noticings, whichever order the runs finished in
-            noticed = [next(p["by"] for p in o.proposals if p["op"] == "adjust" and p["field"] == "link_length")
-                       / -pc.STEP for o in outcomes]
-            assert all(n == int(n) and n >= 1 for n in noticed)
-            total = int(sum(noticed))
-            assert tables["slipnet_link_defs"][pc.PAIR]["link_length"] == pc.LENGTH - pc.STEP * (total - 1)
+            # the pair's link: L * r ** (N - 1) after N noticings, whichever order the runs finished in
+            total = sum(pc.noticings_of(o) for o in outcomes)
+            got = tables["slipnet_link_defs"][pc.PAIR]["link_length"]
+            assert 0 < got and abs(got - pc.expected_length(total)) <= pc.TOLERANCE * pc.expected_length(total)
             # the count adds up across runs the way the link does: each run summed its own `adjust` of +1 per noticing
             counted = sum(p["by"] for o in outcomes for p in o.proposals
                           if p["op"] == "adjust" and p["field"] == "noticings")

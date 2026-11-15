@@ -7,28 +7,35 @@ type ``noticer`` and a bottom-up posting rule that posts it once in every update
 times in a run (a different number of times for each seed).
 
 ``PAIR_BODY`` expresses a noticing of the pair ``plato-a`` to ``plato-b`` the way the ``consolidator``
-body does: ``add_link`` of the pair at length ``L + s`` (``L`` = 90, ``s`` = 0.125, both exact in binary)
-and ``adjust`` of that link's length by ``-s``.  So after ``N`` noticings, in any order and spread over
-any runs, the link is ``L - s * (N - 1)`` long.
+body does: ``add_link`` of the pair at length ``L / r`` and ``scale`` of that link's length by ``r``, where
+``r = 1 - s / L`` (``L`` = 90, ``s`` = 1/16).  The first noticing leaves the link at exactly ``L``, and every later one
+multiplies it by ``r``.  So after ``N`` noticings, in any order and spread over any runs, the link is
+``L * r ** (N - 1)`` long, to the rounding of float multiplication in a different order (the tests allow a relative
+error of ``TOLERANCE``).  It approaches 0 and is never 0 or below.
 """
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 from server.services import config_document as cd
 from server.services import training_base as tb
 from server.services.change_resolve import resolve
 
-LENGTH, STEP = 90, 0.125
+LENGTH, STEP = 90, 0.0625
+RATIO = 1 - STEP / LENGTH
+#: Float multiplication in a different order differs in the last bits; ``N`` is at most a few thousand.
+TOLERANCE = 1e-12
 PAIR = ("plato-a", "plato-b", "adjacent", "")
 PAIR_KEY = {"from_node": "plato-a", "to_node": "plato-b", "link_type": "adjacent", "label_node": ""}
 
 PAIR_BODY = """
 key = {'from_node': 'plato-a', 'to_node': 'plato-b', 'link_type': 'adjacent', 'label_node': ''}
+ratio = 1 - 0.0625 / 90
 propose_ops([
-    {'op': 'add_link', 'from': 'plato-a', 'to': 'plato-b', 'type': 'adjacent', 'fixed': True, 'length': 90.125},
-    {'op': 'adjust', 'table': 'slipnet_link_defs', 'key': key, 'field': 'link_length', 'by': -0.125},
+    {'op': 'add_link', 'from': 'plato-a', 'to': 'plato-b', 'type': 'adjacent', 'fixed': True, 'length': 90 / ratio},
+    {'op': 'scale', 'table': 'slipnet_link_defs', 'key': key, 'field': 'link_length', 'factor': ratio},
 ])
 """
 
@@ -36,10 +43,11 @@ propose_ops([
 ALL_BODY = """
 key = {'from_node': 'plato-a', 'to_node': 'plato-b', 'link_type': 'adjacent', 'label_node': ''}
 near = {'from_node': 'plato-b', 'to_node': 'plato-c', 'link_type': 'near', 'label_node': ''}
+ratio = 1 - 0.0625 / 90
 propose_ops([
     {'op': 'add_link_type', 'name': 'near', 'display_label': 'Near'},
-    {'op': 'add_link', 'from': 'plato-a', 'to': 'plato-b', 'type': 'adjacent', 'fixed': True, 'length': 90.125},
-    {'op': 'adjust', 'table': 'slipnet_link_defs', 'key': key, 'field': 'link_length', 'by': -0.125},
+    {'op': 'add_link', 'from': 'plato-a', 'to': 'plato-b', 'type': 'adjacent', 'fixed': True, 'length': 90 / ratio},
+    {'op': 'scale', 'table': 'slipnet_link_defs', 'key': key, 'field': 'link_length', 'factor': ratio},
     {'op': 'add_link', 'from': 'plato-b', 'to': 'plato-c', 'type': 'near', 'fixed': True, 'length': 12.5},
     {'op': 'adjust', 'table': 'slipnet_node_defs', 'key': {'name': 'plato-b'}, 'field': 'noticings', 'by': 1},
     {'op': 'add_trigger', 'rule_key': 'top-down-description-scout', 'node': 'plato-b'},
@@ -71,8 +79,13 @@ def noticer_provider(body: str = PAIR_BODY, *more: dict[str, Any]):
 
 
 def noticings_of(outcome) -> int:
-    """How many times a ``PAIR_BODY`` run noticed the pair: its ``adjust`` is ``-STEP`` times that."""
-    (by,) = [p["by"] for p in outcome.proposals if p["op"] == "adjust" and p["field"] == "link_length"]
-    count = by / -STEP
-    assert count == int(count) and count >= 1
-    return int(count)
+    """How many times a ``PAIR_BODY`` run noticed the pair: its ``scale`` factor is ``r`` to that power."""
+    (factor,) = [p["factor"] for p in outcome.proposals if p["op"] == "scale" and p["field"] == "link_length"]
+    count = round(math.log(factor) / math.log(RATIO))
+    assert count >= 1 and math.isclose(factor, RATIO ** count, rel_tol=TOLERANCE)
+    return count
+
+
+def expected_length(noticings: int) -> float:
+    """``L * r ** (N - 1)``: the pair's link after ``N`` noticings (in any number of runs, in any order)."""
+    return LENGTH * RATIO ** (noticings - 1)

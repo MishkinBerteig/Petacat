@@ -93,7 +93,7 @@ def test_schema_states_keys_order_code_and_json_columns():
 def test_schema_lists_the_ops_and_the_role_vocabulary():
     s = schema()
     assert s["ops"]["generic"] == ["insert", "update", "delete"]
-    assert {"add_node", "remove_node", "rename_node", "merge_nodes", "adjust", "reorder", "list_add",
+    assert {"add_node", "remove_node", "rename_node", "merge_nodes", "adjust", "scale", "reorder", "list_add",
             "move_layout", "add_trigger", "rebind_role"} <= set(s["ops"]["convenience"])
     assert "dimension.length" in s["roles"]["node"] and "evaluator.bond" in s["roles"]["codelet_type"]
     assert "rational" in s["value_types"]

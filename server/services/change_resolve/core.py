@@ -58,8 +58,8 @@ type exists.  A link of a plain type must have a fixed length (``fixed_length`` 
 Numbers
 -------
 A link length (``slipnet_link_defs.link_length``, the ``length`` of ``add_link``) is a whole number or a
-fraction (a ``WholeAsInt`` column): ``add_link`` and ``adjust`` take 89.875, and a whole value is normalised to an
-``int`` at the door (``_Run.normalise``), so a configuration's hash and JSON print ``90``, never ``90.0``.  Every
+fraction (a ``WholeAsInt`` column): ``add_link`` and ``adjust`` take 89.875, ``scale`` multiplies a number by a ``factor`` (the result may be a fraction too),
+and a whole value is normalised to an ``int`` at the door (``_Run.normalise``), so a configuration's hash and JSON print ``90``, never ``90.0``.  Every
 stored number is finite: a ``nan``, an ``inf`` or a whole number past float's range is refused **per op**
 (``_Run.shape``, ``_finite``), not in the batch's shape check, so under ``skip`` only that op is dropped.
 ``slipnet_node_defs.noticings`` is a whole number with no range: ``adjust`` and the generic update refuse a
@@ -1498,6 +1498,68 @@ def _h_adjust(r: _Run, i: int, op: dict) -> None:
     r.do_update(i, table, op["key"], {field: total})
 
 
+def _scaled_text(r: _Run, i: int, table: str, row: Mapping, factor: Any) -> str:
+    """``scale`` on a parameter's or coefficient's ``value``: the text of the value times *factor*."""
+    vt = row.get("value_type") or "string"
+    ok, cur = parse_param_value(row["value"], vt)
+    where = (i, "value", table, [row["name"]])
+    if not ok or vt not in ("int", "float", "rational"):
+        raise r.fail(MALFORMED, f"{row['name']!r} is {vt}, not a number", *where)
+    if not _finite(factor):
+        raise r.fail(MALFORMED, "'factor' must be a finite number (not nan, inf or past float's range)", *where)
+    if vt == "rational":
+        by = Fraction(factor).limit_denominator(10**12) if isinstance(factor, float) else Fraction(factor)
+        return checks.fraction_text(Fraction(cur) * by)
+    try:
+        total = cur * factor
+    except OverflowError:
+        raise r.fail(MALFORMED, f"{row['name']!r} times 'factor' is past float's range", *where) from None
+    if not _finite(total):
+        raise r.fail(MALFORMED, f"{row['name']!r} would not be a finite number", *where)
+    if vt == "int":
+        if total != int(total):
+            raise r.fail(MALFORMED, f"{row['name']!r} is an integer; {total} is not", *where)
+        return str(int(total))
+    return str(float(total))
+
+
+def _h_scale(r: _Run, i: int, op: dict) -> None:
+    """Multiply a number by ``factor``: addressed and checked as ``adjust`` is, and journaled by
+    before-image.  Factors commute, so the scales of runs that started under one configuration
+    compose in any order (the additive ``adjust`` of a value computed from the length a run saw
+    would overshoot).  No range is imposed on the result beyond being finite (and whole in a
+    whole-number column)."""
+    table, field = op["table"], op["field"]
+    if table not in REGISTRY:
+        raise r.fail(MALFORMED, f"unknown table {table!r}", i, "table")
+    spec = INPUT_TABLES[table]
+    col = spec.columns.get(field)
+    row = r.row(table, op["key"])
+    if row is None:
+        raise r.missing(i, table, dict(op["key"]))
+    if col is None:
+        raise r.fail(MALFORMED, f"unknown field {field!r}", i, "field", table)
+    if table in PARAM_TABLES and field == "value":
+        return r.do_update(i, table, op["key"], {"value": _scaled_text(r, i, table, row, op["factor"])})
+    cur = row.get(field)
+    if col.type not in ("int", "float") or not isinstance(cur, (int, float)) or isinstance(cur, bool):
+        raise r.fail(MALFORMED, f"{table}.{field} is not a number", i, "field", table)
+    if not _finite(op["factor"]):
+        raise r.fail(MALFORMED, "'factor' must be a finite number (not nan, inf or past float's range)",
+                     i, "factor", table)
+    try:
+        total = cur * op["factor"]
+    except OverflowError:
+        raise r.fail(MALFORMED, f"{table}.{field} times 'factor' is past float's range", i, "factor", table) from None
+    if not _finite(total):
+        raise r.fail(MALFORMED, f"{table}.{field} would not be a finite number", i, "factor", table)
+    if col.type == "int":
+        if total != int(total):
+            raise r.fail(MALFORMED, f"{table}.{field} is an integer; {total} is not", i, "field", table)
+        total = int(total)
+    r.do_update(i, table, op["key"], {field: total})
+
+
 def _list_of(r: _Run, i: int, table: str, row: Mapping, field: str) -> list:
     if table in PARAM_TABLES and field == "value":
         ok, v = parse_param_value(row["value"], row.get("value_type") or "string") if row.get("value_type") == "json" else (False, None)
@@ -1685,6 +1747,7 @@ _HANDLERS: dict[str, Callable] = {
     "adjust_coefficient": _h_adjust_param,
     "set_urgency_level": _h_set_level,
     "adjust": _h_adjust,
+    "scale": _h_scale,
     "list_add": _h_list_edit,
     "list_remove": _h_list_edit,
     "reorder": _h_reorder,

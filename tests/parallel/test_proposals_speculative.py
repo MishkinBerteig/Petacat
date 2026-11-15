@@ -1,7 +1,7 @@
 """``propose_ops`` under the speculative executor: the run is the stream-serial reference's, proposals included.
 
 The effects table declares ``propose_ops`` a WRITE with no component, so a body that calls it runs in order under the
-commit token and never in a speculated prefix that is discarded and run again (which would add an ``adjust`` twice).
+commit token and never in a speculated prefix that is discarded and run again (which would add an ``adjust`` or multiply a ``scale`` twice).
 The speculative executor's support for nodes created in a run is not built, and not tested here.
 """
 
@@ -55,11 +55,11 @@ def test_a_run_that_proposes_equals_the_stream_serial_reference_proposals_includ
     reference = proposals_of(meta, "ssr", seed)
     assert proposals_of(meta, "spec", seed, workers) == reference
     ops = json.loads(reference[0])
-    assert [p["op"] for p in ops][:3] == ["add_link_type", "add_link", "adjust"] and len(ops) == 6
-    assert next(p for p in ops if p["op"] == "adjust" and p["field"] == "link_length")["by"] < 0
+    assert [p["op"] for p in ops][:3] == ["add_link_type", "add_link", "scale"] and len(ops) == 6
+    assert 0 < next(p for p in ops if p["op"] == "scale" and p["field"] == "link_length")["factor"] < 1
 
 
 def test_forced_aborts_never_record_an_op_twice(meta):
-    """``chaos`` forces otherwise-valid speculations to abort and run again: the summed ``adjust`` is the same."""
+    """``chaos`` forces otherwise-valid speculations to abort and run again: the multiplied ``scale`` is the same."""
     reference = proposals_of(meta, "ssr", 2)
     assert proposals_of(meta, "spec", 2, 4, chaos=0.5) == reference

@@ -221,7 +221,7 @@ def test_consolidator_is_a_meta_codelet_with_one_top_down_rule_and_the_26_letter
 def test_the_five_consolidator_parameters_are_in_the_base_only():
     doc, std = tb.resolve_base().document, reference_document()
     expected = {"consolidation_threshold": ("40", "int"), "adjacent_link_length": ("90", "int"),
-                "adjacent_link_step": ("0.125", "float"), "symbol_category_link_length": ("20", "int"),
+                "adjacent_link_step": ("0.0625", "float"), "symbol_category_link_length": ("20", "int"),
                 "symbol_instance_link_length": ("97", "int")}
     for name, (value, kind) in expected.items():
         row = doc.tables["engine_params"][(name,)]

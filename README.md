@@ -28,7 +28,7 @@ license change was authorised by Dr. Marshall directly (see
 > end-to-end. Episodic Memory (Metacat-Mode learning) shapes the runs that inherit it: a run
 > declines an answer already held for the same problem and rules, so repeating a
 > problem across Metacat Mode's [episodic runs](#persistence-modes-and-episodic-runs)
-> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 7,038 test cases covering the engine, the API, and the
+> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 7,082 test cases covering the engine, the API, and the
 > help/config system, run on both the CPU and the GPU numeric backends. Underneath the seven components sits an execution
 > substrate — three [persistence modes](#persistence-modes-and-episodic-runs),
 > a [GPU numeric substrate](#the-numeric-substrate), and
@@ -168,9 +168,11 @@ and on the v2.0 Base two neighbours with no known relation can bond as `plato-ad
 `consolidator` does). `plato-adjacent`'s conceptual depth is 45,
 just below `successor`'s and `predecessor`'s 50, because adjacency is the lowest-depth link concept. The third increment builds
 what consolidation needs, and `consolidator` itself. `propose_ops(ops)` records change-API ops in the run's
-`proposals` (it changes nothing in the run, refuses `add_node`, records an identical op once and adds repeated `adjust` ops on one
-`(table, key, field)` into one); the in-worker learner submits every proposal, not only the nodes, with `rebase` and `skip`, so a
-duplicate `add_link` or `add_link_type` from a second run is skipped and an `adjust` from every run applies. A link length is a
+`proposals` (it changes nothing in the run, refuses `add_node`, records an identical op once, adds repeated `adjust` ops on one
+`(table, key, field)` into one and multiplies repeated `scale` ops on one target into one); the in-worker learner submits every proposal, not only the nodes, with `rebase` and `skip`, so a
+duplicate `add_link` or `add_link_type` from a second run is skipped and an `adjust` or `scale` from every run applies (`scale` is the
+change API's multiplying op: `{'op': 'scale', 'table', 'key', 'field', 'factor'}` multiplies a number by a finite factor, and factors
+commute, so the runs of a swarm that start under one configuration compose in any order). A link length is a
 number, whole or a fraction (`add_link` and `adjust` take 89.875; a whole value is stored and printed as an integer, so the Metacat
 Standard Configuration's hash and JSON do not change because of it), and every stored number must be finite: `nan`, `inf`, `1e999` and
 `10**400` are refused on every route, and under `skip` only that op is dropped. `slipnet_node_defs.noticings` is a whole number on each
@@ -180,9 +182,10 @@ passes the gate (urgency half its activation, rounded; the 26 letters are trigge
 trigger, effective from the next run). One run of it is one noticing of that node, and it needs the symbol to be in the
 Workspace: it proposes one more `noticings`; for each built `adjacent` bond between this symbol and another single symbol, the pair's
 `adjacent` link (labelled by `plato-adjacent`, fixed length, from the left symbol to the right one) at `adjacent_link_length` 90 at the
-first noticing and `adjacent_link_step` 0.125 shorter at each later one; and, once the node's `noticings` reach
+first noticing, then multiplied at each later one by `1 - adjacent_link_step / adjacent_link_length` (the first step is
+`adjacent_link_step`, 1/16, and each later step is in proportion to the length left, so the length approaches 0 and never reaches it); and, once the node's `noticings` reach
 `consolidation_threshold` (40), its `category` and `instance` links to the letter category where they are missing. A bond with a group
-at an end writes nothing. Nothing changes in the run that proposes it, so everything acts from the next run. The lengths have no floor, and the association read from a length is clipped to 0 to 100 (`association_from_length`), so a length of 0 or less reads as association 100.
+at an end writes nothing. Nothing changes in the run that proposes it, so everything acts from the next run. The stored lengths have no floor, and the association read from a length is clipped to 0 to 100 (`association_from_length`), so a length of 0 or less reads as association 100.
 Not built yet: the speculative executor's support for created nodes
 (`apply_ops` is a barrier there, and no session reaches the speculative executor), and multi-turn runs.
 
@@ -517,8 +520,8 @@ Petacat has two test suites:
   plugin against the serial runs it claims to equal), `lockstep` (Petacat's decision
   traces against Metacat's), and `e2e` (full HTTP
   stack against a running database). All eight run in a single command against
-  the local Postgres — 7,038 cases, which includes the numeric matrix's second
-  pass over the 1293 backend-sensitive tests. See
+  the local Postgres — 7,082 cases, which includes the numeric matrix's second
+  pass over the 1299 backend-sensitive tests. See
   [TESTING.md](TESTING.md) for the layer breakdown, the numeric backend matrix,
   the session ceiling, the unit-test rules, determinism requirements, test-double
   conventions, how to run the suite under the free-threaded interpreter, and what

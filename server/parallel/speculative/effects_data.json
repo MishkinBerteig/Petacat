@@ -320,7 +320,7 @@
    "writes": [
     "proposals"
    ],
-   "why": "Appends deep copies of change-API op dicts to ctx.proposals (an identical op once; repeated adjust ops on one table, key and field summed into the first). ctx.proposals is not run state and no component names it, so it declares no component, but it is a WRITE: it runs in order under the commit token, never in a speculated prefix that could be discarded and run again. Never changes the Slipnet, the metadata view or the Workspace; draws no random number."
+   "why": "Appends deep copies of change-API op dicts to ctx.proposals (an identical op once; repeated adjust ops on one table, key and field summed into the first, and repeated scale ops on one table, key and field multiplied into the first). ctx.proposals is not run state and no component names it, so it declares no component, but it is a WRITE: it runs in order under the commit token, never in a speculated prefix that could be discarded and run again. Never changes the Slipnet, the metadata view or the Workspace; draws no random number."
   },
   "noticings": {
    "kind": "READ",

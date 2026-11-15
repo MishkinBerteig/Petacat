@@ -7,7 +7,9 @@
 # changes in this run: the count and the links act from the next run.
 #
 # Parameters, each read only here: `adjacent_link_length` (L) and `adjacent_link_step` (s) for
-# the link of a pair of neighbours; `consolidation_threshold` (in noticings) from which a symbol
+# the link of a pair of neighbours (the link starts at L and each later noticing multiplies its
+# length by r = 1 - s / L, so s is the first step, the steps shrink with the length and the length
+# approaches 0 without reaching it); `consolidation_threshold` (in noticings) from which a symbol
 # also gets its category and instance links, at `symbol_category_link_length` and
 # `symbol_instance_link_length`.
 from server.engine.workspace_objects import Letter
@@ -33,6 +35,10 @@ adjacent = role('bond_category.adjacent')
 if adjacent:
     length = meta.get_param('adjacent_link_length')
     step = meta.get_param('adjacent_link_step')
+    # Every noticing proposes the link at L / r and a scale by r: the first one leaves the link at
+    # (L / r) * r = L, and each later one multiplies it by r.  Factors commute, so the runs of a
+    # swarm, which start under one configuration, compose in any order.
+    ratio = 1 - step / length
     for s in workspace.aggregate_strings:
         for bond in s.bonds:
             if bond.bond_category is not adjacent:
@@ -48,11 +54,11 @@ if adjacent:
                 continue
             propose_ops([
                 {'op': 'add_link', 'from': first.name, 'to': second.name, 'type': 'adjacent',
-                 'label': adjacent.name, 'fixed': True, 'length': length + step},
-                {'op': 'adjust', 'table': 'slipnet_link_defs',
+                 'label': adjacent.name, 'fixed': True, 'length': length / ratio},
+                {'op': 'scale', 'table': 'slipnet_link_defs',
                  'key': {'from_node': first.name, 'to_node': second.name, 'link_type': 'adjacent',
                          'label_node': adjacent.name},
-                 'field': 'link_length', 'by': -step},
+                 'field': 'link_length', 'factor': ratio},
             ])
 
 # At or past the threshold: the links a letter has to its dimension, if this run's Slipnet lacks them.

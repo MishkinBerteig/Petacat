@@ -80,12 +80,21 @@ def adjust_of(ops, table, name):
             (o["key"].get("name") == name or o["key"].get("from_node") == name)]
 
 
-def pair_ops(frm, to, by=-0.125, length=90.125):
+L, S = 90, 0.0625   # adjacent_link_length and adjacent_link_step in the v2.0 Base
+R = 1 - S / L       # the ratio each noticing multiplies the pair's link by: r = 1 - s / L
+
+
+def pair_ops(frm, to, noticings=1, ratio=R, length=L):
+    """The pair-link ops of ``noticings`` noticings in one run: one ``add_link`` at L / r (the identical
+    ``add_link`` is recorded once) and one ``scale`` whose factor is r multiplied in once per noticing."""
+    factor = ratio
+    for _ in range(noticings - 1):
+        factor = factor * ratio
     return [{"op": "add_link", "from": frm, "to": to, "type": "adjacent", "label": ADJ, "fixed": True,
-             "length": length},
-            {"op": "adjust", "table": "slipnet_link_defs", "key": {
+             "length": length / ratio},
+            {"op": "scale", "table": "slipnet_link_defs", "key": {
                 "from_node": frm, "to_node": to, "link_type": "adjacent", "label_node": ADJ},
-             "field": "link_length", "by": by}]
+             "field": "link_length", "factor": factor}]
 
 
 COUNT = lambda name, by=1: {"op": "adjust", "table": "slipnet_node_defs", "key": {"name": name},  # noqa: E731
@@ -120,14 +129,14 @@ def test_a_pair_seen_from_both_ends_counts_twice(meta):
     bond_between(r, string_of(r, "initial"), 0, 1)
     notice(r, ONE)
     ops = notice(r, TWO)
-    assert ops == [COUNT(ONE), *pair_ops(ONE, TWO, by=-0.25), COUNT(TWO)]
+    assert ops == [COUNT(ONE), *pair_ops(ONE, TWO, noticings=2), COUNT(TWO)]
 
 
 def test_a_pair_seen_twice_in_the_workspace_counts_twice_from_one_end(meta):
     r = runner_for(meta)
     bond_between(r, string_of(r, "initial"), 0, 1)
     bond_between(r, string_of(r, "modified"), 0, 1)
-    assert notice(r, ONE) == [COUNT(ONE), *pair_ops(ONE, TWO, by=-0.25)]
+    assert notice(r, ONE) == [COUNT(ONE), *pair_ops(ONE, TWO, noticings=2)]
 
 
 def test_it_goes_through_the_bonds_in_the_workspaces_order_and_draws_no_random_number(meta):
@@ -219,8 +228,17 @@ def test_the_threshold_and_the_lengths_are_read_from_parameters(document):
     r = runner_for(meta)
     bond_between(r, string_of(r, "initial"), 0, 1)
     got = notice(r, ONE)
-    assert [o["length"] for o in got if o["op"] == "add_link"] == [70.5, 11, 12]
-    assert [o["by"] for o in got if o["op"] == "adjust" and o["field"] == "link_length"] == [-0.5]
+    ratio = 1 - 0.5 / 70
+    assert [o["length"] for o in got if o["op"] == "add_link"] == [70 / ratio, 11, 12]
+    assert [o["factor"] for o in got if o["op"] == "scale" and o["field"] == "link_length"] == [ratio]
+    assert 70 / ratio == pytest.approx(70.5, rel=1e-4) and ratio == pytest.approx(1 - 0.5 / 70)
+
+
+def test_the_first_noticing_leaves_the_link_at_exactly_90_and_a_step_is_one_sixteenth_of_the_way_there():
+    """``add_link`` at L / r and a ``scale`` by r: (L / r) * r is exactly 90.0 for L = 90 and s = 1/16 (so the
+    configuration stores the whole number 90), and the first later step is s: 90 - 90 * r = s up to float rounding."""
+    assert R == 0.9993055555555556 and L / R == 90.06254343293953 and (L / R) * R == 90.0
+    assert L - L * R == pytest.approx(S, rel=1e-12)
 
 
 # -- landing: the configuration's lengths over several noticings ------------------------------------------
@@ -237,7 +255,7 @@ def land(config, ops, run):
                              learner=IN_WORKER_LEARNER)
 
 
-def test_the_labelled_link_is_90_at_the_first_noticing_and_one_step_shorter_for_each_after(document, meta):
+def test_the_labelled_link_is_90_at_the_first_noticing_and_a_ratio_shorter_for_each_after(document, meta):
     config = LiveConfiguration(document, configuration_id=0, revision=0, episode_version=0)
     key = (ONE, TWO, "adjacent", ADJ)
     lengths = []
@@ -247,7 +265,14 @@ def test_the_labelled_link_is_90_at_the_first_noticing_and_one_step_shorter_for_
         land(config, notice(r, ONE), run)
         lengths.append(config.document.tables["slipnet_link_defs"][key]["link_length"])
     assert config.diagnostics == []
-    assert lengths == [90, 89.875, 89.75, 89.625, 89.5] and type(lengths[0]) is int
+    # one noticing per run: each run multiplies the stored length by r, so the lengths are exactly
+    # the float products 90, 90 r, 90 r r, ... (and within rounding of 90 * r ** (N - 1)), never 0 or below
+    want = [float(L)]
+    for _ in range(4):
+        want.append(want[-1] * R)
+    assert lengths == want and lengths[0] == 90 and type(lengths[0]) is int
+    assert lengths == pytest.approx([L * R ** n for n in range(5)], rel=1e-12)
+    assert all(0 < n < 90.0001 for n in lengths) and lengths == sorted(lengths, reverse=True)
     assert config.document.tables["slipnet_node_defs"][(ONE,)]["noticings"] == 5
     link = config.document.tables["slipnet_link_defs"][key]
     assert link["label_node"] == ADJ and link["fixed_length"] is True
@@ -265,5 +290,7 @@ def test_a_pair_noticed_from_both_ends_in_one_run_and_the_same_pair_in_another_a
         bond_between(r, string_of(r, "initial"), 0, 1)
         notice(r, ONE)
         land(config, notice(r, TWO), run)
-    # four noticings of the pair: 90 - 3 * 0.125
-    assert config.document.tables["slipnet_link_defs"][(ONE, TWO, "adjacent", ADJ)]["link_length"] == 89.625
+    # four noticings of the pair: 90 * r ** 3 (the run's two scales are multiplied into one, so the last
+    # bits can differ from four sequential multiplications; the test allows 1e-12 of relative error)
+    got = config.document.tables["slipnet_link_defs"][(ONE, TWO, "adjacent", ADJ)]["link_length"]
+    assert got == pytest.approx(L * R ** 3, rel=1e-12)

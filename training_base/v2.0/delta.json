@@ -88,7 +88,7 @@
   {
    "op": "add_param",
    "name": "adjacent_link_step",
-   "to": 0.125,
+   "to": 0.0625,
    "value_type": "float"
   },
   {
@@ -137,7 +137,7 @@
    "fields": {
     "family": "meta",
     "phase": "other",
-    "description": "One run is one noticing of the symbol node that triggered it. If the Workspace holds the symbol it proposes one more noticing, an adjacent link (adjacent_link_length, shortened by adjacent_link_step at every later noticing) for each adjacent bond between it and another single symbol, and, once its noticings reach consolidation_threshold, its category and instance links to the letter category (at symbol_category_link_length and symbol_instance_link_length) where they are missing. The v2.0 Base only.",
+    "description": "One run is one noticing of the symbol node that triggered it. If the Workspace holds the symbol it proposes one more noticing, an adjacent link (adjacent_link_length at the first noticing, then multiplied at every later one by 1 - adjacent_link_step / adjacent_link_length, so the length falls towards 0 and never reaches it) for each adjacent bond between it and another single symbol, and, once its noticings reach consolidation_threshold, its category and instance links to the letter category (at symbol_category_link_length and symbol_instance_link_length) where they are missing. The v2.0 Base only.",
     "source_file": null,
     "source_line": null,
     "execute_body": {

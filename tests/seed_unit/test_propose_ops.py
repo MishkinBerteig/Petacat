@@ -3,7 +3,8 @@ session's configuration and to read how often a node has been noticed.
 
 ``propose_ops`` records change-API ops in the run's ``proposals`` (the list ``apply_ops`` writes), in call
 order, and changes nothing in the run.  It refuses ``add_node``, records an identical op once, and adds
-repeated ``adjust`` ops on the same ``(table, key, field)`` into the first one.  It draws no random number.
+repeated ``adjust`` ops on the same ``(table, key, field)`` into the first one (``by`` values added) and repeated ``scale``
+ops on the same target into the first one (``factor`` values multiplied).  It draws no random number.
 ``noticings`` reads the configuration as the run started it.  The same seed gives the same run, proposals
 included, on ``off``, ``python`` and ``numpy``.
 """
@@ -149,6 +150,73 @@ def test_an_identical_adjust_counts_each_time_unlike_every_other_identical_op(ba
     ctx = fresh_ctx(base)
     propose_ops(ctx, [adjust(-0.125), adjust(-0.125), ADD_LINK, ADD_LINK])
     assert ctx.proposals == [adjust(-0.25), ADD_LINK]
+
+
+# -- multiplying ---------------------------------------------------------------------------------------
+
+
+def scale(factor, key=None, table="slipnet_link_defs", field="link_length"):
+    return {"op": "scale", "table": table, "key": dict(KEY if key is None else key), "field": field, "factor": factor}
+
+
+def test_repeated_scale_ops_on_one_target_are_one_op_kept_where_the_first_was_with_the_factors_multiplied(base):
+    ctx = fresh_ctx(base)
+    first_node = {"op": "add_link_type", "name": "near"}
+    propose_ops(ctx, [first_node, scale(0.5), ADD_LINK])
+    propose_ops(ctx, [scale(0.5), scale(2.0), scale(0.25)])
+    assert [p["op"] for p in ctx.proposals] == ["add_link_type", "scale", "add_link"]
+    assert ctx.proposals[1]["factor"] == 0.5 * 0.5 * 2.0 * 0.25 == 0.125
+
+
+def test_eighty_identical_factors_multiply_to_the_product_computed_the_same_way_in_one_call_or_many(base):
+    ratio = 1 - 0.0625 / 90
+    product = ratio
+    for _ in range(79):
+        product = product * ratio   # call order, left to right: ((r * r) * r) ...
+    ctx = fresh_ctx(base)
+    propose_ops(ctx, [scale(ratio) for _ in range(80)])
+    assert ctx.proposals == [scale(product)] and ctx.proposals[0]["factor"] == product
+    many = fresh_ctx(base)
+    for _ in range(80):
+        propose_ops(many, [scale(ratio)])
+    assert many.proposals == ctx.proposals
+    assert product == pytest.approx(ratio ** 80, rel=1e-13) and 0 < product < 1
+
+
+def test_the_same_target_for_scale_is_the_same_table_field_and_key_and_it_never_combines_with_adjust(base):
+    ctx = fresh_ctx(base)
+    other_key = {**KEY, "to_node": "plato-c"}
+    propose_ops(ctx, [
+        scale(0.5), scale(0.5, key=other_key), scale(0.5, field="fixed_length"),
+        scale(2, table="slipnet_node_defs", key={"name": "plato-a"}, field="noticings"),
+        scale(0.5, key={**KEY, "label_node": None}),   # a NULL key part is read as ""
+        adjust(-1),                                       # an adjust on the same target is a different op
+        scale(3, key=other_key),
+        adjust(-1),
+    ])
+    assert ctx.proposals == [
+        scale(0.25),
+        scale(1.5, key=other_key),
+        scale(0.5, field="fixed_length"),
+        scale(2, table="slipnet_node_defs", key={"name": "plato-a"}, field="noticings"),
+        adjust(-2),
+    ]
+
+
+def test_a_scale_that_cannot_be_multiplied_is_recorded_as_it_is_for_the_change_api_to_refuse(base):
+    ctx = fresh_ctx(base)
+    propose_ops(ctx, [scale(0.5), scale(float("inf")), scale(float("nan")), scale(10 ** 400), scale("x")])
+    assert ctx.proposals[0] == scale(0.5) and len(ctx.proposals) == 5
+    assert [p["factor"] for p in ctx.proposals][1:2] == [float("inf")]
+    ints = fresh_ctx(base)
+    propose_ops(ints, [scale(1), scale(2), scale(3)])
+    assert ints.proposals == [scale(6)] and isinstance(ints.proposals[0]["factor"], int)
+
+
+def test_an_identical_scale_counts_each_time_unlike_every_other_identical_op(base):
+    ctx = fresh_ctx(base)
+    propose_ops(ctx, [scale(0.5), scale(0.5), ADD_LINK, ADD_LINK])
+    assert ctx.proposals == [scale(0.25), ADD_LINK]
 
 
 # -- what it does not touch ---------------------------------------------------------------------------
