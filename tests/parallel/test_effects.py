@@ -385,19 +385,25 @@ def test_apply_ops_is_a_barrier_so_the_speculative_executor_serialises_it():
 
 
 def test_links_of_reads_only_the_static_topology_and_writes_nothing():
-    """``links_of`` filters a node's ``outgoing_links`` (links are never added during a run: ``apply_ops``
-    adds nodes only, and is a BARRIER), so it declares no component read and no write."""
+    """``links_of`` filters a node's ``outgoing_links`` (links are added during a run only by ``apply_ops``, which
+    is a BARRIER), so it declares no component read and no write."""
     entry = fx.load().builtins["links_of"]
     assert entry.kind == fx.READ and entry.reads == 0 and entry.writes == 0
 
 
 def test_propose_ops_is_a_write_that_runs_in_order_and_names_no_component():
-    """``propose_ops`` appends to ``ctx.proposals``, which is not run state and has no component.  It is a
-    WRITE, not a READ, so it runs in order under the commit token and never inside a speculated prefix that could
-    be discarded and run again (which would record an ``adjust`` twice)."""
-    entry = fx.load().builtins["propose_ops"]
-    assert entry.kind == fx.WRITE and entry.reads == 0 and entry.writes == 0
-    assert "propose_ops" in fx.load().builtins and "apply_ops" in fx.load().builtins
+    """``propose_ops`` appends to ``ctx.proposals`` or holds ops in ``ctx.held_proposals``, neither of which is run
+    state or has a component.  Held for an instantiator it may post one (it reads the Coderack, and writes the
+    Coderack and the id allocator).  It is a WRITE, not a READ, so it runs in order under the commit token and
+    never inside a speculated prefix that could be discarded and run again (which would record an ``adjust``
+    twice)."""
+    table = fx.load()
+    entry = table.builtins["propose_ops"]
+    assert entry.kind == fx.WRITE
+    assert entry.reads == fx.BIT["coderack"] and entry.writes == fx.BIT["coderack"] | fx.BIT["ids"]
+    assert "propose_ops" in table.builtins and "apply_ops" in table.builtins
+    take = table.builtins["take_proposed_ops"]
+    assert take.kind == fx.WRITE and take.reads == 0 and take.writes == 0
 
 
 def test_noticings_reads_only_the_configuration_the_run_started_with():

@@ -145,6 +145,9 @@ Every doc, UI string, help topic, plan and decision must keep the distinction pe
   The code, API, UI and docs all say Training Mode Session (`/api/training-mode/sessions`, the
   `training_mode_sessions` tables). The one table with an older prefix is
   `training_memory_merges`, a session's Episodic Memory record, written only at Stop.
+- **Context-response analogy problem** is what a Training Mode problem is called, always (the user, 2026-11-15). Its 1st
+  position is the context, and its 4th, the one Petacat constructs, is the response. "Letter-string analogy problem" is said
+  only of Metacat and Metacat Mode.
 - **Episodic Memory is used in both modes, always.** Neither mode has "independent memory".
   - Metacat Mode's Episodic Memory is global, and a user will often clear it after a single
     run.
@@ -169,12 +172,18 @@ Every doc, UI string, help topic, plan and decision must keep the distinction pe
   time a session is created and journaled as the session's creation entry. It is not a Starting Conceptual State
   (that is a base plus a session's overrides). Metacat Mode never reads it. v2.0 is built into it in increments,
   listed in its README. Today a symbol with no Slipnet node gets one inside the run (`apply_ops`), and the in-worker
-  learner keeps it in the session's configuration. A body can also propose any other change-API op for the next run with
+  learner keeps it in the session's configuration. `apply_ops` also builds links in the run's own Slipnet (`add_link`, and
+  `scale` or `adjust` of a link's length), at once, for every reader of links on every numeric backend, and records what it
+  built for the session. A body can propose a change to the run's Slipnet for an instantiator
+  (`propose_ops(ops, built_by=..., urgency=...)`): the change is held, one instantiator waits per link, and it builds what
+  it took if the evidence still holds and otherwise fizzles; what is still held when the turn ends is dropped, and only
+  what was built reaches the session. A body can also propose any other change-API op for the next turn with a plain
   `propose_ops`, which the learner submits too; a link length can be a fraction; and each Slipnet node holds a whole-number
   `noticings` count that only the `noticings` builtin reads, and only the `consolidator` codelet calls. Each run of the
-  `consolidator` codelet is one noticing of a symbol: it adds 1 to the count and writes the `adjacent` links of the pairs of symbols it sees bonded, and, from
-  `consolidation_threshold` noticings on, the symbol's `category` and `instance` links. Two neighbours with no known
-  relation can bond as `adjacent` (below).
+  `consolidator` codelet is one noticing of a symbol: it adds 1 to the count (for the next turn) and proposes the `adjacent`
+  links of the pairs of symbols it sees bonded, and, from `consolidation_threshold` noticings on, the symbol's `category` and
+  `instance` links, for `adjacent-instantiator`, `category-instantiator` and `instance-of-instantiator` to build in the run, each posted at the `high` urgency level. `consolidator` itself is posted in Metacat's own top-down form (urgency `conceptual_depth * activation / 100`, probability `average_unhappiness / 100`).
+  Two neighbours with no known relation can bond as `adjacent` (below).
 - **Link type behaviour** is what the engine does with a link of a type: `category`, `instance`, `property`, `lateral`
   or `slip`. The engine names behaviours, never a link type. `link_types` is configuration that the change API
   addresses (`add_link_type`, `remove_link_type`), not one of the 17 enum tables, so a configuration may hold link
@@ -182,7 +191,7 @@ Every doc, UI string, help topic, plan and decision must keep the distinction pe
   codelet reads them with `links_of(node, type)`.
 - **`adjacent`** exists only in the v2.0 Base. It is a link type (behaviour `lateral`) and a bond category
   (`plato-adjacent`, conceptual depth 45, the lowest of the link concepts): two neighbours that no link relates, such as `a` and `c` or `1` and `2`, can still bond. It makes
-  bonds only, never groups. `consolidator` writes an `adjacent` link into the Slipnet for each pair of single symbols such a bond joined (labelled by `plato-adjacent`, length 90 at the pair's first noticing, and each later noticing multiplies it by `1 - s / 90`, with the first step `s` = 1/16, so the length approaches 0 and never reaches it); a bond with a group at an end writes nothing.
+  bonds only, never groups. `consolidator` proposes an `adjacent` link for each pair of single symbols such a bond joined, and `adjacent-instantiator` writes it into the run's Slipnet if the bond is still in the Workspace and no other link joins the two symbols' nodes, in either direction (labelled by `plato-adjacent`, length 90 at the pair's first noticing, and each later noticing multiplies it by `1 - s / 90`, with the first step `s` = 1/16, so the length approaches 0 and never reaches it); a bond with a group at an end writes nothing.
 - **Run mode** is how runs execute: single-threaded, or multi-core (the speculative executor
   within a run, the swarm across runs). It is orthogonal to the two modes and must be viable
   in both. It is not the persistence mode (Fast, Normal or Audit).

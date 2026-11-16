@@ -1,7 +1,7 @@
 """The v2.0 Base's symbol family and the engine primitive under it.
 
-``Slipnet.add_node`` and ``invalidate_numeric_layout``; ``apply_ops`` (``add_node`` only, this run's
-own Slipnet, recorded on the run, never the shared provider); ``num_unperceived_symbols``; the symbol
+``Slipnet.add_node`` and ``invalidate_numeric_layout``; ``apply_ops`` (``add_node``, this run's
+own Slipnet, recorded on the run, never the shared provider; its link ops are in ``test_apply_ops_links.py``); ``num_unperceived_symbols``; the symbol
 family's posting rule drawing nothing when every symbol is perceived; and a run that creates a node
 giving the same results on every numeric backend.
 """
@@ -103,7 +103,7 @@ def fresh_ctx(meta, problem=("1", "1", "1")):
     return runner.ctx
 
 
-def test_apply_ops_takes_add_node_only_and_refuses_the_rest_by_name(base):
+def test_apply_ops_refuses_what_it_does_not_take_by_name(base):
     ctx = fresh_ctx(base)
     for bad in ({"op": "add_link", "from": "a", "to": "b", "type": "lateral"},
                 {"op": "adjust", "table": "slipnet_link_defs"}, {"op": "add_trigger"}):
@@ -186,7 +186,7 @@ def base_without_consolidator(base) -> MetadataProvider:
 @pytest.fixture(scope="module")
 def base_without_the_symbol_family(base) -> MetadataProvider:
     """The v2.0 Base minus the symbol family's posting rule and ``consolidator``'s (the codelet types stay, unposted)."""
-    return _without_rules(base, "symbol-scout", "consolidator")
+    return _without_rules(base, "novel-string-scout", "consolidator")
 
 
 @pytest.mark.parametrize("problem", LETTER_PROBLEMS, ids=[" ".join(p) for p in LETTER_PROBLEMS])
@@ -208,8 +208,8 @@ def test_with_no_unseen_symbol_the_symbol_family_posts_nothing_and_draws_nothing
 
 
 def test_on_the_standard_the_symbol_family_is_not_there_at_all(standard):
-    assert "symbol-scout" not in standard.codelet_specs
-    assert all(r.codelet_type != "symbol-scout" for r in standard.posting_rules)
+    assert "novel-string-scout" not in standard.codelet_specs
+    assert all(r.codelet_type != "novel-string-scout" for r in standard.posting_rules)
 
 
 # -- adjacent bonds (increment 2) --------------------------------------------------------------------------------
@@ -238,8 +238,8 @@ ADJACENT = "plato-adjacent"
 
 
 #: An adjacent bond is weak by design (intrinsic length 90), so it is built rarely: on this problem
-#: seed 3 builds 25 of them in 3000 codelets, and the Standard builds none.
-ADJACENT_PROBLEM, ADJACENT_SEED, ADJACENT_STEPS = ("aceg", "acei", "bdfh"), 3, 3000
+#: seed 2 builds 19 of them in 3000 codelets (on the Base's own rule for ``consolidator``), and the Standard builds none.
+ADJACENT_PROBLEM, ADJACENT_SEED, ADJACENT_STEPS = ("aceg", "acei", "bdfh"), 2, 3000
 
 
 def adjacent_bonds(meta, problem=ADJACENT_PROBLEM, seeds=(ADJACENT_SEED,), steps=ADJACENT_STEPS):

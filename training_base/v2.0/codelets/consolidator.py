@@ -3,8 +3,16 @@
 # Posted top-down, with `args['slipnode']`, the node whose activation passed the gate.  The
 # node is noticed only if the Workspace holds the symbol (a Letter object whose letter-category
 # description is the node); a node raised past the gate by spreading activation alone is primed,
-# not noticed, and the codelet fizzles.  Everything is proposed with `propose_ops`, so nothing
-# changes in this run: the count and the links act from the next run.
+# not noticed, and the codelet fizzles.
+#
+# Consolidator only proposes.  Each instantiator is posted at the `high` urgency level, as `node-instantiator` is
+# (`meta.get_urgency('high')`).  The count of noticings goes to the next turn with a plain
+# `propose_ops`.  Each change to this run's Slipnet (a pair's `adjacent` link and its strengthening,
+# a symbol's `category` and `instance` links) is proposed for an instantiator, which builds it in
+# this run if the evidence still holds and otherwise fizzles (`adjacent-instantiator`,
+# `category-instantiator`, `instance-of-instantiator`).  Proposing for a link that already has an
+# instantiator waiting only adds to what is held, so the Coderack is not crowded.  A change that no
+# instantiator built by the end of the turn is dropped, and only what was built reaches the session.
 #
 # Parameters, each read only here: `adjacent_link_length` (L) and `adjacent_link_step` (s) for
 # the link of a pair of neighbours (the link starts at L and each later noticing multiplies its
@@ -59,13 +67,15 @@ if adjacent:
                  'key': {'from_node': first.name, 'to_node': second.name, 'link_type': 'adjacent',
                          'label_node': adjacent.name},
                  'field': 'link_length', 'factor': ratio},
-            ])
+            ], built_by='adjacent-instantiator', urgency=meta.get_urgency('high'))
 
 # At or past the threshold: the links a letter has to its dimension, if this run's Slipnet lacks them.
 if noticings(node) >= meta.get_param('consolidation_threshold'):
     if not any(link.to_node is letter_category for link in links_of(node, 'category')):
         propose_ops([{'op': 'add_link', 'from': node.name, 'to': letter_category.name, 'type': 'category',
-                      'fixed': True, 'length': meta.get_param('symbol_category_link_length')}])
+                      'fixed': True, 'length': meta.get_param('symbol_category_link_length')}],
+                    built_by='category-instantiator', urgency=meta.get_urgency('high'))
     if not any(link.to_node is node for link in links_of(letter_category, 'instance')):
         propose_ops([{'op': 'add_link', 'from': letter_category.name, 'to': node.name, 'type': 'instance',
-                      'fixed': True, 'length': meta.get_param('symbol_instance_link_length')}])
+                      'fixed': True, 'length': meta.get_param('symbol_instance_link_length')}],
+                    built_by='instance-of-instantiator', urgency=meta.get_urgency('high'))

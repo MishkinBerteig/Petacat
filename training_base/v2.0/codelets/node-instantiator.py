@@ -1,4 +1,4 @@
-# Symbol builder (v2.0 Base only): make the node for a symbol seen for the first time.
+# Node instantiator (v2.0 Base only): make the node for a symbol seen for the first time.
 #
 # The node is connected to nothing.  Its glyph and short name are the character, which is all
 # that perceiving the symbol needs: sameness bonds, groups of the symbol and answers that keep

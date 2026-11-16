@@ -26,6 +26,7 @@ from server.services.training_mode_session_executor import (
     SerialExecutor, SessionTask, SwarmExecutor, outcome_fingerprint, run_task,
 )
 from server.services.training_mode_session_service import IN_WORKER_LEARNER, TrainingModeSessionService
+from tests.support.noticing_configuration import every_noticing
 
 pytestmark = pytest.mark.numeric_matrix
 
@@ -41,7 +42,9 @@ def node_op(ch):
 
 @pytest.fixture(scope="module")
 def base_document():
-    return tb.resolve_base().document
+    """The Base with ``consolidator`` posted at every gate pass (``tests/support/noticing_configuration.py``): these tests
+    are about what noticings do, and the Base's own rule notices a symbol rarely."""
+    return every_noticing(tb.resolve_base().document)
 
 
 @pytest.fixture(scope="module")

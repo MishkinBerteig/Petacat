@@ -3,7 +3,7 @@
 The swarm, the serial child and the in-process run give the same outcomes, ``proposals`` included;
 a worker that created a node leaves the shipped provider untouched (the next run of the same seed
 creates it again); and once the node is in the configuration a run starts with the symbol perceived,
-posts no ``symbol-scout`` and proposes nothing.
+posts no ``novel-string-scout`` and proposes nothing.
 """
 
 from __future__ import annotations
@@ -81,8 +81,8 @@ def test_with_the_node_in_the_configuration_the_symbol_is_perceived_at_once(base
     monkeypatch.setattr(CodeletInterpreter, "execute", record)
     out = run_task(task(1, PROBLEMS[0]), known)
     assert out.proposals == [] and out.answer == "1" and not out.error
-    assert "symbol-scout" not in seen and "symbol-builder" not in seen
+    assert "novel-string-scout" not in seen and "node-instantiator" not in seen
     seen.clear()
     unknown = run_task(task(1, PROBLEMS[0]), base)
-    assert "symbol-scout" in seen and "symbol-builder" in seen and unknown.proposals
+    assert "novel-string-scout" in seen and "node-instantiator" in seen and unknown.proposals
     assert unknown.codelets > out.codelets

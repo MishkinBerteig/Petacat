@@ -891,6 +891,10 @@ class SlipnetLink:
         self.fixed_length = fixed_link_length is not None
         self._fixed_link_length = fixed_link_length
 
+    def set_fixed_length(self, length: int | float) -> None:
+        """Give this fixed-length link a new length (:meth:`Slipnet.set_link_length` is the caller)."""
+        self._fixed_link_length = length
+
     def link_length(self) -> int | float:
         """Current link length. Dynamic links use label node's intrinsic length
         (or shrunk length if fully active).
@@ -1084,10 +1088,95 @@ class Slipnet:
         self.invalidate_numeric_layout()
         return node
 
+    @staticmethod
+    def _attach_link(link: SlipnetLink, behaviour: str | None) -> None:
+        """Put *link* in the list of its type's *behaviour* on its ``from_node``, and in its ``to_node``'s
+        incoming links.  The one place a link is attached: ``from_metadata`` calls it for every link of the
+        configuration, and :meth:`add_link` for a link made inside a run, so Metacat Mode's construction goes
+        through the code a created link uses."""
+        from_node = link.from_node
+        if behaviour == "category":
+            from_node.category_links.append(link)
+        elif behaviour == "instance":
+            from_node.instance_links.append(link)
+        elif behaviour == "property":
+            from_node.property_links.append(link)
+        elif behaviour == "lateral":
+            from_node.lateral_links.append(link)
+        elif behaviour == "slip":
+            from_node.lateral_sliplinks.append(link)
+        else:
+            from_node.plain_links.append(link)
+
+        link.to_node.incoming_links.append(link)
+
+    def find_link(
+        self, from_name: str, to_name: str, link_type: str, label_name: str | None = None
+    ) -> SlipnetLink | None:
+        """The link from *from_name* to *to_name* of type *link_type* with the label *label_name* (``None``
+        or ``""`` is no label), or ``None``: the row the change API addresses by ``(from_node, to_node,
+        link_type, label_node)``.  Names are unique in a Slipnet, so a node it lacks has no such link."""
+        node = self.nodes.get(from_name)
+        if node is None:
+            return None
+        label = label_name or None
+        for link in node.outgoing_links:
+            if (link.to_node.name == to_name and link.link_type == link_type
+                    and (link.label_node.name if link.label_node is not None else None) == label):
+                return link
+        return None
+
+    def add_link(
+        self,
+        from_name: str,
+        to_name: str,
+        link_type: str,
+        behaviour: str | None,
+        label_name: str | None = None,
+        fixed_length: int | float | None = None,
+    ) -> SlipnetLink:
+        """Add a link between two nodes of this Slipnet (and to this one only).
+
+        The link goes in the list of its type's *behaviour* (``category``, ``instance``, ``property``,
+        ``lateral``, ``slip``, or ``None``/another value for a plain link) on its ``from_node`` and in its
+        ``to_node``'s incoming links, so everything derived from links sees it at once: ``outgoing_links``,
+        ``links_of``, category membership, ``get_related_node`` and slippages.  The alphabet is rebuilt (a
+        first or last letter is a letter with a property link to a marker), and the numeric layout is
+        invalidated, so the next update flattens the Slipnet again with the new edge.  Draws no random number.
+        A node this Slipnet lacks raises ``ValueError``; a link it already has is returned unchanged.
+        """
+        existing = self.find_link(from_name, to_name, link_type, label_name)
+        if existing is not None:
+            return existing
+        from_node = self.nodes.get(from_name)
+        to_node = self.nodes.get(to_name)
+        if from_node is None or to_node is None:
+            raise ValueError(f"the Slipnet has no node {from_name if from_node is None else to_name!r}")
+        label_node = None
+        if label_name:
+            label_node = self.nodes.get(label_name)
+            if label_node is None:
+                raise ValueError(f"the Slipnet has no node {label_name!r}")
+        link = SlipnetLink(
+            from_node=from_node, to_node=to_node, link_type=link_type,
+            label_node=label_node, fixed_link_length=fixed_length,
+        )
+        self._attach_link(link, behaviour)
+        self.alphabet = Alphabet.build(self.nodes, self.roles)
+        self.invalidate_numeric_layout()
+        return link
+
+    def set_link_length(self, link: SlipnetLink, length: int | float) -> None:
+        """Give a fixed-length *link* of this Slipnet a new length, and invalidate the numeric layout (the
+        flattened edge weights hold the old association).  Draws no random number."""
+        link.set_fixed_length(length)
+        self.invalidate_numeric_layout()
+
     def invalidate_numeric_layout(self) -> None:
         """Forget the flattened layout and the backend session built on it.
 
-        Called after the node set changes (:meth:`add_node`).  The next
+        Called after the node set or a link changes (:meth:`add_node`, :meth:`add_link`,
+        :meth:`set_link_length`).  The next
         :meth:`_numeric_session` selects a backend for the new node count and flattens the
         Slipnet again.
         """
@@ -1131,22 +1220,7 @@ class Slipnet:
                 fixed_link_length=link_spec.link_length if link_spec.fixed_length else None,
             )
 
-            # Attach to the list of the type's behaviour on from_node
-            behaviour = behaviour_of.get(link_spec.link_type)
-            if behaviour == "category":
-                from_node.category_links.append(link)
-            elif behaviour == "instance":
-                from_node.instance_links.append(link)
-            elif behaviour == "property":
-                from_node.property_links.append(link)
-            elif behaviour == "lateral":
-                from_node.lateral_links.append(link)
-            elif behaviour == "slip":
-                from_node.lateral_sliplinks.append(link)
-            else:
-                from_node.plain_links.append(link)
-
-            to_node.incoming_links.append(link)
+            cls._attach_link(link, behaviour_of.get(link_spec.link_type))
 
         # Resolve the roles once: the bound node (or the role's Absent token) per role,
         # and each bound node's frozenset of role names.

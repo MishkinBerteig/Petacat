@@ -90,8 +90,9 @@ Episodic Memory and the whole configuration, and the configuration revision (the
 counter, the compare-and-set token).  A run takes a ``ConfigRef`` with its ``MemoryRef`` when it
 is dispatched (the provider, its ``config_hash`` and revision, the episode version) and records
 them.  When a run finishes (``_record``) an entry is made, in completion order: the memory
-merge, then the in-worker learner's batch (the run's ``proposals``: the nodes its codelets made,
-one ``add_node`` per row, actor ``learner:in-worker``), then one version.  The batch of
+merge, then the in-worker learner's batch (the run's ``proposals``: the nodes and links its
+codelets built in the run's own Slipnet and the ops they proposed for the next turn, one op
+per row, actor ``learner:in-worker``), then one version.  The batch of
 the after-run seam (``set_after_run``; none ships), if it returns ops, rides that entry when the
 run made no proposals (actor ``learner:after-run``), and is a second entry straight after it when
 the run did, so the journal names the learning source of every op.  An external or Admin batch (``submit_changes`` / ``apply_live``) is an entry with no
@@ -1084,8 +1085,9 @@ class TrainingModeSessionService:
 
     @staticmethod
     def _proposal_batch(outcome: Any) -> dict[str, Any] | None:
-        """The in-worker learner's batch: the run's ``proposals`` (the nodes its codelets made),
-        one op per row, with ``rebase`` and ``on_op_failure: skip`` (the ``finish_run`` defaults),
+        """The in-worker learner's batch: the run's ``proposals`` (the nodes and links its codelets
+        built, and the ops they proposed), one op per row, with ``rebase`` and ``on_op_failure:
+        skip`` (the ``finish_run`` defaults),
         so a node that several runs made is one row and the duplicates are skipped cleanly.
         ``None`` when the run proposed nothing."""
         ops = [dict(p) for p in (getattr(outcome, "proposals", None) or ())]

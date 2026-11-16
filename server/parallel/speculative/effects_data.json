@@ -312,15 +312,18 @@
     "slipnet_act",
     "slipnet_buf"
    ],
-   "why": "Slipnet.add_node on this run's own Slipnet: appends to slipnet.nodes, rebuilds slipnet.alphabet, invalidates the numeric layout, gives ctx.meta a view with the node's spec and appends to ctx.proposals. The speculative executor's guard class, node list and structure read for created nodes are not built, so it runs serialised under the commit token. Draws no random number; touches no Workspace structure."
+   "why": "Slipnet.add_node, Slipnet.add_link and Slipnet.set_link_length on this run's own Slipnet: they append to slipnet.nodes, attach a link in the behaviour list of its from node and in the incoming list of its to node, set a fixed link length, rebuild slipnet.alphabet, invalidate the numeric layout (the flattened edge weights), give ctx.meta a view with a created node's spec, and append to ctx.proposals (an identical op once, adjust ops on one target summed, scale ops on one target multiplied). Everything is checked before anything is changed. The speculative executor's guard class, node list, link structure and structure read for created nodes and links are not built, so it runs serialised under the commit token. Draws no random number; touches no Workspace structure."
   },
   "propose_ops": {
    "kind": "WRITE",
-   "reads": [],
-   "writes": [
-    "proposals"
+   "reads": [
+    "coderack"
    ],
-   "why": "Appends deep copies of change-API op dicts to ctx.proposals (an identical op once; repeated adjust ops on one table, key and field summed into the first, and repeated scale ops on one table, key and field multiplied into the first). ctx.proposals is not run state and no component names it, so it declares no component, but it is a WRITE: it runs in order under the commit token, never in a speculated prefix that could be discarded and run again. Never changes the Slipnet, the metadata view or the Workspace; draws no random number."
+   "writes": [
+    "coderack",
+    "ids"
+   ],
+   "why": "Plain (no built_by): appends deep copies of change-API op dicts to ctx.proposals (an identical op once; repeated adjust ops on one table, key and field summed into the first, and repeated scale ops on one table, key and field multiplied into the first). Never changes the Slipnet, the metadata view or the Workspace. With built_by: holds the ops of one link in ctx.held_proposals, composed the same way (neither ctx.proposals nor ctx.held_proposals is run state, and no component names them), reads the Coderack to see whether the link's instantiator is still on it (Coderack.holds), and, when none waits, posts one codelet (Codelet.id from the id allocator, Coderack.post, which may evict an old codelet and draws from the run's generator exactly as post_codelet does). It is a WRITE: it runs in order under the commit token, never in a speculated prefix that could be discarded and run again. Never changes the Slipnet, the metadata view or the Workspace."
   },
   "noticings": {
    "kind": "READ",
@@ -354,7 +357,7 @@
    "kind": "READ",
    "reads": [],
    "writes": [],
-   "why": "Filters node.outgoing_links by link_type (static topology: a run adds nodes, never links, and apply_ops is a BARRIER); returns a new list of the Slipnet's own link objects and mutates nothing."
+   "why": "Filters node.outgoing_links by link_type (the run's own Slipnet: apply_ops adds links and is a BARRIER, so the lists do not change under a speculated prefix); returns a new list of the Slipnet's own link objects and mutates nothing."
   },
   "object_has_description_type": {
    "kind": "READ",
@@ -618,6 +621,12 @@
     "workspace"
    ],
    "why": "rules.apply_rule via the image system (builtins.py:3223-3271): resets ctx.last_failure*, and REBUILDS obj.image for every object of the target string."
+  },
+  "take_proposed_ops": {
+   "kind": "WRITE",
+   "reads": [],
+   "writes": [],
+   "why": "Pops the entry of ctx.held_proposals for the instantiator's target and returns its ops (a list of private op dicts). ctx.held_proposals is not run state and no component names it, so it declares no component, but it is a WRITE: it runs in order under the commit token, never in a speculated prefix that could be discarded and run again. Reads and writes no Slipnet, Workspace or Coderack structure; draws no random number."
   }
  },
  "types": {

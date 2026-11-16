@@ -55,6 +55,33 @@ propose_ops([
 """
 
 
+#: An instantiator with no evidence to check: it takes everything held for its target and builds it.
+BUILD_BODY = """
+ops = take_proposed_ops(args.get('held'))
+if not ops:
+    fizzle()
+apply_ops(ops)
+"""
+
+#: The same pair as ``PAIR_BODY``, proposed for the instantiator ``pair-instantiator`` to build in the run.
+INSTANTIATED_PAIR_BODY = """
+key = {'from_node': 'plato-a', 'to_node': 'plato-b', 'link_type': 'adjacent', 'label_node': ''}
+ratio = 1 - 0.0625 / 90
+propose_ops([
+    {'op': 'add_link', 'from': 'plato-a', 'to': 'plato-b', 'type': 'adjacent', 'fixed': True, 'length': 90 / ratio},
+    {'op': 'scale', 'table': 'slipnet_link_defs', 'key': key, 'field': 'link_length', 'factor': ratio},
+], built_by='pair-instantiator', urgency=meta.get_urgency('high'))
+# the plain count of the proposals made, so that a test can tell the changes built from those proposed
+propose_ops([{'op': 'adjust', 'table': 'slipnet_node_defs', 'key': {'name': 'plato-c'}, 'field': 'noticings', 'by': 1}])
+"""
+
+
+def instantiator_ops(name: str = "pair-instantiator", body: str = BUILD_BODY) -> list[dict[str, Any]]:
+    """The codelet type of an instantiator (family ``meta``, phase ``builder``), with no posting rule."""
+    return [{"op": "add_codelet_type", "name": name, "fields": {
+        "family": "meta", "phase": "builder", "description": "a test instantiator", "execute_body": body}}]
+
+
 def noticer_ops(body: str) -> list[dict[str, Any]]:
     return [
         {"op": "add_codelet_type", "name": "noticer", "fields": {
@@ -78,12 +105,32 @@ def noticer_provider(body: str = PAIR_BODY, *more: dict[str, Any]):
     return cd.provider(noticer_document(body, *more))
 
 
+def instantiating_document(body: str = INSTANTIATED_PAIR_BODY, instantiator: str = BUILD_BODY,
+                           *more: dict[str, Any]) -> cd.ConfigDocument:
+    """``noticer_document`` plus the instantiator type ``pair-instantiator`` with the given body."""
+    return noticer_document(body, *instantiator_ops("pair-instantiator", instantiator), *more)
+
+
+def instantiating_provider(body: str = INSTANTIATED_PAIR_BODY, instantiator: str = BUILD_BODY, *more: dict[str, Any]):
+    return cd.provider(instantiating_document(body, instantiator, *more))
+
+
 def noticings_of(outcome) -> int:
-    """How many times a ``PAIR_BODY`` run noticed the pair: its ``scale`` factor is ``r`` to that power."""
-    (factor,) = [p["factor"] for p in outcome.proposals if p["op"] == "scale" and p["field"] == "link_length"]
+    """How many times a ``PAIR_BODY`` run noticed the pair: its ``scale`` factor is ``r`` to that power.  For a run
+    of ``INSTANTIATED_PAIR_BODY`` it is how many noticings' changes were built (0 when none were: no ``scale`` is
+    recorded)."""
+    factors = [p["factor"] for p in outcome.proposals if p["op"] == "scale" and p["field"] == "link_length"]
+    if not factors:
+        return 0
+    (factor,) = factors
     count = round(math.log(factor) / math.log(RATIO))
     assert count >= 1 and math.isclose(factor, RATIO ** count, rel_tol=TOLERANCE)
     return count
+
+
+def proposed_of(outcome) -> int:
+    """How many times an ``INSTANTIATED_PAIR_BODY`` run proposed the pair (its plain count on ``plato-c``)."""
+    return sum(p["by"] for p in outcome.proposals if p["op"] == "adjust" and p["key"] == {"name": "plato-c"})
 
 
 def expected_length(noticings: int) -> float:

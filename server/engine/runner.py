@@ -249,6 +249,13 @@ class EngineContext:
         #: in the order they were applied.  The outcome carries them to the session, which
         #: submits them through the change API.  Not run state: nothing restores it.
         self.proposals: list[dict[str, Any]] = []
+        #: Changes to this run's Slipnet that a body proposed for an instantiator (``propose_ops(ops,
+        #: built_by=...)``) and that no instantiator has taken yet: ``{key: {"ops": [...], "codelet": the
+        #: instantiator posted for it}}``, the key being ``(built_by, "link", from, to, type, label)``.  An
+        #: instantiator takes everything held for its key (``take_proposed_ops``) and builds it with
+        #: ``apply_ops`` or fizzles, which drops it.  Whatever is still held when the turn ends is dropped:
+        #: it is not in ``proposals`` and never reaches the session.  Not run state: nothing restores it.
+        self.held_proposals: dict[tuple, dict[str, Any]] = {}
         #: Is :attr:`meta` a view this run owns (``add_node_spec`` made it)?  Until then
         #: ``meta`` is the provider other runs share, and nothing may write to it.
         self._meta_is_run_view: bool = False

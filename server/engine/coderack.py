@@ -657,6 +657,11 @@ class Coderack:
     def _bin_of(self, codelet: Codelet) -> CoderackBin:
         return self.bins[self._urgency_to_bin(codelet.urgency)]
 
+    def holds(self, codelet: Codelet) -> bool:
+        """Is *codelet* (this very object) on the rack?  False once it has run, been evicted, or been
+        flushed.  A scan of the bins, for the few callers that ask (a held proposal's instantiator)."""
+        return any(codelet is held for b in self.bins for held in b.codelets)
+
     def codelets_present(self) -> bool:
         """Is there anything here, without summing the maintained total?
 

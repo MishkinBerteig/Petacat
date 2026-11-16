@@ -33,7 +33,7 @@ from server.engine.concept_mappings import ConceptMapping
 from server.engine.descriptions import Description
 from server.engine.formulas import round_ratio, temp_adjusted_probability, temp_adjusted_values
 from server.engine.groups import Group
-from server.engine.roles import ROLE_BY_NAME, VOCABULARY_BY_NAME, absent
+from server.engine.roles import LINK_BEHAVIOURS, ROLE_BY_NAME, VOCABULARY_BY_NAME, absent
 from server.engine.run_binding import constants
 from server.engine.rules import Rule
 from server.engine.sink import STRUCTURE_BROKEN, STRUCTURE_BUILT
@@ -87,6 +87,7 @@ def get_builtins() -> dict[str, Any]:
         "letter_node": letter_node,
         "apply_ops": apply_ops,
         "propose_ops": propose_ops,
+        "take_proposed_ops": take_proposed_ops,
         "noticings": noticings,
         "get_activation": get_activation,
         "fully_active": fully_active,
@@ -2428,52 +2429,204 @@ _NODE_OP_FIELDS = (*_NODE_SPEC_FIELDS, "description", "sort_order")
 
 
 def apply_ops(ctx: EngineContext, ops: list) -> None:
-    """Apply ``add_node`` ops to **this run's own** Slipnet, and record them on the run.
+    """Apply change-API ops to **this run's own** Slipnet, and record them on the run.
 
-    Each op is a change-API op dict: ``{"op": "add_node", "name": ..., "fields": {...}}``.
-    Any other op is refused by name (``ValueError``; :func:`propose_ops` records the others), and so is an ``add_node`` that carries
-    ``links``, ``roles``, ``params``, ``layout`` or ``theme_dimension``: a node made inside a
-    run is connected to nothing.  Everything is checked before anything is changed.
+    Each op is a change-API op dict.  Three kinds are taken; any other is refused by name
+    (``ValueError``; :func:`propose_ops` records the others for the next run):
 
-    For each op, ``Slipnet.add_node`` makes the node (and rebuilds the alphabet when it has a
-    glyph, so :func:`letter_node` finds it, and invalidates the numeric layout, so the next
-    update flattens the Slipnet again), the run's metadata view gains the node's spec
-    (``EngineContext.add_node_spec``), and the op is recorded in ``ctx.proposals``, which the
-    run's outcome carries to the session.  An op identical to one already recorded is a
-    no-op.  It never writes the shared provider or anything another run can see, draws no
-    random number and does not touch the Workspace.
+    * ``{"op": "add_node", "name": ..., "fields": {...}}``: a node made inside a run is connected to
+      nothing, so an ``add_node`` that carries ``links``, ``roles``, ``params``, ``layout`` or
+      ``theme_dimension`` is refused.
+    * ``{"op": "add_link", "from": ..., "to": ..., "type": ..., "label": ..., "fixed": ..., "length": ...}``:
+      a link of a type the run's configuration has, between nodes the run's Slipnet has (or an
+      ``add_node`` of the same call makes).  ``label`` is optional (no label), ``fixed`` is a boolean,
+      and ``length`` is a finite number exactly when the link is fixed-length (a link whose type has no
+      behaviour must be).  A link the run's Slipnet already has changes nothing in the run.
+    * ``{"op": "scale", ...}`` and ``{"op": "adjust", ...}`` of a link's length: ``table``
+      ``slipnet_link_defs``, ``field`` ``link_length``, ``key`` ``{from_node, to_node, link_type,
+      label_node}`` (``""`` or ``None`` for no label), and a finite ``factor`` or ``by``.  The link must
+      be in the run's Slipnet (or added by the same call) with a fixed length, and the result must be
+      finite.
+
+    Everything is checked, in order, before anything is changed, so a refused call changes nothing.
+
+    Each op changes the run's Slipnet at once: ``Slipnet.add_node`` makes a node (and rebuilds the
+    alphabet when it has a glyph, so :func:`letter_node` finds it), ``Slipnet.add_link`` attaches a
+    link in the list of its type's behaviour (so ``outgoing_links``, :func:`links_of`, category
+    membership and slippage see it), and ``Slipnet.set_link_length`` sets a length; every one of them
+    invalidates the numeric layout, so the next update flattens the Slipnet again on whatever backend
+    the run uses.  A node's spec also goes to the run's metadata view
+    (``EngineContext.add_node_spec``).  What was applied is recorded in ``ctx.proposals``, which the
+    run's outcome carries to the session, composed as :func:`propose_ops` composes (an identical op
+    once, ``adjust`` ops on one target summed, ``scale`` ops on one target multiplied).  It never
+    writes the shared provider or anything another run can see, draws no random number and does not
+    touch the Workspace.
     """
     from server.engine.metadata import SlipnodeSpec
 
     ops = list(ops)
+    behaviours = {t.name: t.behaviour for t in ctx.meta.link_types}
+    made: set[str] = set()                    # node names an add_node of this call makes
+    lengths: dict[tuple, Any] = {}            # link target -> the length it will have (None: not fixed)
+
+    def has_node(name: Any) -> bool:
+        return isinstance(name, str) and (name in ctx.slipnet.nodes or name in made)
+
+    def link_length_of(target: tuple) -> Any:
+        if target in lengths:
+            return lengths[target]
+        link = ctx.slipnet.find_link(*target[1:])
+        if link is None:
+            return _NO_LINK
+        return link.link_length() if link.fixed_length else None
+
     for op in ops:
         kind = op.get("op") if isinstance(op, dict) else None
-        if kind != "add_node":
-            raise ValueError(f"apply_ops takes add_node only, not {kind!r}")
-        extra = sorted(set(op) - {"op", "name", "fields"})
-        if extra:
-            raise ValueError(f"apply_ops: a node made in a run has no {extra}")
-        if not isinstance(op.get("name"), str) or not op["name"]:
-            raise ValueError("apply_ops: add_node needs a name")
-        fields = op.get("fields")
-        if not isinstance(fields, dict):
-            raise ValueError("apply_ops: add_node needs fields")
-        unknown = sorted(set(fields) - set(_NODE_OP_FIELDS))
-        if unknown:
-            raise ValueError(f"apply_ops: add_node has no field {unknown}")
-        for needed in ("short_name", "conceptual_depth"):
-            if needed not in fields:
-                raise ValueError(f"apply_ops: add_node needs the field {needed!r}")
+        if kind == "add_node":
+            extra = sorted(set(op) - {"op", "name", "fields"})
+            if extra:
+                raise ValueError(f"apply_ops: a node made in a run has no {extra}")
+            if not isinstance(op.get("name"), str) or not op["name"]:
+                raise ValueError("apply_ops: add_node needs a name")
+            fields = op.get("fields")
+            if not isinstance(fields, dict):
+                raise ValueError("apply_ops: add_node needs fields")
+            unknown = sorted(set(fields) - set(_NODE_OP_FIELDS))
+            if unknown:
+                raise ValueError(f"apply_ops: add_node has no field {unknown}")
+            for needed in ("short_name", "conceptual_depth"):
+                if needed not in fields:
+                    raise ValueError(f"apply_ops: add_node needs the field {needed!r}")
+            made.add(op["name"])
+        elif kind == "add_link":
+            extra = sorted(set(op) - {"op", *_LINK_OP_FIELDS})
+            if extra:
+                raise ValueError(f"apply_ops: add_link has no {extra}")
+            for needed in ("from", "to", "type"):
+                if not isinstance(op.get(needed), str) or not op[needed]:
+                    raise ValueError(f"apply_ops: add_link needs {needed!r}")
+            for end in ("from", "to"):
+                if not has_node(op[end]):
+                    raise ValueError(f"apply_ops: add_link {end} {op[end]!r}: the run's Slipnet has no such node")
+            if op["type"] not in behaviours:
+                raise ValueError(f"apply_ops: add_link type {op['type']!r}: the configuration has no such link type")
+            label = op.get("label")
+            if label is not None and not isinstance(label, str):
+                raise ValueError("apply_ops: add_link label is a node's name")
+            if label and not has_node(label):
+                raise ValueError(f"apply_ops: add_link label {label!r}: the run's Slipnet has no such node")
+            fixed = op.get("fixed")
+            if not isinstance(fixed, bool):
+                raise ValueError("apply_ops: add_link needs 'fixed' (true or false)")
+            length = op.get("length")
+            if fixed:
+                if not _finite_number(length):
+                    raise ValueError("apply_ops: a fixed-length link needs 'length', a finite number")
+            else:
+                if length is not None:
+                    raise ValueError("apply_ops: a link that is not fixed-length has no 'length'")
+                if behaviours[op["type"]] not in LINK_BEHAVIOURS:
+                    raise ValueError(f"apply_ops: add_link type {op['type']!r} has no behaviour, so its links need a fixed length")
+            target = _link_target(op)
+            held = link_length_of(target)
+            if held is _NO_LINK:
+                lengths[target] = _as_stored(length) if fixed else None
+            elif target not in lengths:
+                lengths[target] = held
+        elif kind in ("scale", "adjust"):
+            operand = "factor" if kind == "scale" else "by"
+            extra = sorted(set(op) - {"op", "table", "key", "field", operand})
+            if extra:
+                raise ValueError(f"apply_ops: {kind} has no {extra}")
+            target = _link_target(op)
+            if (target is None or not all(isinstance(part, str) for part in target[1:])
+                    or not _finite_number(op.get(operand))):
+                raise ValueError(
+                    f"apply_ops: {kind} takes a link's length: table {_LINK_TABLE!r}, field {_LINK_LENGTH!r}, "
+                    f"a key of {list(_LINK_KEY)} (names), and a finite {operand!r}")
+            for end in target[1:3]:
+                if not has_node(end):
+                    raise ValueError(f"apply_ops: {kind}: the run's Slipnet has no node {end!r}")
+            held = link_length_of(target)
+            if held is _NO_LINK:
+                raise ValueError(f"apply_ops: {kind}: the run's Slipnet has no link {list(target[1:])}")
+            if held is None:
+                raise ValueError(f"apply_ops: {kind}: the link {list(target[1:])} has no fixed length to change")
+            result = held * op[operand] if kind == "scale" else held + op[operand]
+            if not _finite_number(result):
+                raise ValueError(f"apply_ops: {kind} would leave the link {list(target[1:])} with a length that is not finite")
+            lengths[target] = _as_stored(result)
+        else:
+            raise ValueError(f"apply_ops takes add_node, add_link, and scale or adjust of a link's length, not {kind!r}")
+
     for op in ops:
-        if op in ctx.proposals:
-            continue
-        spec = SlipnodeSpec(
-            name=op["name"], **{k: v for k, v in op["fields"].items() if k in _NODE_SPEC_FIELDS}
-        )
-        ctx.slipnet.add_node(spec)
-        ctx.add_node_spec(spec)
-        ctx.proposals.append(copy.deepcopy(op))
+        kind = op["op"]
+        if kind == "add_node":
+            if op in ctx.proposals:
+                continue
+            spec = SlipnodeSpec(
+                name=op["name"], **{k: v for k, v in op["fields"].items() if k in _NODE_SPEC_FIELDS}
+            )
+            ctx.slipnet.add_node(spec)
+            ctx.add_node_spec(spec)
+            ctx.proposals.append(copy.deepcopy(op))
+        elif kind == "add_link":
+            fixed = op["fixed"]
+            ctx.slipnet.add_link(
+                op["from"], op["to"], op["type"], behaviours[op["type"]],
+                op.get("label"), _as_stored(op["length"]) if fixed else None,
+            )
+            if op not in ctx.proposals:
+                ctx.proposals.append(copy.deepcopy(op))
+        else:
+            target = _link_target(op)
+            link = ctx.slipnet.find_link(*target[1:])
+            operand = op["factor"] if kind == "scale" else op["by"]
+            current = link.link_length()
+            ctx.slipnet.set_link_length(link, _as_stored(current * operand if kind == "scale" else current + operand))
+            _record_op(ctx.proposals, op)
     _wrote_component(ctx, "slipnet_act")
+
+
+#: The link table and column the change API's ``scale`` and ``adjust`` address a link's length by, the key
+#: columns of a link row, and the keys of an ``add_link`` op (the change API's short names).
+_LINK_TABLE = "slipnet_link_defs"
+_LINK_LENGTH = "link_length"
+_LINK_KEY = ("from_node", "to_node", "link_type", "label_node")
+_LINK_OP_FIELDS = ("from", "to", "type", "label", "fixed", "length")
+
+#: "The run's Slipnet has no such link", as opposed to a link whose length is not a number (``None``).
+_NO_LINK = object()
+
+
+def _finite_number(value: Any) -> bool:
+    """A number (not a boolean) that is finite, so a length or a factor the change API would take."""
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        return False
+    try:
+        return math.isfinite(value)
+    except OverflowError:
+        return False
+
+
+def _as_stored(value: Any) -> Any:
+    """A whole value as an ``int``, as the configuration's ``WholeAsInt`` column reads it back."""
+    return int(value) if isinstance(value, float) and value.is_integer() else value
+
+
+def _link_target(op: dict) -> tuple | None:
+    """The Slipnet row a link op addresses, ``("link", from, to, type, label)`` with ``""`` for no label,
+    or ``None`` for an op that does not address a link's length.  An ``add_link`` addresses the link it
+    adds; a ``scale`` or ``adjust`` the link its ``key`` names (``table`` ``slipnet_link_defs``, ``field``
+    ``link_length``).  The parts are not checked here."""
+    kind = op.get("op")
+    if kind == "add_link":
+        return ("link", op.get("from"), op.get("to"), op.get("type"), op.get("label") or "")
+    if kind in ("scale", "adjust") and op.get("table") == _LINK_TABLE and op.get("field") == _LINK_LENGTH:
+        key = op.get("key")
+        if isinstance(key, dict) and set(key) == set(_LINK_KEY):
+            return ("link", key["from_node"], key["to_node"], key["link_type"], key["label_node"] or "")
+    return None
 
 
 def _same_target(a: dict, b: dict) -> bool:
@@ -2488,14 +2641,56 @@ def _same_target(a: dict, b: dict) -> bool:
             and key_of(a) == key_of(b))
 
 
-def propose_ops(ctx: EngineContext, ops: list) -> None:
-    """Record change-API ops for the session's configuration, which they reach after the run.
+def _record_op(held: list, op: dict) -> None:
+    """Append *op* to the list *held* (``ctx.proposals``, or what is held for an instantiator), composing it
+    with what the list already has: an identical op is recorded once, repeated ``adjust`` ops on one target
+    (:func:`_same_target`) are one op with the ``by`` values added in call order, and repeated ``scale`` ops
+    on one target are one op with the ``factor`` values multiplied in call order, each staying where the
+    first was.  A ``scale`` is never combined with an ``adjust``."""
+    if op["op"] == "adjust":
+        existing = next((h for h in held if h.get("op") == "adjust" and _same_target(h, op)), None)
+        if existing is not None:
+            try:
+                total = existing.get("by") + op.get("by")
+                kept = math.isfinite(total)
+            except (TypeError, OverflowError):
+                kept = False
+            if kept:
+                existing["by"] = total
+                return
+        # the first adjust of its target, or one that cannot be added to the held one (not a
+        # number, not finite): recorded as it is, and the change API refuses it
+        held.append(copy.deepcopy(op))
+        return
+    if op["op"] == "scale":
+        existing = next((h for h in held if h.get("op") == "scale" and _same_target(h, op)), None)
+        if existing is not None:
+            try:
+                product = existing.get("factor") * op.get("factor")
+                kept = math.isfinite(product)
+            except (TypeError, OverflowError):
+                kept = False
+            if kept:
+                existing["factor"] = product
+                return
+        # the first scale of its target, or one that cannot be multiplied into the held one
+        # (not a number, not finite): recorded as it is, and the change API refuses it
+        held.append(copy.deepcopy(op))
+        return
+    if op not in held:
+        held.append(copy.deepcopy(op))
 
-    Each op is a change-API op dict (``add_link``, ``adjust``, ``add_trigger``,
-    ``add_link_type`` and so on).  The ops are appended to ``ctx.proposals``, the list
+
+def propose_ops(ctx: EngineContext, ops: list, built_by: str | None = None, urgency: int | None = None) -> None:
+    """Record change-API ops for the session's configuration, or hold them for an instantiator.
+
+    Each op is a change-API op dict (``add_link``, ``adjust``, ``scale``, ``add_trigger``,
+    ``add_link_type`` and so on).
+
+    **Plain** (no ``built_by``).  The ops are appended to ``ctx.proposals``, the list
     :func:`apply_ops` writes, in call order.  Nothing in the run changes: not the Slipnet, not the
     metadata view, not the Workspace.  What is recorded reaches the session's configuration when
-    the run ends (the in-worker learner submits it), so it acts from the next run.
+    the run ends (the in-worker learner submits it), so it acts from the next turn.
 
     * ``add_node`` is refused (``ValueError``): it goes through :func:`apply_ops`, which makes the
       node in the run as well.  Any other op is accepted as data, and the change API checks it
@@ -2510,8 +2705,22 @@ def propose_ops(ctx: EngineContext, ops: list) -> None:
       give one ``scale`` by the ``n``-th power of the factor).  An identical ``scale`` counts each
       time.  A ``scale`` is never combined with an ``adjust``: they are different ops.
 
-    It draws no random number and never writes the shared provider or anything another run can
-    see.
+    **For an instantiator** (``built_by``, the name of a codelet type, and ``urgency``, the urgency to
+    post it at, from an urgency level: ``meta.get_urgency('high')``).  The ops are a change to **this
+    run's Slipnet**: ``add_link``, or ``scale`` or ``adjust`` of a link's length, all of **one link**
+    (any other op, or ops of two links, is refused with ``ValueError``).  Nothing changes in the run
+    now and nothing is recorded: the ops are held, grouped by the link they address (its ``from``,
+    ``to``, ``type`` and ``label``) and by ``built_by``, and composed as above.  Proposing for a link
+    that has no instantiator waiting posts one (a codelet of type ``built_by``, with the link in its
+    arguments as ``held``); proposing for a link that has one waiting on the Coderack only adds to
+    what is held, so noticings do not crowd the Coderack.  If that instantiator left the Coderack
+    without running (evicted, or flushed), the next proposal posts a new one.  The instantiator calls
+    :func:`take_proposed_ops` to take what is held, and builds it with :func:`apply_ops` or fizzles;
+    what is still held when the turn ends is dropped, never in the outcome and never at the session.
+
+    It draws no random number of its own (posting an instantiator goes through the Coderack as
+    :func:`post_codelet` does, and a full Coderack evicts an old codelet then) and never writes the
+    shared provider or anything another run can see.
     """
     ops = list(ops)
     for op in ops:
@@ -2520,39 +2729,53 @@ def propose_ops(ctx: EngineContext, ops: list) -> None:
             raise ValueError("propose_ops: an op is a change-API op dict with an 'op'")
         if kind == "add_node":
             raise ValueError("propose_ops: add_node goes through apply_ops")
+    if built_by is None:
+        if urgency is not None:
+            raise ValueError("propose_ops: an urgency goes with built_by")
+        for op in ops:
+            _record_op(ctx.proposals, op)
+        return
+
+    if not isinstance(built_by, str) or not built_by or built_by not in ctx.meta.codelet_specs:
+        raise ValueError(f"propose_ops: built_by {built_by!r} is not a codelet type of the configuration")
+    if not _finite_number(urgency):
+        raise ValueError("propose_ops: built_by needs an urgency (meta.get_urgency(level))")
+    if not ops:
+        raise ValueError("propose_ops: built_by needs ops")
+    target = None
     for op in ops:
-        if op["op"] == "adjust":
-            held = next((h for h in ctx.proposals if h.get("op") == "adjust" and _same_target(h, op)), None)
-            if held is not None:
-                try:
-                    total = held.get("by") + op.get("by")
-                    kept = math.isfinite(total)
-                except (TypeError, OverflowError):
-                    kept = False
-                if kept:
-                    held["by"] = total
-                    continue
-            # the first adjust of its target, or one that cannot be added to the held one (not a
-            # number, not finite): recorded as it is, and the change API refuses it
-            ctx.proposals.append(copy.deepcopy(op))
-            continue
-        if op["op"] == "scale":
-            held = next((h for h in ctx.proposals if h.get("op") == "scale" and _same_target(h, op)), None)
-            if held is not None:
-                try:
-                    product = held.get("factor") * op.get("factor")
-                    kept = math.isfinite(product)
-                except (TypeError, OverflowError):
-                    kept = False
-                if kept:
-                    held["factor"] = product
-                    continue
-            # the first scale of its target, or one that cannot be multiplied into the held one
-            # (not a number, not finite): recorded as it is, and the change API refuses it
-            ctx.proposals.append(copy.deepcopy(op))
-            continue
-        if op not in ctx.proposals:
-            ctx.proposals.append(copy.deepcopy(op))
+        found = _link_target(op)
+        if found is None or not all(isinstance(part, str) for part in found[1:]) or not all(found[1:4]):
+            raise ValueError(
+                "propose_ops: built_by takes the ops of one link, named by from, to and type: add_link, and scale "
+                "or adjust of its link_length")
+        if target is None:
+            target = found
+        elif found != target:
+            raise ValueError("propose_ops: built_by takes the ops of one link, and these name two")
+    key = (built_by, *target)
+    entry = ctx.held_proposals.get(key)
+    if entry is None:
+        entry = ctx.held_proposals[key] = {"ops": [], "codelet": None}
+    for op in ops:
+        _record_op(entry["ops"], op)
+    held_codelet = entry["codelet"]
+    if held_codelet is None or not ctx.coderack.holds(held_codelet):
+        codelet = Codelet(built_by, urgency, arguments={"held": key}, time_stamp=ctx.codelet_count)
+        ctx.coderack.post(codelet)
+        entry["codelet"] = codelet
+        _wrote_component(ctx, "coderack")
+
+
+def take_proposed_ops(ctx: EngineContext, target: Any) -> list:
+    """Take everything held for an instantiator's *target* (the ``held`` argument it was posted
+    with, by :func:`propose_ops`): the ops, composed, in the order first proposed, and nothing is
+    held for the target afterwards.  A list that is empty when nothing is held (the instantiator has
+    already taken it, or *target* is not a target).  The caller builds the ops with :func:`apply_ops`
+    if the evidence still holds, and otherwise fizzles, which drops them.  Reads and writes no
+    structure of the run; draws no random number."""
+    entry = ctx.held_proposals.pop(tuple(target), None) if isinstance(target, (tuple, list)) else None
+    return entry["ops"] if entry is not None else []
 
 
 def noticings(ctx: EngineContext, node: Any) -> int:
@@ -2613,8 +2836,8 @@ def links_of(ctx: EngineContext, node: Any, link_type: str) -> list:
     later change (``from_node``, ``to_node``, ``link_type``, ``label_node``).  The list is new
     on every call and empty when the node has no link of that type, the type does not exist, or
     *node* is an ``Absent`` token.  *link_type* is data (a link type's name, which a
-    configuration may create), never a name the engine knows.  Reads only the Slipnet's
-    topology, which a run does not change.
+    configuration may create), never a name the engine knows.  Reads only the run's own Slipnet,
+    which :func:`apply_ops` changes (a link built in the run is in the list at once).
     """
     return [link for link in node.outgoing_links if link.link_type == link_type]
 

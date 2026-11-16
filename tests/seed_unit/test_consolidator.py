@@ -1,9 +1,12 @@
 """The v2.0 Base's ``consolidator``: what one run of the body proposes for one noticing of a symbol.
 
-A run of the body is one noticing of the node that triggered it.  The tests build a Workspace by hand
-(the Base with the nodes of ``1``, ``2`` and ``3``, as a Training Mode Session keeps them), put bonds in it,
-run the codelet and read ``ctx.proposals``; and they land the proposals in a live configuration the way
-the in-worker learner does, so that the link lengths over several noticings are the configuration's.
+A run of the body is one noticing of the node that triggered it.  The count goes to the next turn
+(``ctx.proposals``); each link is proposed for an instantiator and held, and what an instantiator builds
+is recorded in ``ctx.proposals`` too.  The tests build a Workspace by hand (the Base with the nodes of
+``1``, ``2`` and ``3``, as a Training Mode Session keeps them), put bonds in it, run the codelet and then the
+instantiators it posted (``notice``), and read ``ctx.proposals``; and they land the proposals in a live
+configuration the way the in-worker learner does, so that the link lengths over several noticings are the
+configuration's.
 """
 
 from __future__ import annotations
@@ -21,6 +24,7 @@ from server.services.change_resolve import resolve
 from server.services.session_live_config import LiveConfiguration
 from server.services.training_mode_session_service import IN_WORKER_LEARNER, TrainingModeSessionService
 from server.services.training_mode_session_executor import SessionOutcome
+from tests.support.instantiators import run_instantiators
 
 pytestmark = pytest.mark.numeric_matrix
 
@@ -70,8 +74,12 @@ def bond_between(r, string, i, j, category=ADJ):
     return bond
 
 
-def notice(r, name):
+def notice(r, name, build=True):
+    """Run ``consolidator`` on a node, then (unless ``build`` is false) the instantiators it posted, and return
+    what the run has recorded for the session: the count, and the links the instantiators built."""
     r._execute_codelet(Codelet("consolidator", 50, arguments={"slipnode": r.ctx.slipnet.nodes[name]}))
+    if build:
+        run_instantiators(r)
     return [dict(p) for p in r.ctx.proposals]
 
 

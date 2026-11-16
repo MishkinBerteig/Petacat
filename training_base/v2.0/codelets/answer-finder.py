@@ -1,7 +1,7 @@
 # v2.0 Base: wait until every letter of the Workspace has its letter-category description.
 # An answer built while a symbol is still unperceived silently drops it: a Letter with no
 # letter-category node has no image, so the answer string is generated without it.  The scouts
-# that perceive a symbol (symbol-scout, symbol-builder) are posted every update cycle, so the
+# that perceive a symbol (novel-string-scout, node-instantiator) are posted every update cycle, so the
 # wait ends.  Nothing is drawn here: this runs before the first prob() of the seed body, and
 # on a problem with no unperceived symbol it changes nothing.
 from server.engine.workspace_objects import Letter

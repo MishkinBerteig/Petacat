@@ -28,7 +28,7 @@ license change was authorised by Dr. Marshall directly (see
 > end-to-end. Episodic Memory (Metacat-Mode learning) shapes the runs that inherit it: a run
 > declines an answer already held for the same problem and rules, so repeating a
 > problem across Metacat Mode's [episodic runs](#persistence-modes-and-episodic-runs)
-> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 7,082 test cases covering the engine, the API, and the
+> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 7,273 test cases covering the engine, the API, and the
 > help/config system, run on both the CPU and the GPU numeric backends. Underneath the seven components sits an execution
 > substrate — three [persistence modes](#persistence-modes-and-episodic-runs),
 > a [GPU numeric substrate](#the-numeric-substrate), and
@@ -150,10 +150,10 @@ one or more turns. Metacat Mode's runs stay single-turn.
 What exists is the ground: any UTF-8 text as input in Training Mode (Metacat Mode reads problems through Metacat's input parser), the configuration in the
 database, the one change API and journal, and a Training Mode Session that runs its own evolving
 configuration. The first increment of the first idea is built. On the **Training Mode Base Configuration,
-v2.0** (`training_base/v2.0/`, the default base of a new Training Mode Session), a bottom-up `symbol-scout`
-codelet notices a Letter object whose symbol has no letter-category description, and `symbol-builder` makes
+v2.0** (`training_base/v2.0/`, the default base of a new Training Mode Session), a bottom-up `novel-string-scout`
+codelet notices a Letter object whose symbol has no letter-category description, and `node-instantiator` makes
 a Slipnet node for the symbol (`plato-cp-<hex code point>`, connected to nothing) in the run's own Slipnet
-with the `apply_ops` builtin (`add_node` only). The ordinary description codelets then perceive each
+with the `apply_ops` builtin (`add_node`; the fourth increment's `apply_ops` also builds links). The ordinary description codelets then perceive each
 occurrence, one object at a time, and the run answers with the symbol: `1->1; 1->?` and `😀->😀; 😀->?` give
 no answer on a `global` session and answer with the symbol on the v2.0 Base. The run's outcome carries the
 op as `proposals`, and the **in-worker learner** submits them through the change API (source `learner`,
@@ -178,15 +178,26 @@ Standard Configuration's hash and JSON do not change because of it), and every s
 `10**400` are refused on every route, and under `skip` only that op is dropped. `slipnet_node_defs.noticings` is a whole number on each
 node (default 0, no range; the Admin view shows it), and the `noticings(node)` builtin reads it as the run started, for the
 `consolidator` body alone. On the v2.0 Base, `consolidator` is a top-down codelet posted whenever a symbol node's activation
-passes the gate (urgency half its activation, rounded; the 26 letters are triggers, and `symbol-builder` proposes each new node as a
-trigger, effective from the next run). One run of it is one noticing of that node, and it needs the symbol to be in the
+passes the gate, in Metacat's own top-down form (urgency `conceptual_depth * activation / 100`, posting probability `average_unhappiness / 100`; the 26 letters are triggers, and `node-instantiator` proposes each new node as a
+trigger, effective from the next turn). One run of it is one noticing of that node, and it needs the symbol to be in the
 Workspace: it proposes one more `noticings`; for each built `adjacent` bond between this symbol and another single symbol, the pair's
 `adjacent` link (labelled by `plato-adjacent`, fixed length, from the left symbol to the right one) at `adjacent_link_length` 90 at the
 first noticing, then multiplied at each later one by `1 - adjacent_link_step / adjacent_link_length` (the first step is
 `adjacent_link_step`, 1/16, and each later step is in proportion to the length left, so the length approaches 0 and never reaches it); and, once the node's `noticings` reach
 `consolidation_threshold` (40), its `category` and `instance` links to the letter category where they are missing. A bond with a group
-at an end writes nothing. Nothing changes in the run that proposes it, so everything acts from the next run. The stored lengths have no floor, and the association read from a length is clipped to 0 to 100 (`association_from_length`), so a length of 0 or less reads as association 100.
-Not built yet: the speculative executor's support for created nodes
+at an end writes nothing. The count acts from the next turn (a plain `propose_ops`). The links are proposals for an instantiator, which builds them in the run's own Slipnet: the third increment stopped at proposals, and the fourth builds. The stored lengths have no floor, and the association read from a length is clipped to 0 to 100 (`association_from_length`), so a length of 0 or less reads as association 100.
+The fourth increment's first stage builds Slipnet structure **in the run**, at any time (the user, 2026-11-15):
+`apply_ops` takes `add_link`, and `scale` or `adjust` of a link's length, beside `add_node`, and changes the run's own Slipnet at
+once (the link is in its behaviour list, its target's incoming links, `links_of`, category membership, the alphabet and the numeric
+layout on every backend) and records what it built for the session, composed as `propose_ops` composes. A body proposes a change to the run's
+Slipnet for an instantiator, `propose_ops(ops, built_by='adjacent-instantiator', urgency=...)`: the change is held, one instantiator
+waits per link on the Coderack (a new one is posted if it was evicted), and it takes what is held and builds it if the evidence
+still holds, as a Metacat builder does, or fizzles. What is still held when the turn ends is dropped, so only what was built reaches the session.
+`consolidator` keeps its count for the next turn and proposes the links; `adjacent-instantiator`, `category-instantiator` and
+`instance-of-instantiator` build them (see `training_base/v2.0/README.md`). `adjacent-instantiator` builds a pair's `adjacent` link only if no other link, of any type and in either direction, joins the two nodes in the run's Slipnet (the user's rule, 2026-11-16). `symbol-scout` and `symbol-builder` are renamed
+`novel-string-scout` and `node-instantiator`, with their behaviour unchanged. Training Mode problems are called **context-response analogy problems**; a `1` in the text is never matched to `plato-one`
+(the Slipnet's number nodes are counts of things, and a symbol gets a node of its own).
+Not built yet: the speculative executor's support for nodes and links built in a run
 (`apply_ops` is a barrier there, and no session reaches the speculative executor), and multi-turn runs.
 
 [metacat]: http://science.slc.edu/~jmarshall/metacat/
@@ -520,8 +531,8 @@ Petacat has two test suites:
   plugin against the serial runs it claims to equal), `lockstep` (Petacat's decision
   traces against Metacat's), and `e2e` (full HTTP
   stack against a running database). All eight run in a single command against
-  the local Postgres — 7,082 cases, which includes the numeric matrix's second
-  pass over the 1299 backend-sensitive tests. See
+  the local Postgres — 7,273 cases, which includes the numeric matrix's second
+  pass over the 1394 backend-sensitive tests. See
   [TESTING.md](TESTING.md) for the layer breakdown, the numeric backend matrix,
   the session ceiling, the unit-test rules, determinism requirements, test-double
   conventions, how to run the suite under the free-threaded interpreter, and what
@@ -1301,7 +1312,7 @@ the change API, so all may change exactly the same things:
 ## Training Mode Session: many problems on every core
 
 A **Training Mode Session** is a named, long-lived **Training episode**: many different
-problems (letter strings, or any Unicode text), each run over a number of seeds, spread across every core. It belongs to
+context-response analogy problems (made of letters, or any Unicode text), each run over a number of seeds, spread across every core. It belongs to
 **Training Mode**, which the machine-learning layer drives. It is not the episodic runs of Review, which are Metacat Mode's recordings of dashboard
 runs and share Metacat Mode's Episodic Memory; a Training Mode Session is a job Petacat runs by itself, with its own
 Episodic Memory, and it lives in its own tables (`server/models/training_mode_session.py`).

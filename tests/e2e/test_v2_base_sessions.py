@@ -202,7 +202,7 @@ async def test_creating_sessions_on_the_v2_base_never_changes_the_global_configu
             (entry,) = await journal_views.read_entries(db, row["id"])
         # The journal shows exactly what v2.0 adds, with both hashes in the note.
         assert entry["source"] == "creation"
-        assert "symbol-scout" in str(entry["proposed"]) and "new_node_conceptual_depth" in str(entry["proposed"])
+        assert "novel-string-scout" in str(entry["proposed"]) and "new_node_conceptual_depth" in str(entry["proposed"])
         from server.services import training_base as tb
         base = tb.resolve_base()
         assert base.delta_hash in entry["note"] and base.standard_hash in entry["note"]
@@ -210,12 +210,12 @@ async def test_creating_sessions_on_the_v2_base_never_changes_the_global_configu
             ("new_node_conceptual_depth",)]["value"] == "10"
         override = await stored_document(test_engine, explicit["id"])
         assert override.tables["engine_params"][("update_cycle_length",)]["value"] == "17"
-        assert ("symbol-scout",) in override.tables["codelet_type_defs"]
+        assert ("novel-string-scout",) in override.tables["codelet_type_defs"]
         # global and standard are still what they were
         g = await make(app_client, ("abc", "abd", "xyz"), 1, configuration_base="global")
         s = await make(app_client, ("abc", "abd", "xyz"), 1, configuration_base="standard")
-        assert ("symbol-scout",) not in (await stored_document(test_engine, g["id"])).tables["codelet_type_defs"]
-        assert ("symbol-scout",) not in (await stored_document(test_engine, s["id"])).tables["codelet_type_defs"]
+        assert ("novel-string-scout",) not in (await stored_document(test_engine, g["id"])).tables["codelet_type_defs"]
+        assert ("novel-string-scout",) not in (await stored_document(test_engine, s["id"])).tables["codelet_type_defs"]
         assert s["configuration"]["hash"] != default["configuration"]["hash"]
     finally:
         bs.set_training_mode_session_service(None)
@@ -232,10 +232,10 @@ async def test_the_admin_compare_reads_the_v2_base_like_the_standard(app_client)
     got = resp.json()
     assert got["b"]["id"] == "training-v2" and got["b"]["name"] == "Training Mode Base Configuration, v2.0"
     keys = {(r["table"], tuple(r["key"].values()), r["change"]) for r in got["rows"]}
-    assert ("codelet_type_defs", ("symbol-scout",), "removed") in keys  # only the Base (b) has it
+    assert ("codelet_type_defs", ("novel-string-scout",), "removed") in keys  # only the Base (b) has it
     assert ("engine_params", ("new_node_conceptual_depth",), "removed") in keys
     assert ("codelet_type_defs", ("answer-finder",), "changed") in keys
-    assert ("posting_rules", ("symbol-scout",), "removed") in keys
+    assert ("posting_rules", ("novel-string-scout",), "removed") in keys
     same = (await app_client.get("/api/configurations/compare", params={"a": "training-v2", "b": "training-v2"})).json()
     assert same["same"] is True
     refused = await app_client.get("/api/configurations/compare", params={"a": "standard", "b": "nonsense"})
@@ -252,9 +252,11 @@ ADJACENT_PROBLEM = ("aceg", "acei", "bdfh")
 async def test_a_session_on_the_base_builds_adjacent_bonds_and_the_serial_child_and_the_swarm_agree(
         app_client, test_engine):
     """Neighbours with no relation are perceived as neighbours in a real session: the run's own
-    Workspace builds ``plato-adjacent`` bonds (seed 3 of this problem builds 25), the serial child and
-    the swarm give the same first run, and no ``adjacent`` link is ever written into the session's
-    configuration (only the link type and the node the Base creates are there)."""
+    Workspace builds ``plato-adjacent`` bonds (seed 2 of this problem builds 19), the serial child and
+    the swarm give the same first run, and what ``consolidator`` and ``adjacent-instantiator`` built in the
+    runs reaches the session's configuration as ``adjacent`` links between letters, labelled by
+    ``plato-adjacent``, each with a positive length.  The runs of the serial child learn from one another, so
+    the later ones are not the swarm's; only the first run (one configuration) is compared run for run."""
     from server.api.runs import get_run_service
 
     meta = get_run_service().meta
@@ -271,10 +273,10 @@ async def test_a_session_on_the_base_builds_adjacent_bonds_and_the_serial_child_
             await app_client.post(f"/api/training-mode/sessions/{made['id']}/start")
             await until_state(app_client, made["id"], "finished", timeout=300)
             runs = await runs_of(app_client, made["id"], 1)
-            assert len(runs) == 6 and all(r["status"] == "answer_found" for r in runs)
+            assert len(runs) == 6 and all(r["status"] == "answer_found" for r in runs), [(r["seed"], r["status"], r["codelets"]) for r in runs]
             firsts[kind] = min(executor.outcomes, key=lambda o: o.seed)
+            await stop(app_client, made["id"])  # the live configuration is written at Stop
             documents[kind] = await stored_document(test_engine, made["id"])
-            await stop(app_client, made["id"])
         finally:
             bs.set_training_mode_session_service(None)
             await service.stop()
@@ -283,7 +285,9 @@ async def test_a_session_on_the_base_builds_adjacent_bonds_and_the_serial_child_
     assert outcome_fingerprint(firsts["serial"]) == outcome_fingerprint(firsts["swarm"])
     for doc in documents.values():
         assert ("adjacent",) in doc.tables["link_types"] and ("plato-adjacent",) in doc.tables["slipnet_node_defs"]
-        assert not [k for k, r in doc.tables["slipnet_link_defs"].items() if r["link_type"] == "adjacent"]
+        links = [r for r in doc.tables["slipnet_link_defs"].values() if r["link_type"] == "adjacent"]
+        assert links, "the runs' adjacent bonds were built into links"
+        assert all(r["label_node"] == "plato-adjacent" and r["fixed_length"] and 0 < r["link_length"] < 100
+                   for r in links)
+        assert all(len(r["from_node"]) == len("plato-a") and len(r["to_node"]) == len("plato-a") for r in links)
         assert [k[0] for k in doc.tables["slipnet_node_defs"] if k[0].startswith("plato-cp-")] == []  # letters only
-    # the serial child and the swarm see the same configuration afterwards
-    assert cd.config_hash(documents["serial"]) == cd.config_hash(documents["swarm"])

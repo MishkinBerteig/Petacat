@@ -29,20 +29,34 @@ def test_it_resolves_over_the_standard_and_adds_what_the_readme_says():
     doc = base.document
     assert cd.config_hash(std) == base.standard_hash and base.delta_hash
     assert doc.tables["engine_params"][("new_node_conceptual_depth",)]["value"] == "10"
-    for name, phase in (("symbol-scout", "scout"), ("symbol-builder", "builder")):
+    for name, phase in (("novel-string-scout", "scout"), ("node-instantiator", "builder")):
         row = doc.tables["codelet_type_defs"][(name,)]
         assert (row["family"], row["phase"]) == ("description", phase) and row["execute_body"].strip()
         assert (name,) not in std.tables["codelet_type_defs"]
-    rule = doc.tables["posting_rules"][("symbol-scout",)]
+    rule = doc.tables["posting_rules"][("novel-string-scout",)]
     assert (rule["direction"], rule["urgency_level"], rule["posting_formula"], rule["count_values"],
             rule["condition"]) == ("bottom_up", "low", "1.0", {"fixed": 1}, "num_unperceived_symbols > 0")
     order = [k[0] for k in doc.tables["posting_rules"]]
-    assert order[-3:] == ["breaker", "symbol-scout", "consolidator"]
+    assert order[-3:] == ["breaker", "novel-string-scout", "consolidator"]
     assert tb.resolve_base().delta_hash == base.delta_hash  # stable
 
 
-def test_the_symbol_builder_proposes_the_new_node_as_a_trigger_and_no_link():
-    body = tb.resolve_base().document.tables["codelet_type_defs"][("symbol-builder",)]["execute_body"]
+def test_the_three_link_instantiators_are_meta_builders_with_a_body_and_no_posting_rule_and_the_old_names_are_gone():
+    doc = tb.resolve_base().document
+    for name in ("adjacent-instantiator", "category-instantiator", "instance-of-instantiator"):
+        row = doc.tables["codelet_type_defs"][(name,)]
+        assert (row["family"], row["phase"]) == ("meta", "builder")
+        assert "take_proposed_ops" in row["execute_body"] and "apply_ops" in row["execute_body"]
+        assert (name,) not in reference_document().tables["codelet_type_defs"]
+        assert all(k != (name,) for k in doc.tables["posting_rules"])
+        # consolidator proposes for each of them
+        assert f"built_by='{name}'" in doc.tables["codelet_type_defs"][("consolidator",)]["execute_body"]
+    for old in ("symbol-scout", "symbol-builder"):
+        assert (old,) not in doc.tables["codelet_type_defs"] and (old,) not in doc.tables["posting_rules"]
+
+
+def test_the_node_instantiator_proposes_the_new_node_as_a_trigger_and_no_link():
+    body = tb.resolve_base().document.tables["codelet_type_defs"][("node-instantiator",)]["execute_body"]
     assert "add_link" not in body and "plato-cp-%04x" in body
     assert "propose_ops([{'op': 'add_trigger', 'rule_key': 'consolidator', 'node': node.name}])" in body
     assert body.index("apply_ops(") < body.index("add_trigger")  # the node exists before it is proposed as a trigger
@@ -89,7 +103,7 @@ def test_a_standard_change_that_breaks_an_op_fails_loudly():
     std = reference_document()
     rows = {t: [dict(r) for r in rs.values()] for t, rs in std.tables.items()}
     rows["engine_params"] = [r for r in rows["engine_params"] if r["name"] != "new_node_conceptual_depth"]
-    rows["codelet_type_defs"].append({**std.tables["codelet_type_defs"][("rule-scout",)], "name": "symbol-scout"})
+    rows["codelet_type_defs"].append({**std.tables["codelet_type_defs"][("rule-scout",)], "name": "novel-string-scout"})
     with pytest.raises(tb.BaseOutOfDate) as info:
         tb.resolve_base(standard=cd.from_rows(rows, version=0))
     assert "no longer resolves" in str(info.value)
@@ -114,7 +128,7 @@ def test_an_edit_to_a_codelet_file_changes_the_delta_hash(monkeypatch, tmp_path)
     shutil.copytree(real, copy)
     monkeypatch.setattr(tb, "BASES_DIR", tmp_path)
     first = tb.resolve_base().delta_hash
-    scout = copy / "codelets" / "symbol-scout.py"
+    scout = copy / "codelets" / "novel-string-scout.py"
     scout.write_text(scout.read_text() + "\n# edited\n")
     assert tb.resolve_base().delta_hash != first
 
@@ -207,7 +221,7 @@ def test_consolidator_is_a_meta_codelet_with_one_top_down_rule_and_the_26_letter
     rule = doc.tables["posting_rules"][("consolidator",)]
     assert (rule["direction"], rule["urgency_formula"], rule["posting_formula"], rule["count_formula"],
             rule["count_values"], rule["condition"]) == (
-        "top_down", "round(activation / 2)", "1.0", "fixed", {"fixed": 1}, "always")
+        "top_down", "conceptual_depth * activation / 100", "average_unhappiness / 100", "fixed", {"fixed": 1}, "always")
     letters = [f"plato-{c}" for c in "abcdefghijklmnopqrstuvwxyz"]
     assert list(rule["triggering_slipnodes"]) == letters
     top_down = json.loads(doc.tables["engine_params"][("top_down_slipnodes",)]["value"])

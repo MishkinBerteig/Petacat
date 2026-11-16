@@ -105,21 +105,21 @@
   },
   {
    "op": "add_codelet_type",
-   "name": "symbol-scout",
+   "name": "novel-string-scout",
    "fields": {
     "family": "description",
     "phase": "scout",
-    "description": "Notices a Letter object whose symbol has no letter-category description. If the symbol has a node it binds the object to it and proposes the ordinary description; if not it posts symbol-builder. The v2.0 Base only.",
+    "description": "Notices a Letter object whose symbol has no letter-category description. If the symbol has a node it binds the object to it and proposes the ordinary description; if not it posts node-instantiator. The v2.0 Base only.",
     "source_file": null,
     "source_line": null,
     "execute_body": {
-     "$file": "codelets/symbol-scout.py"
+     "$file": "codelets/novel-string-scout.py"
     }
    }
   },
   {
    "op": "add_codelet_type",
-   "name": "symbol-builder",
+   "name": "node-instantiator",
    "fields": {
     "family": "description",
     "phase": "builder",
@@ -127,7 +127,7 @@
     "source_file": null,
     "source_line": null,
     "execute_body": {
-     "$file": "codelets/symbol-builder.py"
+     "$file": "codelets/node-instantiator.py"
     }
    }
   },
@@ -137,7 +137,7 @@
    "fields": {
     "family": "meta",
     "phase": "other",
-    "description": "One run is one noticing of the symbol node that triggered it. If the Workspace holds the symbol it proposes one more noticing, an adjacent link (adjacent_link_length at the first noticing, then multiplied at every later one by 1 - adjacent_link_step / adjacent_link_length, so the length falls towards 0 and never reaches it) for each adjacent bond between it and another single symbol, and, once its noticings reach consolidation_threshold, its category and instance links to the letter category (at symbol_category_link_length and symbol_instance_link_length) where they are missing. The v2.0 Base only.",
+    "description": "One run is one noticing of the symbol node that triggered it. If the Workspace holds the symbol it proposes one more noticing for the next turn (plain propose_ops) and, for the instantiators to build in this run if the evidence still holds, an adjacent link (adjacent_link_length at the first noticing, then multiplied at every later one by 1 - adjacent_link_step / adjacent_link_length, so the length falls towards 0 and never reaches it) for each adjacent bond between it and another single symbol (adjacent-instantiator), and, once its noticings reach consolidation_threshold, its category link (category-instantiator) and the letter category's instance link (instance-of-instantiator) where the run's Slipnet lacks them (at symbol_category_link_length and symbol_instance_link_length). What no instantiator built by the end of the turn is dropped. Each instantiator is posted at the high urgency level, as node-instantiator is. The v2.0 Base only.",
     "source_file": null,
     "source_line": null,
     "execute_body": {
@@ -146,10 +146,52 @@
    }
   },
   {
-   "op": "add_posting_rule",
-   "rule_key": "symbol-scout",
+   "op": "add_codelet_type",
+   "name": "adjacent-instantiator",
    "fields": {
-    "codelet_type": "symbol-scout",
+    "family": "meta",
+    "phase": "builder",
+    "description": "Posted only by consolidator, for one pair's adjacent link. Takes everything held for the link and builds it in this run's Slipnet (add_link at the first noticing's length, scale for each noticing) if the Workspace still holds a built adjacent bond between two single symbols whose letter-category descriptions are the link's from and to, from on the left, and no other link (of any type, labelled or not, in either direction) joins the two nodes in the run's Slipnet; otherwise fizzles and drops what it took. Draws no random number. The v2.0 Base only.",
+    "source_file": null,
+    "source_line": null,
+    "execute_body": {
+     "$file": "codelets/adjacent-instantiator.py"
+    }
+   }
+  },
+  {
+   "op": "add_codelet_type",
+   "name": "category-instantiator",
+   "fields": {
+    "family": "meta",
+    "phase": "builder",
+    "description": "Posted only by consolidator, for one symbol's category link to the letter category. Takes everything held for the link and builds it in this run's Slipnet if the Workspace still holds the symbol and the run's Slipnet still lacks the link; otherwise fizzles and drops what it took. Draws no random number. The v2.0 Base only.",
+    "source_file": null,
+    "source_line": null,
+    "execute_body": {
+     "$file": "codelets/category-instantiator.py"
+    }
+   }
+  },
+  {
+   "op": "add_codelet_type",
+   "name": "instance-of-instantiator",
+   "fields": {
+    "family": "meta",
+    "phase": "builder",
+    "description": "Posted only by consolidator, for the letter category's instance link to one symbol. Takes everything held for the link and builds it in this run's Slipnet if the Workspace still holds the symbol and the run's Slipnet still lacks the link; otherwise fizzles and drops what it took. Draws no random number. The v2.0 Base only.",
+    "source_file": null,
+    "source_line": null,
+    "execute_body": {
+     "$file": "codelets/instance-of-instantiator.py"
+    }
+   }
+  },
+  {
+   "op": "add_posting_rule",
+   "rule_key": "novel-string-scout",
+   "fields": {
+    "codelet_type": "novel-string-scout",
     "direction": "bottom_up",
     "urgency_level": "low",
     "posting_formula": "1.0",
@@ -167,8 +209,8 @@
     "codelet_type": "consolidator",
     "direction": "top_down",
     "urgency_level": null,
-    "urgency_formula": "round(activation / 2)",
-    "posting_formula": "1.0",
+    "urgency_formula": "conceptual_depth * activation / 100",
+    "posting_formula": "average_unhappiness / 100",
     "count_formula": "fixed",
     "count_values": {
      "fixed": 1
