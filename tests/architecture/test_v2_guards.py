@@ -23,9 +23,9 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 
 #: The engine tree nothing may change without re-basing this: the last commit that changed
-#: ``server/engine/`` (now v2.0's fourth increment, stage A).  Engine work moves this commit on purpose, in a
+#: ``server/engine/`` (now v2.0's fourth increment, stage D).  Engine work moves this commit on purpose, in a
 #: follow-up commit that also adds the engine commit's subject to the set below.
-ENGINE_BASELINE = "1e8fa75"
+ENGINE_BASELINE = "7c88709"
 #: The only commits that touched the engine between EN11's close-out (``0ce7f5d``) and the
 #: baseline; all are allowed engine work.
 ENGINE_COMMITS_AFTER_EN11 = {
@@ -58,6 +58,7 @@ ENGINE_COMMITS_AFTER_EN11 = {
     "Association read from a link length is clipped to 0 to 100",
     "A pair's adjacent link approaches 0 asymptotically, through a multiplying change-API op",
     "Slipnet structure is built inside a run: instantiators build what consolidator proposes",
+    "A context-response benchmark, and the Coderack's pressure in each turn's evidence",
 }
 
 
