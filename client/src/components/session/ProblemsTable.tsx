@@ -599,7 +599,7 @@ function RunsTable({
                   {multiTurn && chat === r.seed && (
                     <tr>
                       <td colSpan={12} style={{ ...tdStyle, padding: '6px 12px' }}>
-                        <RunChat sessionId={sessionId} problemId={problemId} seed={r.seed} onClose={() => setChat(null)} />
+                        <RunChat sessionId={sessionId} problemId={problemId} seed={r.seed} />
                       </td>
                     </tr>
                   )}

@@ -426,7 +426,10 @@ describe('chat client: the problems table, the summary and the runs table', () =
     expect(await screen.findByTestId('run-chat')).toBeInTheDocument()
     await waitFor(() => expect(m.getSessionConversation).toHaveBeenCalledWith(1, 10, 7))
     expect(await screen.findAllByTestId('chat-turn')).toHaveLength(2)
-    fireEvent.click(screen.getAllByRole('button', { name: 'Close chat' })[0])
+    // one Close chat button, on the run's row; the row, not the chat, says the run is waiting
+    expect(screen.getAllByRole('button', { name: /close/i })).toHaveLength(1)
+    expect(screen.getAllByText(/waiting for the input of turn 3/i)).toHaveLength(1)
+    fireEvent.click(screen.getByRole('button', { name: 'Close the chat of seed 7' }))
     expect(screen.queryByTestId('run-chat')).not.toBeInTheDocument()
   })
 })
@@ -436,21 +439,28 @@ describe('chat client: the problems table, the summary and the runs table', () =
 // ---------------------------------------------------------------------------
 
 describe('chat client: the chat', () => {
-  const renderChat = () => render(<RunChat sessionId={1} problemId={10} seed={1} onClose={() => {}} />)
+  const renderChat = () => render(<RunChat sessionId={1} problemId={10} seed={1} />)
 
-  it('shows each turn with its four positions and who supplied each', async () => {
+  it('shows each turn as a Context line of three strings side by side and a Response, with who supplied each', async () => {
     renderChat()
     const turns = await screen.findAllByTestId('chat-turn')
     expect(turns).toHaveLength(2)
     const t1 = within(turns[0])
-    expect(t1.getByTestId('string-context').textContent).toBe('abc')
-    expect(t1.getByTestId('string-second').textContent).toBe('abd')
-    expect(t1.getByTestId('string-input').textContent).toBe('ijk')
-    expect(t1.getByTestId('string-response').textContent).toBe('ijl')
-    expect(t1.getByTestId('supplied-by-context')).toHaveTextContent('1st · the problem')
-    expect(t1.getByTestId('supplied-by-second')).toHaveTextContent('2nd · the problem')
-    expect(t1.getByTestId('supplied-by-input')).toHaveTextContent('3rd · the problem')
-    expect(t1.getByTestId('supplied-by-response')).toHaveTextContent('4th · Petacat')
+    // the 1st, 2nd and 3rd positions are on the Context line, in order; the 4th is the Response
+    const context = within(t1.getByTestId('turn-context'))
+    expect(t1.getByTestId('turn-context').firstElementChild).toHaveTextContent('Context')
+    expect(
+      ['context', 'second', 'input'].map((k) => context.getByTestId(`string-${k}`).textContent),
+    ).toEqual(['abc', 'abd', 'ijk'])
+    expect(t1.getByTestId('turn-response').firstElementChild).toHaveTextContent('Response')
+    expect(within(t1.getByTestId('turn-response')).getByTestId('string-response').textContent).toBe('ijl')
+    // no letter-string labels
+    expect(t1.queryByText('Second string')).not.toBeInTheDocument()
+    expect(t1.queryByText('Input')).not.toBeInTheDocument()
+    expect(t1.getByTestId('supplied-by-context')).toHaveTextContent('the problem')
+    expect(t1.getByTestId('supplied-by-second')).toHaveTextContent('the problem')
+    expect(t1.getByTestId('supplied-by-input')).toHaveTextContent('the problem')
+    expect(t1.getByTestId('supplied-by-response')).toHaveTextContent('Petacat')
 
     const t2 = within(turns[1])
     expect(t2.getByTestId('string-context').textContent).toBe('abc abd ijk')
@@ -458,11 +468,18 @@ describe('chat client: the chat', () => {
     expect(t2.getByTestId('string-input').textContent).toBe('xyz')
     expect(t2.getByTestId('string-response').textContent).toBe('xyd')
     // The history reads as a conversation: where the window's strings come from is said.
-    expect(t2.getByTestId('supplied-by-context')).toHaveTextContent(
-      "the window: turn 1's context, second string and input, joined with single spaces",
-    )
-    expect(t2.getByTestId('supplied-by-second')).toHaveTextContent("the window: turn 1's response")
-    expect(t2.getByTestId('supplied-by-input')).toHaveTextContent('3rd · the teacher')
+    expect(t2.getByTestId('supplied-by-context')).toHaveTextContent("turn 1's context, joined with single spaces")
+    expect(t2.getByTestId('supplied-by-second')).toHaveTextContent("turn 1's response")
+    expect(t2.getByTestId('supplied-by-input')).toHaveTextContent('the teacher')
+  })
+
+  it('heads a turn with its number only: the status and codelets are in its Details', async () => {
+    renderChat()
+    const [first] = await screen.findAllByTestId('chat-turn')
+    const heading = first.firstElementChild as HTMLElement
+    expect(heading.textContent).toBe('Turn 1')
+    const details = within(first).getByTestId('turn-details')
+    expect(within(details).getByTestId('turn-outcome')).toHaveTextContent('Status: answer_found · 812 codelets')
   })
 
   it('says a turn with no response has none, with its end reason and label', async () => {
@@ -488,18 +505,19 @@ describe('chat client: the chat', () => {
     renderChat()
     const turns = await screen.findAllByTestId('chat-turn')
     expect(within(turns[1]).getByTestId('no-response')).toHaveTextContent('No response: this turn did not answer.')
-    expect(within(turns[1]).getByTestId('turn-end')).toHaveTextContent('Ended the run: a turn with no answer')
-    expect(within(turns[1]).getByTestId('turn-status')).toHaveTextContent('step_limit')
+    const details = within(turns[1]).getByTestId('turn-details')
+    expect(within(details).getByTestId('turn-end')).toHaveTextContent('Ended the run: a turn with no answer')
+    expect(within(details).getByTestId('turn-status')).toHaveTextContent('step_limit')
     expect(within(turns[0]).queryByTestId('turn-end')).not.toBeInTheDocument()
-    expect(screen.getByTestId('chat-state')).toHaveTextContent('Ended: a turn with no answer.')
   })
 
-  it('shows the teacher label of the end', async () => {
-    m.getSessionConversation.mockResolvedValue(
-      twoTurns({ state: 'ended', waiting_for: null, accepts_input: false, end_reason: 'teacher', end_label: 'good chat' }),
-    )
+  it("shows the teacher label of the end in the last turn's Details", async () => {
+    const ended = twoTurns({ state: 'ended', waiting_for: null, accepts_input: false, end_reason: 'teacher', end_label: 'good chat' })
+    ended.turns[1] = { ...ended.turns[1], end_reason: 'teacher', end_label: 'good chat' }
+    m.getSessionConversation.mockResolvedValue(ended)
     renderChat()
-    expect(await screen.findByTestId('chat-state')).toHaveTextContent('Ended: the teacher ended it (label: good chat).')
+    const turns = await screen.findAllByTestId('chat-turn')
+    expect(within(turns[1]).getByTestId('turn-end')).toHaveTextContent('Ended the run: the teacher ended it (label: good chat)')
   })
 
   it('shows strings exactly as given: spaces, a tab, a line break, an emoji and a combining mark', async () => {
@@ -578,16 +596,20 @@ describe('chat client: the chat', () => {
     expect(within(cards[1]).getByTestId('no-response')).toHaveTextContent('No response yet: this turn has not finished.')
   })
 
-  it('heads the chat with the run state: running a turn, waiting for turn N, ended', async () => {
+  it("leaves the run state and Close chat to the run's row: the chat repeats neither", async () => {
     m.getSessionConversation.mockResolvedValue(
       twoTurns({ state: 'running', waiting_for: null, accepts_input: false, turn_count: 1, turns: [turn(), turn({ turn: 2, status: 'pending', evidence: null, positions: { context: 'abc abd ijk', second: 'ijl', input: 'xyz', response: null } })] }),
     )
     const { unmount } = renderChat()
-    expect(await screen.findByTestId('chat-state')).toHaveTextContent('Running turn 2.')
+    await screen.findAllByTestId('chat-turn')
+    expect(screen.queryByTestId('chat-state')).not.toBeInTheDocument()
+    expect(screen.queryByText(/running turn/i)).not.toBeInTheDocument()
     unmount()
     m.getSessionConversation.mockResolvedValue(twoTurns())
     renderChat()
-    await waitFor(() => expect(screen.getByTestId('chat-state')).toHaveTextContent('Waiting for the input of turn 3.'))
+    await screen.findAllByTestId('chat-turn')
+    expect(screen.queryByText(/waiting for the input/i)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /close/i })).not.toBeInTheDocument()
   })
 })
 
@@ -596,7 +618,7 @@ describe('chat client: the chat', () => {
 // ---------------------------------------------------------------------------
 
 describe('chat client: supplying input', () => {
-  const renderChat = () => render(<RunChat sessionId={1} problemId={10} seed={1} onClose={() => {}} />)
+  const renderChat = () => render(<RunChat sessionId={1} problemId={10} seed={1} />)
 
   it('shows the input box only when the run waits and accepts input', async () => {
     renderChat()
@@ -605,6 +627,7 @@ describe('chat client: supplying input', () => {
     expect(within(box).getByRole('button', { name: 'Send' })).toBeInTheDocument()
     expect(within(box).getByRole('button', { name: 'End' })).toBeInTheDocument()
     expect(within(box).getByLabelText('End label (optional)')).toBeInTheDocument()
+    expect(within(box).getByRole('button', { name: 'Show help for End and its label' })).toBeInTheDocument()
     expect(screen.queryByTestId('no-input-reason')).not.toBeInTheDocument()
   })
 
@@ -614,7 +637,7 @@ describe('chat client: supplying input', () => {
   ])('shows no input box and no reason when the run is %s', async (_n, over) => {
     m.getSessionConversation.mockResolvedValue(twoTurns(over))
     renderChat()
-    await screen.findByTestId('chat-state')
+    await screen.findAllByTestId('chat-turn')
     expect(screen.queryByTestId('chat-input')).not.toBeInTheDocument()
     expect(screen.queryByTestId('no-input-reason')).not.toBeInTheDocument()
   })
@@ -642,7 +665,6 @@ describe('chat client: supplying input', () => {
     expect(m.supplySessionInput).toHaveBeenCalledWith(1, 10, 1, { turn: 3, text })
     // The answer is the conversation: the box goes while a turn runs.
     await waitFor(() => expect(screen.queryByTestId('chat-input')).not.toBeInTheDocument())
-    expect(screen.getByTestId('chat-state')).toHaveTextContent('Running turn')
   })
 
   it('End calls supplySessionInput with end: true, and the label when there is one', async () => {
@@ -741,7 +763,7 @@ describe('chat client: polling', () => {
     vi.useFakeTimers()
     const running = twoTurns({ state: 'running', waiting_for: null, accepts_input: false })
     m.getSessionConversation.mockResolvedValue(running)
-    render(<RunChat sessionId={1} problemId={10} seed={1} onClose={() => {}} />)
+    render(<RunChat sessionId={1} problemId={10} seed={1} />)
     await flush(0)
     expect(m.getSessionConversation).toHaveBeenCalledTimes(1)
     await flush(1500)
@@ -769,7 +791,7 @@ describe('chat client: polling', () => {
   it('does not poll a run that has already ended, after the first fetch', async () => {
     vi.useFakeTimers()
     m.getSessionConversation.mockResolvedValue(twoTurns({ state: 'ended', waiting_for: null, accepts_input: false, end_reason: 'no-answer' }))
-    render(<RunChat sessionId={1} problemId={10} seed={1} onClose={() => {}} />)
+    render(<RunChat sessionId={1} problemId={10} seed={1} />)
     await flush(0)
     await flush(60000)
     expect(m.getSessionConversation).toHaveBeenCalledTimes(1)
@@ -778,7 +800,7 @@ describe('chat client: polling', () => {
   it('stops polling when the chat is closed', async () => {
     vi.useFakeTimers()
     m.getSessionConversation.mockResolvedValue(twoTurns({ state: 'running', waiting_for: null, accepts_input: false }))
-    const { unmount } = render(<RunChat sessionId={1} problemId={10} seed={1} onClose={() => {}} />)
+    const { unmount } = render(<RunChat sessionId={1} problemId={10} seed={1} />)
     await flush(0)
     await flush(3000)
     const calls = m.getSessionConversation.mock.calls.length
@@ -791,7 +813,7 @@ describe('chat client: polling', () => {
   it('shows a failed load as an alert and keeps trying', async () => {
     vi.useFakeTimers()
     m.getSessionConversation.mockRejectedValueOnce(apiError(404, 'no such run'))
-    render(<RunChat sessionId={1} problemId={10} seed={1} onClose={() => {}} />)
+    render(<RunChat sessionId={1} problemId={10} seed={1} />)
     await flush(0)
     expect(screen.getByRole('alert')).toHaveTextContent('Could not load the chat')
     await flush(1500)

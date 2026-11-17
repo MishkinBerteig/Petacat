@@ -1459,15 +1459,18 @@ views.
 - **The runs table.** For a multi-turn problem, each run shows its state (`running`, `waiting for the input of turn N`, or
   `ended`), its turns, and what ended it (with the teacher's label), and a waiting run stands out. A single-turn problem's runs
   table is as it was. **Open chat** on a run's row opens its chat.
-- **The chat.** It heads with the run's state, then lists every turn in order. Each turn shows its four positions (the
-  context, the second string, the input and the response) and who supplied each (the problem, the window, the teacher or
-  Petacat); a later turn's context and second string say they come from the window, the turn before's context, second string and input
-  joined with single spaces, and its response. A turn that did not answer says so, and so does a turn that has not finished. Strings are shown exactly as given: each in a
-  box that keeps its spaces, tabs and line breaks, and a string that holds anything but words separated by single spaces also
-  gets an "as written" line that spells out tabs, line breaks, combining marks and unusual spaces. A turn's status, codelets and
-  end reason show on its header, and a closed Details section holds its evidence and its proposals.
+- **The chat.** It lists every turn in order, each like a message and its reply: a **Context** line with the turn's 1st, 2nd
+  and 3rd positions side by side, and the **Response**, the 4th, which Petacat constructs. Beneath each string it says who
+  supplied it (the problem, the teacher or Petacat); a later turn's first two strings say they come from the turn before, its
+  three context strings joined with single spaces and its response. A turn that did not answer says so, and so does a turn that
+  has not finished. Strings are shown exactly as given: each in a box that keeps its spaces, tabs and line breaks, and a string
+  that holds anything but words separated by single spaces also gets an "as written" line that spells out tabs, line breaks,
+  combining marks and unusual spaces. A turn's header is its number (and an error, if it had one); a closed Details section
+  holds its status, codelets and end reason, its evidence and its proposals. The run's state and **Close chat** are on its row
+  in the runs table, not repeated in the chat.
 - **Input.** When the run waits and the session would take the input, the chat ends with a box for the input of the waiting
-  turn, **Send**, and **End** with an optional label. Only empty text, U+0000 and a lone surrogate are refused. When the session is
+  turn, **Send**, and **End** with an optional label (a note of why, shown in the run's Ended by; it changes nothing Petacat
+  does or learns, and the help topic `session_chat_end` says so). Only empty text, U+0000 and a lone surrogate are refused. When the session is
   Stopped, Starting or Stopping, the chat says so instead. A 409 `stale` (the chat is refreshed), a 409 `busy` and a 422 are shown
   as they came.
 - **Following along** is by polling the conversation while the chat is open and the run has not ended: every 1.5 s while a

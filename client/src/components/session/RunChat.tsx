@@ -3,22 +3,23 @@
 // ---------------------------------------------------------------------------
 //
 // A multi-turn run is a chat. Each turn is one engine run on the four positions of a
-// context-response analogy problem: the context (1st position), the second string
-// (2nd), the input (3rd) and the response (4th), which Petacat constructs. The next
-// turn's context is the previous context, second string and input joined with single
-// spaces; its second string is the previous response; its input is what the teacher
-// gives. So the conversation reads as a context history that grows turn by turn.
+// context-response analogy problem, and reads like a message and its reply: the Context line
+// shows the 1st, 2nd and 3rd positions side by side, and the Response is the 4th, which
+// Petacat constructs. The next turn's 1st position is the previous turn's three context
+// strings joined with single spaces, its 2nd is the previous response, and its 3rd is what
+// the teacher gives. So the conversation reads as a context history that grows turn by turn.
+// The run's state and its Close chat button are on its row in the runs table, not here.
 //
 // The chat polls `GET .../runs/{seed}` while it is open and the run is not ended (no
 // push channel), and sends the teacher's input or end through `POST .../input`.
 // Strings are shown exactly as given: never trimmed, collapsed or normalised.
 // ---------------------------------------------------------------------------
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { ApiError, describeApiError, getSessionConversation, supplySessionInput } from '@/api/client';
 import type { SessionConversation, SessionPositionSource, SessionRunEndReason, SessionTurn } from '@/types';
 import { checkString } from './problemText';
-import { ControlHelp, IDLE_POLL_MS, RUNNING_POLL_MS, errorStyle, fmtInt, noticeStyle, usePolling } from './shared';
+import { ControlHelp, IDLE_POLL_MS, RUNNING_POLL_MS, errorStyle, fmtInt, usePolling } from './shared';
 
 /** Plain words: letters, numbers, punctuation and symbols, single-spaced. Anything else gets an "as written" line. */
 const PLAIN = /^[\p{L}\p{N}\p{P}\p{S}]+(?: [\p{L}\p{N}\p{P}\p{S}]+)*$/u;
@@ -58,70 +59,74 @@ const SOURCE: Record<SessionPositionSource, string> = {
   petacat: 'Petacat',
 };
 
-/** What a position holds, and where it came from, for a turn. */
-function whereFrom(position: 'context' | 'second' | 'input' | 'response', t: SessionTurn): string {
+type Position = 'context' | 'second' | 'input' | 'response';
+
+/** Where a position's string came from, for a turn: the problem, the turn before, the teacher or Petacat. */
+function whereFrom(position: Position, t: SessionTurn): string {
   const by = t.supplied_by[position];
   if (by === 'window' && t.turn > 1) {
     const prev = t.turn - 1;
-    if (position === 'context') {
-      return `the window: turn ${prev}'s context, second string and input, joined with single spaces`;
-    }
-    if (position === 'second') return `the window: turn ${prev}'s response`;
+    if (position === 'context') return `turn ${prev}'s context, joined with single spaces`;
+    if (position === 'second') return `turn ${prev}'s response`;
   }
   return SOURCE[by];
 }
 
-const POSITIONS: { key: 'context' | 'second' | 'input' | 'response'; label: string; number: string }[] = [
-  { key: 'context', label: 'Context', number: '1st' },
-  { key: 'second', label: 'Second string', number: '2nd' },
-  { key: 'input', label: 'Input', number: '3rd' },
-  { key: 'response', label: 'Response', number: '4th' },
-];
+/** The positions the Context line shows, side by side: the 1st, 2nd and 3rd. */
+const CONTEXT_POSITIONS: Position[] = ['context', 'second', 'input'];
 
-function Position({ turn, position }: { turn: SessionTurn; position: (typeof POSITIONS)[number] }) {
-  const value = turn.positions[position.key];
-  const constructed = position.key === 'response';
+/** One string of a turn, in a box that keeps its whitespace, with where it came from beneath it. */
+function Part({ turn, position }: { turn: SessionTurn; position: Position }) {
+  const value = turn.positions[position];
+  const constructed = position === 'response';
   return (
-    <div style={{ display: 'flex', gap: 8, marginBottom: 4, alignItems: 'flex-start' }} data-testid={`position-${position.key}`}>
-      <div style={{ width: 118, flexShrink: 0 }} className="text-xs">
-        <div style={{ fontWeight: 700 }}>{position.label}</div>
-        <div className="text-muted" data-testid={`supplied-by-${position.key}`}>
-          {position.number} · {whereFrom(position.key, turn)}
+    <div data-testid={`position-${position}`} style={{ minWidth: 0, maxWidth: '100%' }}>
+      {value === null ? (
+        <div className="text-xs text-muted" data-testid="no-response" style={{ padding: '1px 0' }}>
+          {turn.status === 'pending'
+            ? 'No response yet: this turn has not finished.'
+            : 'No response: this turn did not answer.'}
         </div>
+      ) : (
+        <div
+          className="mono"
+          data-testid={`string-${position}`}
+          style={{
+            whiteSpace: 'pre-wrap',
+            overflowWrap: 'anywhere',
+            border: `1px ${constructed ? 'solid' : 'dashed'} var(--border)`,
+            borderRadius: 3,
+            padding: '1px 6px',
+            minHeight: '1.4em',
+            minWidth: '1.5em',
+            background: constructed ? 'var(--bg-panel)' : undefined,
+          }}
+        >
+          {value}
+        </div>
+      )}
+      <div className="text-xs text-muted" data-testid={`supplied-by-${position}`}>
+        {whereFrom(position, turn)}
       </div>
-      <div style={{ minWidth: 0, flex: 1 }}>
-        {value === null ? (
-          <div className="text-xs text-muted" data-testid="no-response">
-            {turn.status === 'pending'
-              ? 'No response yet: this turn has not finished.'
-              : 'No response: this turn did not answer.'}
-          </div>
-        ) : (
-          <>
-            <div
-              className="mono"
-              data-testid={`string-${position.key}`}
-              style={{
-                display: 'block',
-                whiteSpace: 'pre-wrap',
-                overflowWrap: 'anywhere',
-                border: `1px ${constructed ? 'solid' : 'dashed'} var(--border)`,
-                borderRadius: 3,
-                padding: '1px 4px',
-                minHeight: '1.4em',
-                background: constructed ? 'var(--bg-panel)' : undefined,
-              }}
-            >
-              {value}
-            </div>
-            {value === '' && <div className="text-xs text-muted">(empty string)</div>}
-            {!PLAIN.test(value) && value !== '' && (
-              <div className="text-xs text-muted mono" data-testid={`written-${position.key}`} style={{ overflowWrap: 'anywhere', whiteSpace: 'pre-wrap' }}>
-                as written: {asWritten(value)} ({characters(value)})
-              </div>
-            )}
-          </>
-        )}
+      {value === '' && <div className="text-xs text-muted">(empty string)</div>}
+      {value !== null && value !== '' && !PLAIN.test(value) && (
+        <div className="text-xs text-muted mono" data-testid={`written-${position}`} style={{ overflowWrap: 'anywhere', whiteSpace: 'pre-wrap' }}>
+          as written: {asWritten(value)} ({characters(value)})
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** A labelled line of a turn: "Context" with its three strings side by side, or "Response". */
+function Line({ label, testId, children }: { label: string; testId: string; children: ReactNode }) {
+  return (
+    <div data-testid={testId} style={{ display: 'flex', gap: 8, marginBottom: 6, alignItems: 'flex-start' }}>
+      <div className="text-xs" style={{ width: 70, flexShrink: 0, fontWeight: 700, paddingTop: 2 }}>
+        {label}
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, minWidth: 0, flex: 1, alignItems: 'flex-start' }}>
+        {children}
       </div>
     </div>
   );
@@ -146,6 +151,12 @@ function Details({ turn }: { turn: SessionTurn }) {
         Details of turn {turn.turn}
       </summary>
       <div className="text-xs" style={{ marginTop: 4 }}>
+        <div data-testid="turn-outcome">
+          Status: <span data-testid="turn-status">{turn.status}</span> · {fmtInt(turn.codelets)} codelets
+        </div>
+        {turn.end_reason !== null && (
+          <div data-testid="turn-end">Ended the run: {endText(turn.end_reason, turn.end_label)}</div>
+        )}
         <div style={{ fontWeight: 700 }}>Evidence</div>
         {ev === null ? (
           <div className="text-muted" data-testid="no-evidence">
@@ -195,39 +206,23 @@ function TurnCard({ turn }: { turn: SessionTurn }) {
     >
       <div className="text-xs" style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
         <strong>Turn {turn.turn}</strong>
-        <span data-testid="turn-status">{turn.status}</span>
-        <span>{fmtInt(turn.codelets)} codelets</span>
-        {turn.end_reason !== null && (
-          <span data-testid="turn-end">Ended the run: {endText(turn.end_reason, turn.end_label)}</span>
-        )}
         {turn.error && (
           <span style={{ color: 'var(--error)' }} data-testid="turn-error">
             Error: {turn.error}
           </span>
         )}
       </div>
-      {POSITIONS.map((p) => (
-        <Position key={p.key} turn={turn} position={p} />
-      ))}
+      <Line label="Context" testId="turn-context">
+        {CONTEXT_POSITIONS.map((p) => (
+          <Part key={p} turn={turn} position={p} />
+        ))}
+      </Line>
+      <Line label="Response" testId="turn-response">
+        <Part turn={turn} position="response" />
+      </Line>
       <Details turn={turn} />
     </div>
   );
-}
-
-/** The run's state, as the heading of the chat. */
-export function stateText(c: SessionConversation): string {
-  switch (c.state) {
-    case 'running': {
-      const last = c.turns[c.turns.length - 1];
-      return `Running turn ${last ? last.turn : c.turn_count + 1}.`;
-    }
-    case 'waiting':
-      return `Waiting for the input of turn ${c.waiting_for}.`;
-    case 'ended':
-      return `Ended: ${endText(c.end_reason, c.end_label) || 'no reason recorded'}.`;
-    default:
-      return 'Queued: nothing has run yet, or the next turn waits for the session to run.';
-  }
 }
 
 /** Why the chat is not taking input although the run waits for it. */
@@ -265,10 +260,9 @@ export interface RunChatProps {
   sessionId: number;
   problemId: number;
   seed: number;
-  onClose: () => void;
 }
 
-export function RunChat({ sessionId, problemId, seed, onClose }: RunChatProps) {
+export function RunChat({ sessionId, problemId, seed }: RunChatProps) {
   const [conv, setConv] = useState<SessionConversation | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [text, setText] = useState('');
@@ -318,10 +312,6 @@ export function RunChat({ sessionId, problemId, seed, onClose }: RunChatProps) {
           Chat of seed {seed}
         </strong>
         <ControlHelp topic="session_chat" label="the chat" />
-        <span style={{ flex: 1 }} />
-        <button type="button" onClick={onClose}>
-          Close chat
-        </button>
       </div>
       {error && (
         <div role="alert" style={errorStyle}>
@@ -331,18 +321,6 @@ export function RunChat({ sessionId, problemId, seed, onClose }: RunChatProps) {
       {!conv && !error && <div className="text-xs text-muted">Loading…</div>}
       {conv && (
         <>
-          <div
-            role="status"
-            data-testid="chat-state"
-            style={{
-              ...noticeStyle,
-              marginBottom: 6,
-              fontWeight: 700,
-              borderColor: conv.state === 'waiting' ? 'var(--warning)' : undefined,
-            }}
-          >
-            {stateText(conv)}
-          </div>
           {conv.turns.map((t) => (
             <TurnCard key={t.turn} turn={t} />
           ))}
@@ -378,6 +356,7 @@ export function RunChat({ sessionId, problemId, seed, onClose }: RunChatProps) {
                 <label htmlFor={`chat-end-label-${seed}`} className="text-xs">
                   End label (optional)
                 </label>
+                <ControlHelp topic="session_chat_end" label="End and its label" />
                 <input
                   id={`chat-end-label-${seed}`}
                   type="text"
