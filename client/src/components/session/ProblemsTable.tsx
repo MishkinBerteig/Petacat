@@ -27,6 +27,7 @@ import type {
 } from '@/types';
 import { Pager } from '@/components/Pager';
 import { formatProblem } from './problemText';
+import { RunChat, endText } from './RunChat';
 import {
   ControlHelp,
   errorStyle,
@@ -241,6 +242,15 @@ export function ProblemsTable({ session }: { session: SessionSummary }) {
                       <td style={tdStyle} className="mono">
                         {formatProblem(r)}
                         {r.answer ? ` → ${r.answer}` : ''}
+                        {r.multi_turn && (
+                          <span
+                            data-testid="multi-turn-badge"
+                            title="Multi-turn: each run is a chat, with the teacher's input between turns"
+                            style={multiTurnBadgeStyle}
+                          >
+                            multi-turn
+                          </span>
+                        )}
                       </td>
                       <td style={tdStyle}>{r.status}</td>
                       <td style={{ ...tdStyle, textAlign: 'right' }}>
@@ -299,6 +309,17 @@ export function ProblemsTable({ session }: { session: SessionSummary }) {
     </div>
   );
 }
+
+const multiTurnBadgeStyle: React.CSSProperties = {
+  marginLeft: 6,
+  fontSize: 10,
+  fontWeight: 700,
+  padding: '0 5px',
+  border: '1px solid var(--text-accent, #6cf)',
+  borderRadius: 3,
+  color: 'var(--text-accent, #6cf)',
+  fontFamily: 'inherit',
+};
 
 const sortButtonStyle: React.CSSProperties = {
   background: 'none',
@@ -439,7 +460,7 @@ function ProblemDetailView({ sessionId, row }: { sessionId: number; row: Session
               {runsError}
             </div>
           )}
-          {runs && <RunsTable runs={runs} />}
+          {runs && <RunsTable runs={runs} sessionId={sessionId} problemId={row.id} multiTurn={shown.multi_turn} />}
         </>
       )}
       {cancelError && (
@@ -467,8 +488,20 @@ function ProblemDetailView({ sessionId, row }: { sessionId: number; row: Session
 
 const RUNS_PAGE = 25;
 
-function RunsTable({ runs }: { runs: SessionRun[] }) {
+function RunsTable({
+  runs,
+  sessionId,
+  problemId,
+  multiTurn,
+}: {
+  runs: SessionRun[];
+  sessionId: number;
+  problemId: number;
+  multiTurn: boolean;
+}) {
   const [offset, setOffset] = useState(0);
+  // The seed of the run whose chat is open (a multi-turn problem only).
+  const [chat, setChat] = useState<number | null>(null);
   const shown = runs.slice(offset, offset + RUNS_PAGE);
   return (
     <div style={{ marginTop: 8 }} data-testid="runs-table">
@@ -493,11 +526,28 @@ function RunsTable({ runs }: { runs: SessionRun[] }) {
                   </th>
                   <th style={{ ...thStyle, textAlign: 'right' }}>Attempts</th>
                   <th style={thStyle}>Error</th>
+                  {multiTurn && (
+                    <>
+                      <th style={thStyle}>State</th>
+                      <th style={{ ...thStyle, textAlign: 'right' }}>Turns</th>
+                      <th style={thStyle}>Ended by</th>
+                      <th style={thStyle} aria-label="Chat" />
+                    </>
+                  )}
                 </tr>
               </thead>
               <tbody>
                 {shown.map((r) => (
-                  <tr key={r.seed} data-testid="run-row">
+                  <Fragment key={r.seed}>
+                  <tr
+                    data-testid="run-row"
+                    data-state={multiTurn ? r.state : undefined}
+                    style={
+                      multiTurn && r.state === 'waiting'
+                        ? { background: 'var(--bg-secondary)', boxShadow: 'inset 3px 0 0 var(--warning)', fontWeight: 600 }
+                        : undefined
+                    }
+                  >
                     <td style={tdStyle} className="mono">
                       {r.seed}
                     </td>
@@ -517,7 +567,38 @@ function RunsTable({ runs }: { runs: SessionRun[] }) {
                     >
                       {r.error ?? ''}
                     </td>
+                    {multiTurn && (
+                      <>
+                        <td style={tdStyle} data-testid="run-state">
+                          {r.state === 'waiting' ? `waiting for the input of turn ${r.waiting_for}` : r.state}
+                        </td>
+                        <td style={{ ...tdStyle, textAlign: 'right' }} data-testid="run-turns">
+                          {r.turns}
+                        </td>
+                        <td style={tdStyle} data-testid="run-ended-by">
+                          {endText(r.end_reason, r.end_label) || '–'}
+                        </td>
+                        <td style={tdStyle}>
+                          <button
+                            type="button"
+                            onClick={() => setChat(chat === r.seed ? null : r.seed)}
+                            aria-expanded={chat === r.seed}
+                            aria-label={`${chat === r.seed ? 'Close' : 'Open'} the chat of seed ${r.seed}`}
+                          >
+                            {chat === r.seed ? 'Close chat' : 'Open chat'}
+                          </button>
+                        </td>
+                      </>
+                    )}
                   </tr>
+                  {multiTurn && chat === r.seed && (
+                    <tr>
+                      <td colSpan={12} style={{ ...tdStyle, padding: '6px 12px' }}>
+                        <RunChat sessionId={sessionId} problemId={problemId} seed={r.seed} onClose={() => setChat(null)} />
+                      </td>
+                    </tr>
+                  )}
+                  </Fragment>
                 ))}
               </tbody>
             </table>

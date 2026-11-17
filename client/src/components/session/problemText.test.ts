@@ -12,7 +12,7 @@ import { describe, it, expect } from 'vitest'
 
 // The repository's own list, read as text at build time (no Node typings needed).
 import problemListMd from '../../../../list-of-letter-string-analogy-problems.md?raw'
-import { parseProblemText, chunk, formatProblem, fieldText, quoteField } from './problemText'
+import { parseProblemText, chunk, formatProblem, fieldText, quoteField, MULTI_TURN_ANSWER } from './problemText'
 
 const ABC = { initial: 'abc', modified: 'abd', target: 'xyz', answer: null }
 
@@ -394,5 +394,35 @@ describe('helpers', () => {
     expect(chunk([1, 2], 5)).toEqual([[1, 2]])
     expect(chunk([], 5)).toEqual([[]])
     expect(chunk([1, 2, 3], 0)).toEqual([[1], [2], [3]])
+  })
+})
+
+describe('parseProblemText: the multi-turn mark', () => {
+  it('marks every problem multi-turn, and leaves them unmarked without it', () => {
+    const text = 'abc → abd; xyz → ?\nabc abd ijk'
+    expect(parseProblemText(text).problems.every((p) => p.multi_turn === undefined)).toBe(true)
+    const r = parseProblemText(text, { multiTurn: true })
+    expect(r.problems).toEqual([
+      { initial: 'abc', modified: 'abd', target: 'xyz', answer: null, multi_turn: true },
+      { initial: 'abc', modified: 'abd', target: 'ijk', answer: null, multi_turn: true },
+    ])
+  })
+
+  it('rejects a line that gives an answer, with the reason, and keeps its line number', () => {
+    const r = parseProblemText('abc → abd; xyz → ?\nabc → abd; ijk → ijl', { multiTurn: true })
+    expect(r.problems).toHaveLength(1)
+    expect(r.rejected).toHaveLength(1)
+    expect(r.rejected[0].line).toBe(2)
+    expect(r.rejected[0].reason).toBe(MULTI_TURN_ANSWER)
+  })
+
+  it('does the same for a JSON array', () => {
+    const r = parseProblemText(
+      '[{"initial":"a b","modified":"c","target":"d"},{"initial":"a","modified":"b","target":"c","answer":"d"}]',
+      { multiTurn: true },
+    )
+    expect(r.problems).toEqual([{ initial: 'a b', modified: 'c', target: 'd', answer: null, multi_turn: true }])
+    expect(r.rejected).toHaveLength(1)
+    expect(r.rejected[0].reason).toBe(MULTI_TURN_ANSWER)
   })
 })

@@ -13,7 +13,7 @@ import type {
 } from '@/types';
 import { chunk, parseProblemText } from './problemText';
 import { FALLBACK_POLICY, PolicyFields } from './PolicyFields';
-import { ProblemPreview, ProblemTextInput } from './ProblemTextInput';
+import { MultiTurnMark, ProblemPreview, ProblemTextInput } from './ProblemTextInput';
 import {
   cardStyle,
   ControlHelp,
@@ -70,6 +70,7 @@ export function NewSessionForm({ configurationBase = null, limits, defaults, onC
   const [backends, setBackends] = useState<string[]>([]);
   const [policy, setPolicy] = useState<SessionErrorPolicy>(defaults?.policy ?? FALLBACK_POLICY);
   const [text, setText] = useState('');
+  const [multiTurn, setMultiTurn] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -95,7 +96,7 @@ export function NewSessionForm({ configurationBase = null, limits, defaults, onC
     };
   }, []);
 
-  const parsed = useMemo(() => parseProblemText(text), [text]);
+  const parsed = useMemo(() => parseProblemText(text, { multiTurn }), [text, multiTurn]);
 
   const maxSeeds = limits?.max_seeds_per_problem ?? Number.MAX_SAFE_INTEGER;
   const maxCodeletsLimit = limits?.max_codelets ?? Number.MAX_SAFE_INTEGER;
@@ -329,6 +330,7 @@ export function NewSessionForm({ configurationBase = null, limits, defaults, onC
       </details>
 
       <ProblemTextInput id="session-problems" value={text} onChange={setText} disabled={busy} demos />
+      <MultiTurnMark id="session-multi-turn" checked={multiTurn} onChange={setMultiTurn} disabled={busy} />
       <ProblemPreview parsed={parsed} seedsPerProblem={seedsOk ? seedsN : DEFAULT_SEEDS} />
 
       {problem && (

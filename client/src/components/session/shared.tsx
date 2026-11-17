@@ -7,6 +7,10 @@ import { useHelp } from '@/hooks/useHelp';
 import type { ComponentHelpKey } from '@/constants/helpTopics';
 import type { SessionActivity, SessionState } from '@/types';
 
+/** How often the Training Mode Sessions view polls while something is running, and while nothing is. */
+export const RUNNING_POLL_MS = 1500;
+export const IDLE_POLL_MS = 5000;
+
 /** A small "?" that opens the control's own help topic. */
 export function ControlHelp({ topic, label }: { topic: ComponentHelpKey; label: string }) {
   const { showHelp } = useHelp();

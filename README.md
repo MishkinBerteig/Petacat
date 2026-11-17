@@ -102,11 +102,12 @@ machine-learning platform:
   (`propose_ops`), the in-worker learner submits every one of them, a link length can be a fraction, each Slipnet node holds a
   `noticings` count, and the v2.0 Base's `consolidator` codelet uses all of it: a symbol is noticed, counted, and connected to
   the symbols it was seen beside. See [The v2.0 milestone](#the-v20-milestone).
-- **Fourth increment of v2.0, in progress:** a run builds Slipnet structure as it goes (stage A), and **multi-turn runs**
+- **Fourth increment of v2.0, in progress:** a run builds Slipnet structure as it goes (stage A), **multi-turn runs**
   (stage B): a problem with `multi_turn: true` makes each of its runs a chat. A turn is one engine run, a turn that answers
   makes the run wait for the teacher's next input (holding no worker), and the next turn's strings come from the sliding
-  window. See [Multi-turn runs](#multi-turn-runs-chats). Still to come: the chat client in the GUI and the benchmark.
-- **Not built:** the chat client in the GUI, and the benchmark. The after-run seam (`set_after_run`, a call to the change API after each run) stays,
+  window. See [Multi-turn runs](#multi-turn-runs-chats). Stage C is the **chat client** in the Training Mode Session view (see
+  [The chat client](#the-chat-client)). Still to come: the benchmark.
+- **Not built:** the benchmark. The after-run seam (`set_after_run`, a call to the change API after each run) stays,
   beside the in-worker learner.
 
 A Training Mode Session never reads or writes Metacat Mode's Episodic Memory, Slipnet or configuration.
@@ -201,7 +202,7 @@ still holds, as a Metacat builder does, or fizzles. What is still held when the 
 `instance-of-instantiator` build them (see `training_base/v2.0/README.md`). `adjacent-instantiator` builds a pair's `adjacent` link only if no other link, of any type and in either direction, joins the two nodes in the run's Slipnet (the user's rule, 2026-11-16). `symbol-scout` and `symbol-builder` are renamed
 `novel-string-scout` and `node-instantiator`, with their behaviour unchanged. Training Mode problems are called **context-response analogy problems**; a `1` in the text is never matched to `plato-one`
 (the Slipnet's number nodes are counts of things, and a symbol gets a node of its own).
-Multi-turn runs are built (see [Multi-turn runs](#multi-turn-runs-chats)); the chat client and the benchmark are not.
+Multi-turn runs and the chat client are built (see [Multi-turn runs](#multi-turn-runs-chats)); the benchmark is not.
 Not built yet: the speculative executor's support for nodes and links built in a run
 (`apply_ops` is a barrier there, and no session reaches the speculative executor).
 
@@ -1436,6 +1437,33 @@ the **input**, and the 4th, which Petacat constructs, the **response**.
   driven by `set_teacher`, finish them in the same order. A swarm with more workers finishes them in another order, as it
   already does for single-turn runs, and so does a teacher that answers over HTTP while other runs go on. The speculative
   executor is not offered inside sessions.
+
+#### The chat client
+
+The Training Mode Session view has the chat (`client/src/components/session/RunChat.tsx`). It changes nothing in Metacat Mode's
+views.
+
+- **Making a multi-turn problem.** Below the problems box, in the new-session form and in Add problems, a **Multi-turn** checkbox
+  makes every problem read from the box multi-turn. A multi-turn problem takes no answer, so while the mark is on the form says
+  so, and a line that gives an answer is rejected in the preview. The problems table marks such a problem **multi-turn**.
+- **The summary.** The runs line shows how many runs are waiting for the teacher's input (`runs.waiting`), and the badge reads
+  `waiting` while every run left is waiting (the `waiting` activity).
+- **The runs table.** For a multi-turn problem, each run shows its state (`running`, `waiting for the input of turn N`, or
+  `ended`), its turns, and what ended it (with the teacher's label), and a waiting run stands out. A single-turn problem's runs
+  table is as it was. **Open chat** on a run's row opens its chat.
+- **The chat.** It heads with the run's state, then lists every turn in order. Each turn shows its four positions (the
+  context, the second string, the input and the response) and who supplied each (the problem, the window, the teacher or
+  Petacat); a later turn's context and second string say they come from the window, the turn before's context, second string and input
+  joined with single spaces, and its response. A turn that did not answer says so, and so does a turn that has not finished. Strings are shown exactly as given: each in a
+  box that keeps its spaces, tabs and line breaks, and a string that holds anything but words separated by single spaces also
+  gets an "as written" line that spells out tabs, line breaks, combining marks and unusual spaces. A turn's status, codelets and
+  end reason show on its header, and a closed Details section holds its evidence and its proposals.
+- **Input.** When the run waits and the session would take the input, the chat ends with a box for the input of the waiting
+  turn, **Send**, and **End** with an optional label. Only empty text, U+0000 and a lone surrogate are refused. When the session is
+  Stopped, Starting or Stopping, the chat says so instead. A 409 `stale` (the chat is refreshed), a 409 `busy` and a 422 are shown
+  as they came.
+- **Following along** is by polling the conversation while the chat is open and the run has not ended: every 1.5 s while a
+  turn runs, every 5 s while the run waits. There is no push channel.
 
 ### The Episodic Memory
 

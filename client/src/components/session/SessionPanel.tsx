@@ -16,11 +16,17 @@ import type { SessionListResponse, SessionSummary } from '@/types';
 import { SessionDetail } from './SessionDetail';
 import { SessionList, describeExecutor } from './SessionList';
 import { NewSessionForm, type ConfigurationBase } from './NewSessionForm';
-import { ControlHelp, errorStyle, noticeStyle, sectionLabelStyle, usePolling } from './shared';
+import {
+  ControlHelp,
+  IDLE_POLL_MS,
+  RUNNING_POLL_MS,
+  errorStyle,
+  noticeStyle,
+  sectionLabelStyle,
+  usePolling,
+} from './shared';
 
 const LIST_POLL_MS = 3000;
-const RUNNING_POLL_MS = 1500;
-const IDLE_POLL_MS = 5000;
 
 export interface SessionPanelProps {
   /** A session to select straight away, from `#/training-mode/42`. */

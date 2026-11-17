@@ -113,6 +113,44 @@ export function ProblemTextInput({ id, value, onChange, disabled, demos = false,
   );
 }
 
+/**
+ * The multi-turn mark of the problems being added: each run of a marked problem is a chat (a turn per engine run, the
+ * teacher's input between turns). A multi-turn problem takes no answer, so while the mark is on a line that gives an
+ * answer is refused (the parse says so in the preview), and the note says why.
+ */
+export function MultiTurnMark({
+  id,
+  checked,
+  onChange,
+  disabled,
+}: {
+  id: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div style={{ marginTop: 6 }} data-testid="multi-turn-mark">
+      <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+        <input
+          id={id}
+          type="checkbox"
+          checked={checked}
+          disabled={disabled}
+          onChange={(e) => onChange(e.target.checked)}
+        />
+        <label htmlFor={id}>Multi-turn: each run of these context-response analogy problems is a chat</label>
+        <ControlHelp topic="session_chat" label="multi-turn problems and the chat" />
+      </span>
+      {checked && (
+        <div className="text-xs text-muted" role="note" data-testid="multi-turn-answer-note">
+          Answer: not taken. Petacat constructs the response of every turn, so a line that gives an answer is refused.
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Total runs the problems come to: each one's own seeds, or the session's default. */
 export function totalRuns(problems: ProblemInput[], seedsPerProblem: number): number {
   return problems.reduce((sum, p) => sum + (p.seeds ?? seedsPerProblem), 0);
@@ -135,6 +173,7 @@ export function ProblemPreview({
         {fmtInt(problems.length)} problems parsed, {fmtInt(rejected.length)} lines rejected,{' '}
         {fmtInt(duplicates.length)} duplicates
         {problems.length > 0 && <> · {fmtInt(runs)} runs in total</>}
+        {problems.some((p) => p.multi_turn) && <> · each run is a chat</>}
       </div>
       {rejected.length > 0 && (
         <div>

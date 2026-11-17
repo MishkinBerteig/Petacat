@@ -75,7 +75,8 @@ export function fieldText(s: string): string {
   return /^[\p{L}\p{M}\p{N}]+$/u.test(s) ? s : quoteField(s);
 }
 
-function checkString(role: string, s: string): string | null {
+/** Why the database cannot store `s` as the text of `role` (empty, U+0000, a lone surrogate), or null. */
+export function checkString(role: string, s: string): string | null {
   if (s === '') return `${role} is empty`;
   if (s.includes('\u0000')) {
     return `${role} contains the character U+0000 (NUL), which the database cannot store`;
@@ -338,7 +339,7 @@ function keyOf(p: Fields): string {
   return JSON.stringify([p.initial, p.modified, p.target, p.answer]);
 }
 
-function parseJson(value: unknown): ParsedProblems {
+function parseJson(value: unknown, multiTurn: boolean): ParsedProblems {
   const result: ParsedProblems = { problems: [], rejected: [], duplicates: [] };
   const items = Array.isArray(value) ? value : [value];
   const seen = new Set<string>();
@@ -374,6 +375,10 @@ function parseJson(value: unknown): ParsedProblems {
         return;
       }
     }
+    if (multiTurn && out.value.answer !== null) {
+      result.rejected.push({ ...where, reason: MULTI_TURN_ANSWER });
+      return;
+    }
     const key = keyOf(out.value);
     if (seen.has(key)) {
       result.duplicates.push({ ...where, reason: 'duplicate of an earlier problem' });
@@ -381,6 +386,7 @@ function parseJson(value: unknown): ParsedProblems {
     }
     seen.add(key);
     const problem: ProblemInput = { ...out.value };
+    if (multiTurn) problem.multi_turn = true;
     if (typeof o.seeds === 'number') problem.seeds = o.seeds;
     if (o.tag !== undefined) problem.tag = o.tag;
     result.problems.push(problem);
@@ -388,12 +394,21 @@ function parseJson(value: unknown): ParsedProblems {
   return result;
 }
 
-/** Read problems from pasted or uploaded text. Never throws. */
-export function parseProblemText(text: string): ParsedProblems {
+/** Why a problem line with an answer is refused while the multi-turn mark is on. */
+export const MULTI_TURN_ANSWER =
+  'a multi-turn context-response analogy problem takes no answer: Petacat constructs the response of every turn';
+
+/**
+ * Read problems from pasted or uploaded text. Never throws. With `multiTurn` every problem read is marked
+ * multi-turn (each of its runs is a chat), and a problem that gives an answer is rejected, because a
+ * multi-turn problem takes none.
+ */
+export function parseProblemText(text: string, options: { multiTurn?: boolean } = {}): ParsedProblems {
+  const multiTurn = options.multiTurn === true;
   const trimmed = text.trim();
   if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
     try {
-      return parseJson(JSON.parse(trimmed));
+      return parseJson(JSON.parse(trimmed), multiTurn);
     } catch {
       // Not JSON after all (a Markdown link list, say): read it line by line.
     }
@@ -413,13 +428,17 @@ export function parseProblemText(text: string): ParsedProblems {
       result.rejected.push({ ...where, reason: out.reason });
       return;
     }
+    if (multiTurn && out.value.answer !== null) {
+      result.rejected.push({ ...where, reason: MULTI_TURN_ANSWER });
+      return;
+    }
     const key = keyOf(out.value);
     if (seen.has(key)) {
       result.duplicates.push({ ...where, reason: 'duplicate of an earlier problem' });
       return;
     }
     seen.add(key);
-    result.problems.push({ ...out.value });
+    result.problems.push(multiTurn ? { ...out.value, multi_turn: true } : { ...out.value });
   });
   return result;
 }

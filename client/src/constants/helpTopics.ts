@@ -34,6 +34,7 @@ export const COMPONENT_HELP_KEYS = [
   'run_history',
   'session',
   'session_add_problems',
+  'session_chat',
   'session_configuration_tab',
   'session_error_policy',
   'session_export',

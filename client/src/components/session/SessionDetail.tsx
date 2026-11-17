@@ -20,7 +20,7 @@ import { chunk, parseProblemText } from './problemText';
 import { ConfigurationTab } from './ConfigurationTab';
 import { MemoryTab } from './MemoryTab';
 import { PolicyFields } from './PolicyFields';
-import { ProblemPreview, ProblemTextInput } from './ProblemTextInput';
+import { MultiTurnMark, ProblemPreview, ProblemTextInput } from './ProblemTextInput';
 import { ProblemsTable } from './ProblemsTable';
 import {
   cardStyle,
@@ -213,7 +213,7 @@ export function SessionDetail({ session, limits, notice, onSessionChanged, onDel
           Runs: {fmtInt(session.runs.done)} / {fmtInt(session.runs.total)}
           {' · '}
           {fmtInt(session.runs.errors)} errors · {fmtInt(session.runs.capped)} gave up at max codelets ·{' '}
-          {fmtInt(session.runs.retries)} retries
+          {fmtInt(session.runs.retries)} retries · {fmtInt(session.runs.waiting)} waiting for the teacher's input
           {' · '}
           {fmtRate(session.runs_per_second)} · ETA {fmtEta(session.eta_seconds)} · {fmtInt(session.codelets)}{' '}
           codelets
@@ -460,10 +460,11 @@ function AddProblems({
   onSessionChanged: (b: SessionSummary) => void;
 }) {
   const [text, setText] = useState('');
+  const [multiTurn, setMultiTurn] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
-  const parsed = useMemo(() => parseProblemText(text), [text]);
+  const parsed = useMemo(() => parseProblemText(text, { multiTurn }), [text, multiTurn]);
 
   const add = async () => {
     setBusy(true);
@@ -515,6 +516,7 @@ function AddProblems({
       )}
       <div style={{ marginTop: 6 }}>
         <ProblemTextInput id="add-problems-text" value={text} onChange={setText} disabled={busy} demos rows={3} />
+        <MultiTurnMark id="add-problems-multi-turn" checked={multiTurn} onChange={setMultiTurn} disabled={busy} />
         <ProblemPreview parsed={parsed} seedsPerProblem={session.settings.seeds_per_problem} />
       </div>
       {error && (

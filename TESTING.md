@@ -883,7 +883,7 @@ nothing consults them now.
 
 `client/` carries a Vitest suite covering the store, the panels, the admin
 editors and the review surfaces. Run it with `cd client && npx vitest run`, and
-`npx tsc --noEmit` alongside it. **792 cases across 55 files**, all passing, in
+`npx tsc --noEmit` alongside it. **830 cases across 56 files**, all passing, in
 3.1 s on an Apple M-series machine.
 
 | File (`client/src/`) | Cases | Covers |
@@ -941,7 +941,8 @@ editors and the review surfaces. Run it with `cd client && npx vitest run`, and
 | `components/review/EpisodicRunTimeline.test.tsx` | 3 | A note being typed on an Episodic Memory clear survives a late refresh, and an untouched note follows the server |
 | `components/review/ReviewPanel.test.tsx` | 42 | The review surfaces read the record back, and the episodic-run timeline shows each Episodic Memory clear between the runs with an editable note |
 | `components/session/ConfigurationTab.test.tsx` | 12 | A Training Mode Session's Configuration tab: the version slider and the Live (in memory) or Stored (as of last stop) label, the Slipnet graph redrawn per version, the timeline and its source filter, Compare versions, Table rows, the link to the configuration manager, and no edit controls |
-| `components/session/problemText.test.ts` | 52 | Parsing pasted or uploaded problems (any Unicode text, kept exactly and case-sensitive; double-quoted fields with JSON escapes in every line form; JSON entries with their own seeds, answer and tag) and the preview the Training Mode Session view shows before adding them |
+| `components/session/problemText.test.ts` | 55 | Parsing pasted or uploaded problems (any Unicode text, kept exactly and case-sensitive; double-quoted fields with JSON escapes in every line form; JSON entries with their own seeds, answer and tag) and the preview the Training Mode Session view shows before adding them; the multi-turn mark (every problem marked, a line with an answer rejected, in a line list and in JSON) |
+| `components/session/SessionChat.test.tsx` | 35 | The chat client for multi-turn runs: the multi-turn mark in the new-session form and in Add problems (and no answer taken while it is on), the problems table's mark, the summary's waiting count and activity, the runs table's state, turns, end and waiting turn (a waiting run stands out; a single-turn problem's table unchanged), opening a run's chat, each turn's four positions with who supplied each, strings shown exactly (spaces, a tab, a line break, an emoji, a combining mark), the closed details with evidence and proposals, the input box only when the run waits and the session accepts input (and the reason otherwise), Send and End bodies, the input checks, `stale` (with the refresh), `busy` and 422 shown, and polling that follows the run's state and stops |
 | `components/session/SessionPanel.test.tsx` | 72 | The Training Mode Session view: the list and the selected Training Mode Session, creating one, adding problems, the error-policy fields, the problems table searched and sorted through the server, the Memory and Configuration tabs, the controls (start, pause, resume, stop, cancel, export), and Delete behind the session's name typed exactly; a session name of any length is sent whole on create and rename |
 
 ### Running under the free-threaded interpreter
