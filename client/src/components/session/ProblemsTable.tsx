@@ -551,8 +551,13 @@ function RunsTable({
                     <td style={tdStyle} className="mono">
                       {r.seed}
                     </td>
-                    <td style={tdStyle} className="mono">
-                      {outcomeLabel(r.key)}
+                    <td
+                      style={tdStyle}
+                      className="mono"
+                      data-testid="run-outcome"
+                      title={r.key === null ? 'The latest response: this run has not ended' : undefined}
+                    >
+                      {r.key !== null ? outcomeLabel(r.key) : r.answer || '–'}
                     </td>
                     <td style={{ ...tdStyle, textAlign: 'right' }}>{fmtInt(r.codelets)}</td>
                     <td style={{ ...tdStyle, textAlign: 'right' }}>

@@ -1206,11 +1206,14 @@ export interface SessionProblemDetail extends SessionProblemRow {
 }
 
 export interface SessionRun {
-  seq: number;
-  memory_version: number;
+  /** The run's merge order; `null` while a multi-turn run has not ended. */
+  seq: number | null;
+  memory_version: number | null;
   seed: number;
   status: string;
-  key: string;
+  /** The outcome key (the answer, or `*NONE*`, `*CAP*`, `*ERROR*`); `null` while a multi-turn run has not ended. */
+  key: string | null;
+  /** The answer; while a multi-turn run has not ended, its latest response (`''` before its first turn answers). */
   answer: string;
   answers: string[];
   codelets: number;
@@ -1220,7 +1223,7 @@ export interface SessionRun {
   error: string | null;
   config_hash: string;
   attempts: number;
-  memory_added: { answers: number; snags: number };
+  memory_added: { answers: number; snags: number } | null;
   /** `ended`, or for a multi-turn run still going `running` (a turn is queued or in flight) or `waiting`. */
   state: SessionRunState;
   /** Turns finished. */

@@ -384,11 +384,13 @@ describe('chat client: the problems table, the summary and the runs table', () =
   }
 
   it('shows each run state, its turns, its end and the turn a waiting run waits for; the waiting run stands out', async () => {
+    // As the server lists them: a run that has not ended has no key, and its answer is its latest response.
+    const going = { seq: null, key: null, answers: [], answer_quality: null, memory_added: null, status: 'waiting' }
     const table = await openRuns({}, [
       run({ seed: 1, state: 'ended', turns: 3, end_reason: 'teacher', end_label: 'enough' }),
-      run({ seed: 2, state: 'waiting', turns: 2, waiting_for: 3, end_reason: null }),
-      run({ seed: 3, state: 'running', turns: 0, end_reason: null }),
-      run({ seed: 4, state: 'ended', turns: 1, end_reason: 'no-answer' }),
+      run({ ...going, seed: 2, state: 'waiting', turns: 2, waiting_for: 3, end_reason: null, answer: '2 cat' }),
+      run({ ...going, seed: 3, state: 'running', status: 'running', turns: 0, end_reason: null, answer: '' }),
+      run({ seed: 4, state: 'ended', turns: 1, end_reason: 'no-answer', status: 'gave_up', key: '*NONE*', answer: '', answers: [] }),
     ])
     const rows = await within(table).findAllByTestId('run-row')
     expect(rows).toHaveLength(4)
@@ -401,6 +403,12 @@ describe('chat client: the problems table, the summary and the runs table', () =
     expect(rows[0].style.fontWeight).toBe('')
     expect(within(rows[2]).getByTestId('run-state')).toHaveTextContent('running')
     expect(within(rows[3]).getByTestId('run-ended-by')).toHaveTextContent('a turn with no answer')
+    // the Outcome column: an ended run's outcome, a waiting run's latest response, a dash before any response
+    expect(within(rows[0]).getByTestId('run-outcome')).toHaveTextContent('ijl')
+    expect(within(rows[1]).getByTestId('run-outcome')).toHaveTextContent('2 cat')
+    expect(within(rows[1]).getByTestId('run-outcome')).toHaveAttribute('title', 'The latest response: this run has not ended')
+    expect(within(rows[2]).getByTestId('run-outcome')).toHaveTextContent('–')
+    expect(within(rows[3]).getByTestId('run-outcome')).toHaveTextContent('no answer')
   })
 
   it('leaves the runs table of a single-turn problem as it was: no state, turns or chat columns', async () => {

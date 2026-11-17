@@ -1592,7 +1592,7 @@ worker, and the speculative executor is not yet available to Training Mode Sessi
 | POST | `/api/training-mode/sessions/{id}/problems` | Add problems, in any state |
 | GET | `/api/training-mode/sessions/{id}/problems` | Search, sort and page the problems |
 | GET | `/api/training-mode/sessions/{id}/problems/{pid}` | One problem with its full answer distribution |
-| GET | `/api/training-mode/sessions/{id}/problems/{pid}/runs` | Its runs in seed order, with `seq` and `memory_version`, and each run's `state` (`ended`, or for a multi-turn run still going `running` or `waiting`), `turns` and `end_reason` |
+| GET | `/api/training-mode/sessions/{id}/problems/{pid}/runs` | Its runs in seed order, with `seq` and `memory_version`, and each run's `state` (`ended`, or for a multi-turn run still going `running` or `waiting`), `turns` and `end_reason`; a run still going has no `key` or `seq` yet, and its `answer` is its latest response |
 | GET | `/api/training-mode/sessions/{id}/problems/{pid}/runs/{seed}` | One run's whole conversation: every turn's context, second string, input and response, its codelets, end reason and `evidence`, and whether the run is running, waiting for input (`waiting_for`) or ended |
 | POST | `/api/training-mode/sessions/{id}/problems/{pid}/runs/{seed}/input` | The teacher's entrance: `{turn, text}` (the next turn's input) or `{turn, end: true, label?}`; 409 `stale` unless it is the exact next input of a waiting run |
 | POST | `/api/training-mode/sessions/{id}/problems/{pid}/cancel` | Cancel one problem, keeping its finished runs |
