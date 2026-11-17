@@ -8,14 +8,15 @@
 // Petacat constructs. The next turn's 1st position is the previous turn's three context
 // strings joined with single spaces, its 2nd is the previous response, and its 3rd is what
 // the teacher gives. So the conversation reads as a context history that grows turn by turn.
-// The run's state and its Close chat button are on its row in the runs table, not here.
+// The run's state and its Close chat button are on its row in the runs table, not here; the chat
+// tells its row (`onChange`) as soon as the run's state or turn count changes, so the row keeps up.
 //
 // The chat polls `GET .../runs/{seed}` while it is open and the run is not ended (no
 // push channel), and sends the teacher's input or end through `POST .../input`.
 // Strings are shown exactly as given: never trimmed, collapsed or normalised.
 // ---------------------------------------------------------------------------
 
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { ApiError, describeApiError, getSessionConversation, supplySessionInput } from '@/api/client';
 import type { SessionConversation, SessionPositionSource, SessionRunEndReason, SessionTurn } from '@/types';
 import { checkString } from './problemText';
@@ -46,10 +47,21 @@ const END_REASON: Record<SessionRunEndReason, string> = {
   cancelled: 'its problem was cancelled',
 };
 
-/** "no answer" or "the teacher ended it (label)". */
-export function endText(reason: SessionRunEndReason | null, label: string | null): string {
+/** The same, naming the turn that ended the run (the runs table): "turn 2 had no answer". */
+const END_REASON_AT: Partial<Record<SessionRunEndReason, (turn: number) => string>> = {
+  'no-answer': (n) => `turn ${n} had no answer`,
+  teacher: (n) => `the teacher ended it after turn ${n}`,
+  error: (n) => `an error in turn ${n}`,
+};
+
+/**
+ * "a turn with no answer" or "the teacher ended it (label: ...)"; given the number of the run's
+ * last turn, the reasons that happen at a turn name it: "turn 2 had no answer".
+ */
+export function endText(reason: SessionRunEndReason | null, label: string | null, lastTurn?: number): string {
   if (reason === null) return '';
-  return `${END_REASON[reason]}${label ? ` (label: ${label})` : ''}`;
+  const at = lastTurn !== undefined && lastTurn > 0 ? END_REASON_AT[reason] : undefined;
+  return `${at ? at(lastTurn!) : END_REASON[reason]}${label ? ` (label: ${label})` : ''}`;
 }
 
 const SOURCE: Record<SessionPositionSource, string> = {
@@ -260,10 +272,20 @@ export interface RunChatProps {
   sessionId: number;
   problemId: number;
   seed: number;
+  /** Called when the run's state or turn count changes while the chat is open (not on the first load). */
+  onChange?: () => void;
 }
 
-export function RunChat({ sessionId, problemId, seed }: RunChatProps) {
+export function RunChat({ sessionId, problemId, seed, onChange }: RunChatProps) {
   const [conv, setConv] = useState<SessionConversation | null>(null);
+  // The state and turn count last shown, to tell the run's row when they change.
+  const shown = useRef<string | null>(null);
+  const take = (next: SessionConversation) => {
+    const now = `${next.state}|${next.turn_count}`;
+    if (shown.current !== null && shown.current !== now) onChange?.();
+    shown.current = now;
+    setConv(next);
+  };
   const [error, setError] = useState<string | null>(null);
   const [text, setText] = useState('');
   const [label, setLabel] = useState('');
@@ -272,7 +294,7 @@ export function RunChat({ sessionId, problemId, seed }: RunChatProps) {
 
   const refresh = async () => {
     try {
-      setConv(await getSessionConversation(sessionId, problemId, seed));
+      take(await getSessionConversation(sessionId, problemId, seed));
       setError(null);
     } catch (err) {
       setError(describeApiError(err, 'load the chat'));
@@ -293,8 +315,7 @@ export function RunChat({ sessionId, problemId, seed }: RunChatProps) {
     setBusy(true);
     setSendError(null);
     try {
-      const next = await supplySessionInput(sessionId, problemId, seed, { turn: conv.waiting_for, ...input });
-      setConv(next);
+      take(await supplySessionInput(sessionId, problemId, seed, { turn: conv.waiting_for, ...input }));
       setText('');
       setLabel('');
     } catch (err) {

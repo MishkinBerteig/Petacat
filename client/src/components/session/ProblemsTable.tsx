@@ -321,6 +321,13 @@ const multiTurnBadgeStyle: React.CSSProperties = {
   fontFamily: 'inherit',
 };
 
+/** The turn count of a run the teacher has given input to (more than one turn). */
+const turnsBadgeStyle: React.CSSProperties = {
+  ...multiTurnBadgeStyle,
+  marginLeft: 0,
+  fontSize: 11,
+};
+
 const sortButtonStyle: React.CSSProperties = {
   background: 'none',
   border: 'none',
@@ -343,26 +350,24 @@ function ProblemDetailView({ sessionId, row }: { sessionId: number; row: Session
   const [cancelError, setCancelError] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
 
-  // Fetched on opening, then no more often than every 3 s while the problem is live.
+  // Fetched on opening, then no more often than every 3 s while the problem is live, and at once
+  // when an open chat sees its run's state or turn count change.
   const live = (detail?.status ?? row.status) === 'queued' || (detail?.status ?? row.status) === 'running';
-  usePolling(
-    async () => {
-      try {
-        setDetail(await getSessionProblem(sessionId, row.id));
-        setError(null);
-      } catch (err) {
-        setError(describeApiError(err, 'load the problem'));
-      }
-      try {
-        setRuns((await getSessionProblemRuns(sessionId, row.id)).runs);
-        setRunsError(null);
-      } catch (err) {
-        setRunsError(describeApiError(err, "load the problem's runs"));
-      }
-    },
-    live ? DETAIL_POLL_MS : null,
-    row.id,
-  );
+  const load = async () => {
+    try {
+      setDetail(await getSessionProblem(sessionId, row.id));
+      setError(null);
+    } catch (err) {
+      setError(describeApiError(err, 'load the problem'));
+    }
+    try {
+      setRuns((await getSessionProblemRuns(sessionId, row.id)).runs);
+      setRunsError(null);
+    } catch (err) {
+      setRunsError(describeApiError(err, "load the problem's runs"));
+    }
+  };
+  usePolling(load, live ? DETAIL_POLL_MS : null, row.id);
 
   const shown = detail ?? row;
   const canCancel = shown.status === 'queued' || shown.status === 'running';
@@ -460,7 +465,15 @@ function ProblemDetailView({ sessionId, row }: { sessionId: number; row: Session
               {runsError}
             </div>
           )}
-          {runs && <RunsTable runs={runs} sessionId={sessionId} problemId={row.id} multiTurn={shown.multi_turn} />}
+          {runs && (
+            <RunsTable
+              runs={runs}
+              sessionId={sessionId}
+              problemId={row.id}
+              multiTurn={shown.multi_turn}
+              onRunChanged={() => void load()}
+            />
+          )}
         </>
       )}
       {cancelError && (
@@ -493,11 +506,14 @@ function RunsTable({
   sessionId,
   problemId,
   multiTurn,
+  onRunChanged,
 }: {
   runs: SessionRun[];
   sessionId: number;
   problemId: number;
   multiTurn: boolean;
+  /** An open chat saw its run's state or turn count change: fetch the runs again. */
+  onRunChanged: () => void;
 }) {
   const [offset, setOffset] = useState(0);
   // The seed of the run whose chat is open (a multi-turn problem only).
@@ -537,15 +553,21 @@ function RunsTable({
                 </tr>
               </thead>
               <tbody>
-                {shown.map((r) => (
+                {shown.map((r) => {
+                  // A run with more than one turn is one the teacher has given input to.
+                  const chatted = multiTurn && r.turns > 1;
+                  return (
                   <Fragment key={r.seed}>
                   <tr
                     data-testid="run-row"
                     data-state={multiTurn ? r.state : undefined}
+                    data-chatted={chatted ? 'true' : undefined}
                     style={
                       multiTurn && r.state === 'waiting'
                         ? { background: 'var(--bg-secondary)', boxShadow: 'inset 3px 0 0 var(--warning)', fontWeight: 600 }
-                        : undefined
+                        : chatted
+                          ? { boxShadow: 'inset 3px 0 0 var(--text-accent, #6cf)' }
+                          : undefined
                     }
                   >
                     <td style={tdStyle} className="mono">
@@ -577,11 +599,15 @@ function RunsTable({
                         <td style={tdStyle} data-testid="run-state">
                           {r.state === 'waiting' ? `waiting for the input of turn ${r.waiting_for}` : r.state}
                         </td>
-                        <td style={{ ...tdStyle, textAlign: 'right' }} data-testid="run-turns">
-                          {r.turns}
+                        <td
+                          style={{ ...tdStyle, textAlign: 'right' }}
+                          data-testid="run-turns"
+                          title={chatted ? `${r.turns} turns: the teacher has given this run input. Open its chat to see them.` : undefined}
+                        >
+                          {chatted ? <span style={turnsBadgeStyle}>{r.turns}</span> : r.turns}
                         </td>
                         <td style={tdStyle} data-testid="run-ended-by">
-                          {endText(r.end_reason, r.end_label) || '–'}
+                          {endText(r.end_reason, r.end_label, r.turns) || '–'}
                         </td>
                         <td style={tdStyle}>
                           <button
@@ -599,12 +625,13 @@ function RunsTable({
                   {multiTurn && chat === r.seed && (
                     <tr>
                       <td colSpan={12} style={{ ...tdStyle, padding: '6px 12px' }}>
-                        <RunChat sessionId={sessionId} problemId={problemId} seed={r.seed} />
+                        <RunChat sessionId={sessionId} problemId={problemId} seed={r.seed} onChange={onRunChanged} />
                       </td>
                     </tr>
                   )}
                   </Fragment>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

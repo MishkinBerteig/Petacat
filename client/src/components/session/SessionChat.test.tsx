@@ -5,7 +5,8 @@
 // What these defend: a person can mark problems multi-turn when creating a session and when adding
 // problems (and a multi-turn problem takes no answer); the problems table marks such a problem, the
 // summary counts the runs waiting for the teacher, and the runs table shows each run's state, turns,
-// end and the turn it waits for; opening a run opens its chat, which shows every turn's four
+// end (naming the turn) and the turn it waits for, marks a run the teacher has given input to, and
+// fetches the row again as soon as its open chat changes; opening a run opens its chat, which shows every turn's four
 // positions (context, second string, input, response) with who supplied each, the strings exactly as
 // given, and a details section; the input box appears only when the run waits and the session would
 // take the input; Send and End call the API with the right body; a stale, busy or 422 refusal is
@@ -396,13 +397,13 @@ describe('chat client: the problems table, the summary and the runs table', () =
     expect(rows).toHaveLength(4)
     expect(within(rows[0]).getByTestId('run-state')).toHaveTextContent('ended')
     expect(within(rows[0]).getByTestId('run-turns')).toHaveTextContent('3')
-    expect(within(rows[0]).getByTestId('run-ended-by')).toHaveTextContent('the teacher ended it (label: enough)')
+    expect(within(rows[0]).getByTestId('run-ended-by')).toHaveTextContent('the teacher ended it after turn 3 (label: enough)')
     expect(within(rows[1]).getByTestId('run-state')).toHaveTextContent('waiting for the input of turn 3')
     expect(rows[1]).toHaveAttribute('data-state', 'waiting')
     expect(rows[1].style.fontWeight).toBe('600')
     expect(rows[0].style.fontWeight).toBe('')
     expect(within(rows[2]).getByTestId('run-state')).toHaveTextContent('running')
-    expect(within(rows[3]).getByTestId('run-ended-by')).toHaveTextContent('a turn with no answer')
+    expect(within(rows[3]).getByTestId('run-ended-by')).toHaveTextContent('turn 1 had no answer')
     // the Outcome column: an ended run's outcome, a waiting run's latest response, a dash before any response
     expect(within(rows[0]).getByTestId('run-outcome')).toHaveTextContent('ijl')
     expect(within(rows[1]).getByTestId('run-outcome')).toHaveTextContent('2 cat')
@@ -418,6 +419,52 @@ describe('chat client: the problems table, the summary and the runs table', () =
       expect(within(table).queryByRole('columnheader', { name })).not.toBeInTheDocument()
     }
     expect(within(table).queryByRole('button', { name: /chat/i })).not.toBeInTheDocument()
+  })
+
+  it('marks a run the teacher has given input to (more than one turn), and names the turn that ended it', async () => {
+    // Seed 39 answered in turn 1, was given input, and its turn 2 had no answer; seed 36 gave up in turn 1.
+    const table = await openRuns({}, [
+      run({ seed: 36, state: 'ended', turns: 1, end_reason: 'no-answer', status: 'gave_up', key: '*NONE*', answer: '', answers: [] }),
+      run({ seed: 39, state: 'ended', turns: 2, end_reason: 'no-answer', status: 'gave_up', key: '*NONE*', answer: '', answers: [] }),
+    ])
+    const [once, chatted] = await within(table).findAllByTestId('run-row')
+    expect(once).not.toHaveAttribute('data-chatted')
+    expect(once.style.boxShadow).toBe('')
+    expect(within(once).getByTestId('run-turns').querySelector('span')).toBeNull()
+    expect(within(once).getByTestId('run-ended-by')).toHaveTextContent('turn 1 had no answer')
+    expect(chatted).toHaveAttribute('data-chatted', 'true')
+    expect(chatted.style.boxShadow).toContain('inset 3px 0 0')
+    const turns = within(chatted).getByTestId('run-turns')
+    expect(turns.querySelector('span')).toHaveTextContent('2')
+    expect(turns).toHaveAttribute('title', '2 turns: the teacher has given this run input. Open its chat to see them.')
+    expect(within(chatted).getByTestId('run-ended-by')).toHaveTextContent('turn 2 had no answer')
+  })
+
+  it("updates a run's row as soon as its open chat changes, without waiting for the table's next refresh", async () => {
+    const going = { seq: null, key: null, answers: [], answer_quality: null, memory_added: null, status: 'waiting' }
+    const waiting = twoTurns({ seed: 39, waiting_for: 2, turn_count: 1, turns: [turn()] })
+    m.getSessionConversation.mockResolvedValue(waiting)
+    const table = await openRuns({}, [
+      run({ ...going, seed: 39, state: 'waiting', turns: 1, waiting_for: 2, end_reason: null, answer: '2 cat' }),
+    ])
+    fireEvent.click(await within(table).findByRole('button', { name: 'Open the chat of seed 39' }))
+    const box = await screen.findByLabelText('Input for turn 2')
+    // Opening the chat changes nothing, so the runs are not fetched again for it.
+    await screen.findAllByTestId('chat-turn')
+    const before = m.getSessionProblemRuns.mock.calls.length
+    // The input is taken and turn 2 runs; it then ends the run with no answer.
+    m.supplySessionInput.mockResolvedValue({ ...waiting, state: 'running', waiting_for: null, accepts_input: false })
+    m.getSessionProblemRuns.mockResolvedValue({ runs: [
+      run({ seed: 39, state: 'ended', turns: 2, end_reason: 'no-answer', status: 'gave_up', key: '*NONE*', answer: '', answers: [] }),
+    ] })
+    type(box, '3 dog')
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    // Well inside the table's own 3 s refresh: the row was fetched again because the chat changed.
+    await waitFor(() => expect(m.getSessionProblemRuns.mock.calls.length).toBeGreaterThan(before), { timeout: 1000 })
+    const row = within(screen.getByTestId('runs-table')).getAllByTestId('run-row')[0]
+    await waitFor(() => expect(within(row).getByTestId('run-turns')).toHaveTextContent('2'), { timeout: 1000 })
+    expect(row).toHaveAttribute('data-chatted', 'true')
+    expect(within(row).getByTestId('run-ended-by')).toHaveTextContent('turn 2 had no answer')
   })
 
   it('opens the chat of a run of a multi-turn problem, and closes it', async () => {
