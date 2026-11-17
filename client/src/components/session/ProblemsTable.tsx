@@ -562,12 +562,12 @@ function RunsTable({
                     data-testid="run-row"
                     data-state={multiTurn ? r.state : undefined}
                     data-chatted={chatted ? 'true' : undefined}
+                    // outlined all round in the accent colour (index.css), as well as any waiting mark
+                    className={chatted ? 'run-chatted' : undefined}
                     style={
                       multiTurn && r.state === 'waiting'
                         ? { background: 'var(--bg-secondary)', boxShadow: 'inset 3px 0 0 var(--warning)', fontWeight: 600 }
-                        : chatted
-                          ? { boxShadow: 'inset 3px 0 0 var(--text-accent, #6cf)' }
-                          : undefined
+                        : undefined
                     }
                   >
                     <td style={tdStyle} className="mono">

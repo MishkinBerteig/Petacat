@@ -246,6 +246,16 @@ button:disabled {
   background: var(--text-secondary);
 }
 
+/* A Training Mode Session's run that the teacher has given input to (more than one turn): an
+   outline around its whole row in the runs table. Drawn with the cells' borders, because a table
+   row's own outline or shadow is not drawn reliably when the table collapses its borders. */
+tr.run-chatted > td {
+  border-top: 2px solid var(--text-accent);
+  border-bottom: 2px solid var(--text-accent);
+}
+tr.run-chatted > td:first-child { border-left: 2px solid var(--text-accent); }
+tr.run-chatted > td:last-child { border-right: 2px solid var(--text-accent); }
+
 /* Utility */
 .mono { font-family: var(--font-mono); }
 .text-accent { color: var(--text-accent); }

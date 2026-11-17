@@ -1459,7 +1459,7 @@ views.
 - **The runs table.** For a multi-turn problem, each run shows its state (`running`, `waiting for the input of turn N`, or
   `ended`), its turns, and what ended it, naming the turn (`turn 2 had no answer`, `the teacher ended it after turn 3`, with
   the teacher's label). A waiting run stands out, and so does a run the teacher has given input to (more than one turn): an
-  accent bar on its row and its turn count in a box. A single-turn problem's runs table is as it was. **Open chat** on a run's
+  accent-coloured outline around its whole row and its turn count in a box. A single-turn problem's runs table is as it was. **Open chat** on a run's
   row opens its chat, and while it is open the row is fetched again as soon as the run's state or turn count changes.
 - **The chat.** It lists every turn in order, each like a message and its reply: a **Context** line with the turn's 1st, 2nd
   and 3rd positions side by side, and the **Response**, the 4th, which Petacat constructs. Beneath each string it says who
