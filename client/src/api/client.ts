@@ -65,7 +65,9 @@ import type {
   SessionProblemPage,
   SessionProblemDetail,
   SessionProblemRow,
+  SessionConversation,
   SessionRun,
+  SessionRunInput,
   SessionFinishedResponse,
   SessionMemory,
   SessionExportWhat,
@@ -930,6 +932,28 @@ export async function getSessionProblemRuns(
   problemId: number,
 ): Promise<{ runs: SessionRun[] }> {
   return request<{ runs: SessionRun[] }>(`/training-mode/sessions/${sessionId}/problems/${problemId}/runs`);
+}
+
+/** One run as a chat: every turn in order, and the run's state (poll it to follow along). */
+export async function getSessionConversation(
+  sessionId: number,
+  problemId: number,
+  seed: number,
+): Promise<SessionConversation> {
+  return request<SessionConversation>(`/training-mode/sessions/${sessionId}/problems/${problemId}/runs/${seed}`);
+}
+
+/** The teacher's entrance: the input of a waiting run's next turn, or the end of the run (409 `stale` if it is not that run's next input). */
+export async function supplySessionInput(
+  sessionId: number,
+  problemId: number,
+  seed: number,
+  input: SessionRunInput,
+): Promise<SessionConversation> {
+  return request<SessionConversation>(`/training-mode/sessions/${sessionId}/problems/${problemId}/runs/${seed}/input`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
 }
 
 export async function cancelSessionProblem(

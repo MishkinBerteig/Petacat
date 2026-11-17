@@ -145,7 +145,7 @@ ALLOWED.update(_group(
         "server/services/problem_text.py": {"answer": 2, "initial": 2, "modified": 2, "target": 2},
         "server/services/review_service.py": {"answer": 1, "initial": 1, "modified": 1, "target": 1},
         "server/services/training_mode_session_service.py": {
-            "answer": 11, "initial": 8, "modified": 8, "target": 8},
+            "answer": 15, "initial": 9, "modified": 9, "target": 9},
     }))
 ALLOWED.update(_group(
     "a key of the Workspace-state payload the client reads: the problem fields (state.problem), "

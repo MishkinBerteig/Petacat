@@ -20,7 +20,7 @@ def test_configuration_tables_exclude_runtime_tables_and_help_topics():
     runtime = {
         "runs", "trace_events", "answer_descriptions",
         "snag_descriptions", "training_mode_sessions", "training_mode_session_problems", "training_mode_session_runs",
-        "training_memory_merges", "training_mode_session_memory_snapshots", "configuration_state",
+        "training_mode_session_turns", "training_memory_merges", "training_mode_session_memory_snapshots", "configuration_state",
     }
     assert not (names & runtime), f"runtime tables counted as configuration: {names & runtime}"
     assert "help_topics" not in names, "help topics are upserted, not part of the load"

@@ -159,6 +159,11 @@ def proposals_key(proposals: Any) -> tuple:
     return tuple(json.dumps(p, sort_keys=True) for p in proposals or ())
 
 
+def evidence_key(evidence: Any) -> str | None:
+    """A hashable form of a run's ``evidence`` for the fingerprints."""
+    return None if evidence is None else json.dumps(evidence, sort_keys=True)
+
+
 @dataclass
 class RunOutcome:
     """What a run produced, small and picklable."""
@@ -189,13 +194,16 @@ class RunOutcome:
     #: The change-API ops the run's codelets applied to its own Slipnet (``apply_ops``), as plain,
     #: picklable dicts with identical ops removed, in order.  Empty for a run that made nothing.
     proposals: list = field(default_factory=list)
+    #: What a Training Mode Session's run built in its Workspace, as plain data (``turn_record.gather_evidence``);
+    #: in the fingerprint, so the executors must agree on it.  ``None`` for Metacat Mode's runs and a run that raised.
+    evidence: dict | None = None
 
     def fingerprint(self) -> tuple:
         """The fields that must be identical to a serial run (not timing/pid/index)."""
         return (
             self.seed, self.status, self.answer, tuple(self.answers), self.codelets,
             self.stopping_state, self.temperature, self.answer_quality, self.error,
-            proposals_key(self.proposals),
+            proposals_key(self.proposals), evidence_key(self.evidence),
         )
 
 
@@ -338,7 +346,12 @@ def run_one(task: RunTask, meta: MetadataProvider) -> RunOutcome:
         result = _drive(runner, task)
         outcome = _outcome(runner, result, task.seed, started, base_a if memory is not None else None)
         if memory is not None:
+            from server.services import turn_record
+
             outcome.additions = tm.end(memory, base_a, base_s)
+            # A Training Mode Session's run (one turn) reports what its Workspace built, read after the run
+            # (never during it), exactly as ``run_task`` does.  Metacat Mode's runs never read it.
+            outcome.evidence = turn_record.gather_evidence(runner.ctx, base_a, base_s)
         return outcome
     except Exception:  # noqa: BLE001 - one bad run must not sink a sweep
         return _failure(task.seed, started)

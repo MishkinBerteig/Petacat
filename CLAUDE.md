@@ -201,7 +201,14 @@ Every doc, UI string, help topic, plan and decision must keep the distinction pe
      the Slipnet. That is Training-Mode learning.
   2. **Multi-turn runs:** several turns inside a single run, re-using past input and output in
      the sliding-window sense of `FUTURE_DIRECTION_DETAILS.md` §8 (the turn recurrence).
-- **Turn** is something that happens inside a single run. Today every single run with the fourth
-  spot open (`abc -> abd; xyz -> ?`) is one turn. With the sliding window, a single run of a
-  Training Mode Session will have many turns. A Training episode holds many runs; a run holds one
-  or more turns. Metacat Mode's runs stay single-turn.
+- **Turn** is something that happens inside a single run. Every single run with the fourth spot open
+  (`abc -> abd; xyz -> ?`) is one turn. A run of a `multi_turn` problem in a Training Mode Session has many
+  turns, built as a chat: a turn is one engine run (a pure function of the session's configuration and
+  Episodic Memory at dispatch, the four positions' strings, the run's seed and the turn number; turn 1
+  uses the run's seed, a later turn `turn_seed(seed, n)`), each turn is one `finish_run`, and a turn that
+  answers makes the run **wait**, holding no worker, for the teacher's next input (`supply_input`, the
+  route `POST .../runs/{seed}/input`, `set_teacher`, or `scripts/session_client.py --teacher`). The next
+  turn's context (1st position) is the turn's context, second string and input joined with single spaces
+  (U+0020), its second string is the turn's response (the 4th position), and its input is the one supplied;
+  a turn with no answer, or the teacher's `end`, ends the run. A Training episode holds many runs; a run
+  holds one or more turns. Metacat Mode's runs stay single-turn.

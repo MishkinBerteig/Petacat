@@ -16,6 +16,11 @@ The database is written only when a Training Mode Session is Stopped (see
 problems, outcomes, runs and memory merges in one transaction.  A Stopped session's record is
 written at once (creating it, renaming it, adding problems).  ``running`` is live-only.
 
+A **run** (a problem at one seed) has one or more **turns**, one row each in ``training_mode_session_turns`` (a
+single-turn problem's run has exactly one); the runs row is the run as one outcome of its problem and is written
+when the run ends, so a run that is waiting for the teacher's input, or has a turn pending, has turn rows and no
+runs row.
+
 A problem's identifier is a per-session **ordinal**: ``(session_id, problem_id)`` is its key,
 so the identifier a live session hands out is the stored one.  Runs and merges name their
 problem by the same ordinal.
@@ -33,8 +38,8 @@ runtime tables whose value sets are fixed by the service.
 from __future__ import annotations
 
 from sqlalchemy import (
-    BigInteger, CheckConstraint, Column, DateTime, Float, ForeignKey, ForeignKeyConstraint, Index, Integer,
-    LargeBinary, String, Text, UniqueConstraint,
+    BigInteger, Boolean, CheckConstraint, Column, DateTime, Float, ForeignKey, ForeignKeyConstraint, Index,
+    Integer, LargeBinary, String, Text, UniqueConstraint, false,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 
@@ -113,6 +118,9 @@ class TrainingModeSessionProblem(Base):
     answer = Column(Text, nullable=True)
     seeds = Column(Integer, nullable=False)
     seed_start = Column(Integer, nullable=False)
+    #: A multi-turn problem: each of its runs is a chat, a turn per engine run, that goes on while the
+    #: teacher supplies inputs (``training_mode_session_turns``).  A problem without it is one turn.
+    multi_turn = Column(Boolean, nullable=False, default=False, server_default=false())
     #: The client's own label for the problem, returned untouched.
     tag = Column(JSONB, nullable=True)
     status = Column(String(16), nullable=False, default="queued")
@@ -182,6 +190,81 @@ class TrainingModeSessionRun(Base):
     #: What the merge actually added to the episode after the presence checks.
     added_answers = Column(Integer, nullable=False)
     added_snags = Column(Integer, nullable=False)
+
+
+class TrainingModeSessionTurn(Base):
+    """One turn of a run: one engine run, keyed ``(session, problem, seed, turn)``.
+
+    Every run has at least one turn row (a single-turn problem's run has exactly one, turn 1).  The four
+    positions are the turn's context, second string and input, and the response Petacat constructed
+    (``answer``, set when the turn answered).  A turn of a multi-turn run after the first has its context
+    and second string from the window (``training_mode_session_service`` and ``turn_record``): its context is
+    the previous turn's context, second string and input joined with single spaces, and its second string is
+    the previous turn's response.
+
+    ``status`` is the engine run's status, or ``pending`` for a turn that was dispatched or queued and had not
+    finished when the session was Stopped (it is run again, from these stored positions, on Start).  A run is
+    **waiting** when its last row has an ``answer``, no ``end_reason`` and the status is not ``pending``;
+    ``end_reason`` is set on the last row of a run that has ended.  The Stop write is the only writer.
+    """
+
+    __tablename__ = "training_mode_session_turns"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["session_id", "problem_id"],
+            ["training_mode_session_problems.session_id", "training_mode_session_problems.problem_id"],
+            ondelete="CASCADE",
+        ),
+        CheckConstraint("input_from IN ('problem','teacher')", name="ck_training_mode_session_turns_input_from"),
+        CheckConstraint(
+            "end_reason IS NULL OR end_reason IN ('single-turn','no-answer','teacher','error','cancelled')",
+            name="ck_training_mode_session_turns_end_reason",
+        ),
+        Index("ix_training_mode_session_turns_session_problem", "session_id", "problem_id"),
+    )
+
+    session_id = Column(Integer, ForeignKey("training_mode_sessions.id", ondelete="CASCADE"), primary_key=True)
+    #: The problem's ordinal in the session.
+    problem_id = Column(Integer, primary_key=True, autoincrement=False)
+    #: The run's seed (the problem's seed for turn 1).
+    seed = Column(Integer, primary_key=True, autoincrement=False)
+    #: The turn number, from 1.
+    turn = Column(Integer, primary_key=True, autoincrement=False)
+    #: The seed this turn's engine run used: the run's seed for turn 1, ``turn_record.turn_seed`` after.
+    turn_seed = Column(BigInteger, nullable=False)
+    context = Column(Text, nullable=False)
+    second_string = Column(Text, nullable=False)
+    input = Column(Text, nullable=False)
+    #: Who supplied the input: ``problem`` (turn 1) or ``teacher``.
+    input_from = Column(String(16), nullable=False)
+    status = Column(String(16), nullable=False)
+    #: The Workspace's answer string at the end of the turn (the response when ``status`` is ``answer_found``).
+    answer = Column(Text, nullable=False, default="")
+    answers = Column(JSONB, nullable=True)
+    answer_quality = Column(Float, nullable=True)
+    codelets = Column(Integer, nullable=False, default=0)
+    seconds = Column(Float, nullable=False, default=0.0)
+    temperature = Column(Float, nullable=False, default=0.0)
+    error = Column(Text, nullable=True)
+    attempts = Column(Integer, nullable=False, default=1)
+    #: What this turn's merge added to the Episodic Memory (summed into the run's row).
+    added_answers = Column(Integer, nullable=False, default=0)
+    added_snags = Column(Integer, nullable=False, default=0)
+    #: Why the run ended, on its last turn: ``single-turn``, ``no-answer``, ``teacher`` (with ``end_label``),
+    #: ``error`` or ``cancelled``.  ``NULL`` while the run goes on.
+    end_reason = Column(String(16), nullable=True)
+    end_label = Column(Text, nullable=True)
+    #: The change-API ops the turn's codelets built or proposed (what the in-worker learner submitted).
+    proposals = Column(JSONB, nullable=True)
+    #: What the turn's Workspace built (``turn_record.gather_evidence``): bonds and groups by category, the
+    #: rule, the snags and the symbols still unperceived.
+    evidence = Column(JSONB, nullable=True)
+    #: The merge order, the Training episode version the turn started from, the configuration revision it
+    #: ran under and that configuration's hash; ``NULL`` for a turn still ``pending``.
+    seq = Column(Integer, nullable=True)
+    memory_version = Column(Integer, nullable=True)
+    configuration_revision = Column(Integer, nullable=True)
+    config_hash = Column(String(64), nullable=False, default="")
 
 
 class SessionMemoryMerge(Base):

@@ -22,6 +22,10 @@ run starts under, pickled once per provider object by the executor and cached by
 worker.  Sessions with different configurations, and one session across many versions, share
 one pool (the swarm) or one child (the serial executor).
 
+A task is one **turn**: its strings are the turn's context, second string and input (``turn_record``), and its seed
+is the run's seed for turn 1 and ``turn_record.turn_seed`` after.  The executors know nothing of turns: waiting for
+the teacher's input happens in the service, never in a worker.
+
 Both execute exactly the steps of ``swarm.run_one`` (``EngineRunner(meta)``,
 ``init_mcat(..., seed=seed, parameters=...)``, ``run_mcat(max_steps=...)`` under the task's
 backend), so a run's outcome is the same whichever executor ran it
@@ -47,6 +51,7 @@ from typing import Any
 
 from server.engine.metadata import MetadataProvider
 from server.engine.start_check import require_run_start
+from server.services import turn_record
 
 logger = logging.getLogger("petacat.session")
 
@@ -55,7 +60,7 @@ ENV_EXECUTOR = "PETACAT_SESSION_EXECUTOR"
 
 @dataclass
 class SessionTask:
-    """One run of a Training Mode Session: a problem at one seed."""
+    """One run of a Training Mode Session, or one turn of a multi-turn run: four strings and a seed."""
 
     initial: str
     modified: str
@@ -94,13 +99,13 @@ class SessionOutcome:
     #: The change-API ops the run's codelets applied to its own Slipnet (``apply_ops``): plain,
     #: picklable dicts, identical ops removed.  The session's in-worker learner submits them.
     proposals: list = field(default_factory=list)
+    #: What the run's Workspace built, as plain data (``turn_record.gather_evidence``): bonds and groups
+    #: by category, the rule the answer used, the snags, and how many symbols were still unperceived.
+    #: ``None`` for a task with no Training Mode Session memory and for a run that raised.
+    evidence: dict | None = None
 
     def fingerprint(self) -> tuple:
-        return (
-            self.seed, self.status, self.answer, tuple(self.answers), self.codelets,
-            self.stopping_state, self.temperature, self.answer_quality, self.error,
-            _proposals_key(self.proposals),
-        )
+        return outcome_fingerprint(self)
 
 
 def outcome_fingerprint(o: Any) -> tuple:
@@ -108,11 +113,16 @@ def outcome_fingerprint(o: Any) -> tuple:
     return (
         o.seed, o.status, o.answer, tuple(o.answers), o.codelets, o.stopping_state,
         o.temperature, o.answer_quality, o.error, _proposals_key(getattr(o, "proposals", ())),
+        _evidence_key(getattr(o, "evidence", None)),
     )
 
 
 def _proposals_key(proposals: Any) -> tuple:
     return tuple(json.dumps(p, sort_keys=True) for p in proposals or ())
+
+
+def _evidence_key(evidence: Any) -> str | None:
+    return None if evidence is None else json.dumps(evidence, sort_keys=True)
 
 
 # ---------------------------------------------------------------------------
@@ -269,6 +279,7 @@ def run_task(task: SessionTask, meta: MetadataProvider | None = None) -> Session
                 answer_quality=quality, worker_pid=os.getpid(),
                 additions=tm.end(memory, base_a, base_s) if memory is not None else None,
                 proposals=list(ctx.proposals) if ctx else [],
+                evidence=turn_record.gather_evidence(ctx, base_a, base_s) if memory is not None else None,
             )
     except Exception:  # noqa: BLE001 - one bad run must not sink a Training Mode Session
         return SessionOutcome(

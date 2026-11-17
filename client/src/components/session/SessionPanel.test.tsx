@@ -106,7 +106,7 @@ function session(over: Partial<SessionSummary> = {}): SessionSummary {
     stopped_from: null,
     stop_reason: null,
     problems: { total: 4, queued: 1, running: 1, finished: 2, cancelled: 0 },
-    runs: { total: 400, done: 250, errors: 2, capped: 5, retries: 1 },
+    runs: { total: 400, done: 250, errors: 2, capped: 5, retries: 1, waiting: 0 },
     codelets: 1_234_567,
     runs_per_second: 42.5,
     eta_seconds: 125,
@@ -130,6 +130,7 @@ function row(over: Partial<SessionProblemRow> = {}): SessionProblemRow {
     seeds: 100,
     seed_start: 1,
     tag: null,
+    multi_turn: false,
     status: 'finished',
     runs_done: 100,
     errors: 0,
@@ -172,7 +173,7 @@ const LIST: SessionListResponse = {
       state: 'running',
       activity: 'idle',
       problems: { total: 2, queued: 0, running: 0, finished: 2, cancelled: 0 },
-      runs: { total: 200, done: 200, errors: 0, capped: 0, retries: 0 },
+      runs: { total: 200, done: 200, errors: 0, capped: 0, retries: 0, waiting: 0 },
     }),
   ],
   executor: { kind: 'swarm', workers: 17, in_flight: 34, queued_runs: 12000 },
@@ -979,6 +980,11 @@ describe('SessionPanel: v2 features', () => {
           config_hash: 'h',
           attempts: 1,
           memory_added: { answers: 1, snags: 0 },
+          state: 'ended',
+          turns: 1,
+          waiting_for: null,
+          end_reason: 'single-turn',
+          end_label: null,
         },
         {
           seq: 4,
@@ -996,6 +1002,11 @@ describe('SessionPanel: v2 features', () => {
           config_hash: 'h',
           attempts: 2,
           memory_added: { answers: 0, snags: 0 },
+          state: 'ended',
+          turns: 1,
+          waiting_for: null,
+          end_reason: 'error',
+          end_label: null,
         },
       ],
     })
@@ -1018,6 +1029,7 @@ describe('SessionPanel: v2 features', () => {
     const mk = (seed: number) => ({
       seq: seed, memory_version: seed, seed, status: 'answer_found', key: 'a', answer: 'a', answers: ['a'],
       codelets: 10, seconds: 0.1, temperature: 1, answer_quality: 1, error: null, config_hash: 'h', attempts: 1, memory_added: { answers: 0, snags: 0 },
+      state: 'ended' as const, turns: 1, waiting_for: null, end_reason: 'single-turn' as const, end_label: null,
     })
     m.getSessionProblemRuns.mockResolvedValue({ runs: Array.from({ length: 60 }, (_, i) => mk(i + 1)) })
     await open()

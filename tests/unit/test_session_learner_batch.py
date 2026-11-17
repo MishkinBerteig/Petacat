@@ -37,8 +37,8 @@ def test_proposals_are_plain_picklable_dicts_in_both_fingerprints():
     r = outcome([NODE], cls=RunOutcome)
     assert r.fingerprint() != outcome([], cls=RunOutcome).fingerprint()
     assert outcome_fingerprint(r) == outcome_fingerprint(a)
-    assert outcome_fingerprint(r)[-1] == proposals_key([NODE])
-    assert outcome([]).fingerprint()[-1] == ()
+    assert outcome_fingerprint(r)[-2] == proposals_key([NODE])  # the last element is the run's evidence
+    assert outcome([]).fingerprint()[-2] == () and outcome([]).fingerprint()[-1] is None  # no proposals; no evidence
 
 
 def test_no_proposals_means_no_batch():

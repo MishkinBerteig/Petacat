@@ -1076,8 +1076,11 @@ export interface SwarmResult {
  * Stopping are transient and refuse every change with 409 `busy`.
  */
 export type SessionState = 'stopped' | 'starting' | 'running' | 'paused' | 'stopping';
-/** Inside Running only: nothing left to run (`idle`) or unable to run (`stalled`). */
-export type SessionActivity = 'idle' | 'stalled' | null;
+/**
+ * Inside Running only: nothing left to run (`idle`), unable to run (`stalled`), or every run that is left is
+ * waiting for the teacher's next input (`waiting`).
+ */
+export type SessionActivity = 'idle' | 'stalled' | 'waiting' | null;
 export type SessionProblemStatus = 'queued' | 'running' | 'finished' | 'cancelled';
 
 export interface SessionErrorPolicy {
@@ -1110,6 +1113,11 @@ export interface ProblemInput {
   seeds?: number | null;
   /** Any JSON, returned untouched. */
   tag?: unknown;
+  /**
+   * Each run is a chat: a turn per engine run, and when a turn answers the run waits for the teacher's next input.
+   * A multi-turn problem has no `answer`. Defaults to false (one turn).
+   */
+  multi_turn?: boolean;
 }
 
 export interface SessionSummary {
@@ -1129,7 +1137,8 @@ export interface SessionSummary {
   stopped_from: 'running' | 'paused' | null;
   stop_reason: 'user' | 'shutdown' | 'error' | null;
   problems: { total: number; queued: number; running: number; finished: number; cancelled: number };
-  runs: { total: number; done: number; errors: number; capped: number; retries: number };
+  /** `waiting` counts the runs waiting for the teacher's next input (they hold no worker). */
+  runs: { total: number; done: number; errors: number; capped: number; retries: number; waiting: number };
   memory: { answers: number; snags: number };
   codelets: number;
   runs_per_second: number | null;
@@ -1174,6 +1183,7 @@ export interface SessionProblemRow {
   seeds: number;
   seed_start: number;
   tag: unknown | null;
+  multi_turn: boolean;
   status: SessionProblemStatus;
   runs_done: number;
   errors: number;
@@ -1211,7 +1221,81 @@ export interface SessionRun {
   config_hash: string;
   attempts: number;
   memory_added: { answers: number; snags: number };
+  /** `ended`, or for a multi-turn run still going `running` (a turn is queued or in flight) or `waiting`. */
+  state: SessionRunState;
+  /** Turns finished. */
+  turns: number;
+  /** The number of the turn the input is for, while `state` is `waiting`. */
+  waiting_for: number | null;
+  end_reason: SessionRunEndReason | null;
+  end_label: string | null;
 }
+
+/** Where a run stands: `queued` (nothing run yet, or its next turn is queued while the session is Stopped). */
+export type SessionRunState = 'queued' | 'running' | 'waiting' | 'ended';
+/** Why a run ended: its only turn, a turn with no answer, the teacher, an error, or its problem cancelled. */
+export type SessionRunEndReason = 'single-turn' | 'no-answer' | 'teacher' | 'error' | 'cancelled';
+/** Who supplied a position: the problem, the window (the turns before), the teacher, or Petacat. */
+export type SessionPositionSource = 'problem' | 'window' | 'teacher' | 'petacat';
+
+/** What a turn's Workspace built (see `evidence` in `API.md`). */
+export interface TurnEvidence {
+  bonds: Record<string, number>;
+  groups: Record<string, number>;
+  rule: { top_rule: string; bottom_rule: string } | null;
+  snags: string[];
+  /** Symbols still unperceived at the end: a turn blocked on perception, not a cognitive give-up. */
+  unperceived: number;
+}
+
+/** One turn of a conversation. Its 1st position is the context, its 3rd the input and its 4th the response. */
+export interface SessionTurn {
+  turn: number;
+  positions: { context: string; second: string; input: string; response: string | null };
+  supplied_by: { context: SessionPositionSource; second: SessionPositionSource; input: SessionPositionSource; response: SessionPositionSource };
+  /** The engine run's status, or `pending` for a turn queued or in flight. */
+  status: string;
+  codelets: number;
+  seconds: number;
+  answers: string[];
+  answer_quality: number | null;
+  temperature: number;
+  error: string | null;
+  turn_seed: number;
+  attempts: number;
+  end_reason: SessionRunEndReason | null;
+  end_label: string | null;
+  proposals: Record<string, unknown>[];
+  evidence: TurnEvidence | null;
+  seq: number | null;
+  episode_version: number | null;
+  configuration_revision: number | null;
+  config_hash: string;
+}
+
+/** A run as a chat: every turn in order, and whether to send input, and for which turn. */
+export interface SessionConversation {
+  session_id: number;
+  problem_id: number;
+  seed: number;
+  multi_turn: boolean;
+  problem: { initial: string; modified: string; target: string; tag: unknown | null };
+  session_state: SessionState | 'stopped';
+  state: SessionRunState;
+  /** The number of the turn the input is for, while `state` is `waiting`. */
+  waiting_for: number | null;
+  /** True when `POST .../input` would be taken now. */
+  accepts_input: boolean;
+  end_reason: SessionRunEndReason | null;
+  end_label: string | null;
+  turn_count: number;
+  turns: SessionTurn[];
+}
+
+/** The teacher's call: the input of turn `turn`, or the end of the run (with an optional label). */
+export type SessionRunInput =
+  | { turn: number; text: string }
+  | { turn: number; end: true; label?: string };
 
 export interface SessionExecutorInfo {
   kind: 'swarm' | 'serial';

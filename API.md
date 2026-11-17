@@ -2,7 +2,7 @@
 
 > **Auto-generated.** Run `python scripts/generate_api_docs.py` to regenerate from the FastAPI application.
 
-205 HTTP routes, plus `WS /ws/runs/{run_id}` for live state push.
+207 HTTP routes, plus `WS /ws/runs/{run_id}` for live state push.
 
 Interactive documentation is served at `/docs` while the API is running.
 
@@ -73,7 +73,7 @@ Metacat Mode, multi-core across runs: one problem over many seeds on every core,
 
 ## Training Mode Sessions
 
-Training Mode: named, long-lived Training episodes of many problems over many seeds (Training Mode Sessions), each with its own Episodic Memory that no route clears (never Metacat Mode's). A Training Mode Session is created Stopped and is started, paused, resumed, stopped and started again; problems can be added in any state; the database is written only at milestones (works with or without the parallel plugin).
+Training Mode: named, long-lived Training episodes of many problems over many seeds (Training Mode Sessions), each with its own Episodic Memory that no route clears (never Metacat Mode's). A Training Mode Session is created Stopped and is started, paused, resumed, stopped and started again; problems can be added in any state; the database is written only at milestones (works with or without the parallel plugin). A problem with `multi_turn: true` makes each of its runs a chat: a turn is one engine run, and when a turn answers the run waits (holding no worker) for the teacher's next input, `POST .../runs/{seed}/input` with `{turn, text}` or `{turn, end: true, label?}` (409 `stale` for a duplicate, late or wrong-turn call). `GET .../runs/{seed}` returns the run's whole conversation: for each turn its context (1st position), second string, input (3rd) and the response Petacat constructed (4th), who supplied each, its codelets, end reason and `evidence`, and for the run whether it is running, waiting for the input of turn `waiting_for` or ended. The next turn's context is the turn's context, second string and input joined with single spaces, its second string is the turn's response, and its input is the one supplied. A client follows along by polling.
 
 | Method | Path | Purpose |
 |---|---|---|
@@ -96,6 +96,8 @@ Training Mode: named, long-lived Training episodes of many problems over many se
 | `GET` | `/api/training-mode/sessions/{session_id}/problems/{problem_id}` | Get Problem |
 | `POST` | `/api/training-mode/sessions/{session_id}/problems/{problem_id}/cancel` | Cancel Problem |
 | `GET` | `/api/training-mode/sessions/{session_id}/problems/{problem_id}/runs` | Problem Runs |
+| `GET` | `/api/training-mode/sessions/{session_id}/problems/{problem_id}/runs/{seed}` | Run Conversation |
+| `POST` | `/api/training-mode/sessions/{session_id}/problems/{problem_id}/runs/{seed}/input` | Supply Input |
 | `POST` | `/api/training-mode/sessions/{session_id}/resume` | Resume |
 | `GET` | `/api/training-mode/sessions/{session_id}/slipnet` | Session Slipnet |
 | `POST` | `/api/training-mode/sessions/{session_id}/start` | Start |

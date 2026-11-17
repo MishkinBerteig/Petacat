@@ -27,6 +27,7 @@ that key before the change API sees the op. A Standard change that breaks any ot
 2. Link types a configuration creates, and `adjacent` (the link type, `plato-adjacent`, the `bottom-up-bond-scout` override).
 3. A session keeps what it saw side by side: `propose_ops`, `noticings`, fractional link lengths, `plato-adjacent` at depth 45 (stage A); `consolidator`, its rule, its triggers and its five parameters (stage B); the association read from a link length clipped to 0 to 100 (stage C); a pair's `adjacent` link that approaches 0 asymptotically, through the change API's multiplying op `scale` (stage D).
 4. In-run building (stage A): `apply_ops` builds links in the run's own Slipnet (`add_link`, `scale` and `adjust` of a link's length); a body proposes a change to the run's Slipnet for an instantiator (`propose_ops(ops, built_by=..., urgency=...)`, `take_proposed_ops`); `consolidator` proposes and three new codelet types build: `adjacent-instantiator`, `category-instantiator` and `instance-of-instantiator`; `symbol-scout` is renamed `novel-string-scout` and `symbol-builder` `node-instantiator`, with their behaviour unchanged.
+5. Multi-turn runs (stage B): a `multi_turn` problem's run is a chat of turns, each one engine run, joined by the sliding window and a teacher's inputs. It lives in the session service, the executors and the API, and adds nothing to the Base: no node, link type, category, codelet type, posting rule or parameter.
 
 ## What v2.0 adds so far
 
@@ -136,8 +137,10 @@ such an `adjust` would overshoot; factors commute, so the runs compose in any or
 can differ in the last bits (the tests allow a relative error of 1e-12). A link length can be a fraction (89.9375) and a whole
 one stays an `int`, so a configuration's hash and JSON print `90`, never `90.0`.
 
+Multi-turn runs (stage B of the fourth increment) change nothing in the Base: a turn is one engine run, so the window's joined strings (a space between the strings of the context) meet the Base as any text does, the space getting a node of its own through `novel-string-scout` and `node-instantiator`, and what a turn builds is in the session's configuration before the next turn is dispatched.
+
 On a context-response analogy problem made of letters the v2.0 Base is no longer the Standard run for run: two neighbours with no link between them (`a` and
 `c`) can now bond. An `adjacent` bond is weak (see the intrinsic link length above), so few are built.
 
 Not yet here: `slipnet_rounds_to_whole`, an `adjacent` group category, a floor on a stored link length (a pair's link has none, though
-its asymptotic length does not reach 0; the association read from any length is clipped to 0 to 100, so a length of 0 or less reads as 100 and one of 100 or more as 0, and the stored length stays as it is), anything for an `adjacent` bond with a group at an end, multi-turn runs, a held proposal for a node (only links are held), and the speculative executor's support for links and nodes built in a run (`apply_ops` is a BARRIER there).
+its asymptotic length does not reach 0; the association read from any length is clipped to 0 to 100, so a length of 0 or less reads as 100 and one of 100 or more as 0, and the stored length stays as it is), anything for an `adjacent` bond with a group at an end, a held proposal for a node (only links are held), and the speculative executor's support for links and nodes built in a run (`apply_ops` is a BARRIER there).

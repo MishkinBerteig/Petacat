@@ -19,6 +19,12 @@ Conceptual State (``settings.configuration_base`` plus ``settings.parameters`` f
 creation); every summary carries its ``configuration`` block, and every run its
 ``configuration_revision``, ``episode_version`` and ``config_hash``.
 
+A problem with ``multi_turn`` makes each run a chat: ``GET /{id}/problems/{pid}/runs/{seed}`` returns its whole
+conversation (every turn's context, second string, input and response, and whether the run is running, waiting
+for the input of turn ``waiting_for``, or ended), and ``POST .../runs/{seed}/input`` is the teacher's entrance
+(``{turn, text}`` or ``{turn, end: true, label?}``; 409 ``stale`` unless it is the exact next input of a waiting
+run).  A client follows along by polling.
+
 The routes work with or without the parallel plugin: without it the runs execute serially
 in one child process, with identical results.
 """
@@ -55,12 +61,41 @@ class ProblemInput(BaseModel):
     answer: str | None = None
     seeds: int | None = Field(default=None, ge=1, le=MAX_SEEDS_PER_PROBLEM)
     tag: Any = None
+    #: Each run of the problem is a chat: when a turn answers, the run waits for the teacher's next input
+    #: (``POST .../runs/{seed}/input``), and the next turn's strings come from the window.  A multi-turn
+    #: problem has no ``answer``: Petacat constructs the response of every turn.
+    multi_turn: bool = False
 
     @model_validator(mode="after")
     def _problem_text(self) -> "ProblemInput":
         # Refuses only the empty string (initial, modified, target; an answer is null or
         # non-empty), U+0000 and a lone surrogate; every other string is valid.
         check_problem(self.initial, self.modified, self.target, self.answer, require_nonempty=True)
+        if self.multi_turn and self.answer is not None:
+            raise ValueError("a multi-turn problem has no answer: Petacat constructs the response of every turn")
+        return self
+
+
+class RunInputRequest(BaseModel):
+    """The teacher's call: the input of turn ``turn`` (``text``), or the end of the run (``end``)."""
+
+    model_config = {"extra": "forbid"}
+    #: The number of the turn the input is for: the run's finished turns plus one (``waiting_for``).
+    turn: int = Field(ge=1)
+    #: The next turn's input: any text, kept exactly; empty is refused (send ``end``, or send nothing).
+    text: str | None = None
+    #: End the run instead; ``label`` is kept on its last turn.
+    end: bool = False
+    label: str | None = None
+
+    @model_validator(mode="after")
+    def _one_of(self) -> "RunInputRequest":
+        if (self.text is None) == (not self.end):
+            raise ValueError("send either text (the next input) or end: true")
+        if self.text is not None:
+            check_string("text", self.text)
+        if self.label is not None:
+            check_string("label", self.label)
         return self
 
 
@@ -208,6 +243,27 @@ async def problem_runs(session_id: int, problem_id: int) -> dict[str, Any]:
     return {"runs": await _call(_service().problem_runs(session_id, problem_id))}
 
 
+@router.get("/{session_id}/problems/{problem_id}/runs/{seed}")
+async def run_conversation(session_id: int, problem_id: int, seed: int) -> dict[str, Any]:
+    """One run as a chat: every turn in order (its context, second string, input and the response Petacat
+    constructed; who supplied each; its status, codelets, end reason and ``evidence``), and the run's
+    ``state``: ``running`` a turn, ``waiting`` for the input of turn ``waiting_for`` (``accepts_input``
+    says it would be taken now) or ``ended`` (``end_reason``).  Poll it to follow along."""
+    return await _call(_service().conversation(session_id, problem_id, seed))
+
+
+@router.post("/{session_id}/problems/{problem_id}/runs/{seed}/input")
+async def supply_input(session_id: int, problem_id: int, seed: int, req: RunInputRequest) -> dict[str, Any]:
+    """The teacher's entrance: the input of the next turn of a waiting run (``{turn, text}``), or the end of
+    the run (``{turn, end: true, label?}``).  ``turn`` is the number of the turn the input is for
+    (``waiting_for``).  Returns the run's conversation.  409 ``stale`` for a duplicate or late call, a run
+    that is not waiting and the wrong turn; 409 when the session is Stopped, Starting or Stopping; 404 for
+    an unknown problem or seed; 422 for an empty input.  An input given while the session is Paused is kept
+    and dispatched on Resume."""
+    return await _call(_service().supply_input(
+        session_id, problem_id, seed, req.turn, req.text, end=req.end, label=req.label))
+
+
 @router.post("/{session_id}/problems/{problem_id}/cancel")
 async def cancel_problem(session_id: int, problem_id: int) -> dict[str, Any]:
     """Drop a problem's remaining seeds; the runs already finished are kept."""
@@ -348,7 +404,7 @@ async def delete_session(session_id: int) -> None:
 PROBLEM_COLUMNS = [
     "id", "initial", "modified", "target", "answer", "seeds", "seed_start", "status",
     "runs_done", "errors", "capped", "mean_codelets", "top_answer", "top_fraction", "none_fraction",
-    "distinct", "finished_seq", "added_at", "started_at", "finished_at", "tag",
+    "distinct", "finished_seq", "added_at", "started_at", "finished_at", "tag", "multi_turn",
 ]
 DISTRIBUTION_COLUMNS = [
     "problem_id", "initial", "modified", "target", "answer_key", "count", "fraction",

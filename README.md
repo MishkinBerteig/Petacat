@@ -28,7 +28,7 @@ license change was authorised by Dr. Marshall directly (see
 > end-to-end. Episodic Memory (Metacat-Mode learning) shapes the runs that inherit it: a run
 > declines an answer already held for the same problem and rules, so repeating a
 > problem across Metacat Mode's [episodic runs](#persistence-modes-and-episodic-runs)
-> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 7,273 test cases covering the engine, the API, and the
+> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 7,305 test cases covering the engine, the API, and the
 > help/config system, run on both the CPU and the GPU numeric backends. Underneath the seven components sits an execution
 > substrate — three [persistence modes](#persistence-modes-and-episodic-runs),
 > a [GPU numeric substrate](#the-numeric-substrate), and
@@ -102,7 +102,11 @@ machine-learning platform:
   (`propose_ops`), the in-worker learner submits every one of them, a link length can be a fraction, each Slipnet node holds a
   `noticings` count, and the v2.0 Base's `consolidator` codelet uses all of it: a symbol is noticed, counted, and connected to
   the symbols it was seen beside. See [The v2.0 milestone](#the-v20-milestone).
-- **Not built:** the rest of v2.0's two ideas (see [The v2.0 milestone](#the-v20-milestone)): multi-turn runs. The after-run seam (`set_after_run`, a call to the change API after each run) stays,
+- **Fourth increment of v2.0, in progress:** a run builds Slipnet structure as it goes (stage A), and **multi-turn runs**
+  (stage B): a problem with `multi_turn: true` makes each of its runs a chat. A turn is one engine run, a turn that answers
+  makes the run wait for the teacher's next input (holding no worker), and the next turn's strings come from the sliding
+  window. See [Multi-turn runs](#multi-turn-runs-chats). Still to come: the chat client in the GUI and the benchmark.
+- **Not built:** the chat client in the GUI, and the benchmark. The after-run seam (`set_after_run`, a call to the change API after each run) stays,
   beside the in-worker learner.
 
 A Training Mode Session never reads or writes Metacat Mode's Episodic Memory, Slipnet or configuration.
@@ -142,10 +146,10 @@ What is available today:
    the sliding-window sense of [FUTURE_DIRECTION_DETAILS.md](FUTURE_DIRECTION_DETAILS.md) §8 (the
    turn recurrence).
 
-A **turn** is something that happens inside a single run. Today every single run with the fourth
-spot open (`abc -> abd; xyz -> ?`) is one turn; with the sliding window, a single run of a
-Training Mode Session will have many turns. A Training episode holds many runs, and a run holds
-one or more turns. Metacat Mode's runs stay single-turn.
+A **turn** is something that happens inside a single run. Every single run with the fourth
+spot open (`abc -> abd; xyz -> ?`) is one turn. A run of a `multi_turn` problem in a Training Mode Session has
+many turns, each one engine run, joined by the sliding window (see [Multi-turn runs](#multi-turn-runs-chats)). A Training episode holds many
+runs, and a run holds one or more turns. Metacat Mode's runs stay single-turn.
 
 What exists is the ground: any UTF-8 text as input in Training Mode (Metacat Mode reads problems through Metacat's input parser), the configuration in the
 database, the one change API and journal, and a Training Mode Session that runs its own evolving
@@ -197,8 +201,9 @@ still holds, as a Metacat builder does, or fizzles. What is still held when the 
 `instance-of-instantiator` build them (see `training_base/v2.0/README.md`). `adjacent-instantiator` builds a pair's `adjacent` link only if no other link, of any type and in either direction, joins the two nodes in the run's Slipnet (the user's rule, 2026-11-16). `symbol-scout` and `symbol-builder` are renamed
 `novel-string-scout` and `node-instantiator`, with their behaviour unchanged. Training Mode problems are called **context-response analogy problems**; a `1` in the text is never matched to `plato-one`
 (the Slipnet's number nodes are counts of things, and a symbol gets a node of its own).
+Multi-turn runs are built (see [Multi-turn runs](#multi-turn-runs-chats)); the chat client and the benchmark are not.
 Not built yet: the speculative executor's support for nodes and links built in a run
-(`apply_ops` is a barrier there, and no session reaches the speculative executor), and multi-turn runs.
+(`apply_ops` is a barrier there, and no session reaches the speculative executor).
 
 [metacat]: http://science.slc.edu/~jmarshall/metacat/
 [marshall]: http://science.slc.edu/~jmarshall/
@@ -531,7 +536,7 @@ Petacat has two test suites:
   plugin against the serial runs it claims to equal), `lockstep` (Petacat's decision
   traces against Metacat's), and `e2e` (full HTTP
   stack against a running database). All eight run in a single command against
-  the local Postgres — 7,273 cases, which includes the numeric matrix's second
+  the local Postgres — 7,305 cases, which includes the numeric matrix's second
   pass over the 1394 backend-sensitive tests. See
   [TESTING.md](TESTING.md) for the layer breakdown, the numeric backend matrix,
   the session ceiling, the unit-test rules, determinism requirements, test-double
@@ -1363,7 +1368,7 @@ A Training Mode Session is **Stopped**, **Starting**, **Running**, **Paused** or
   It only reads: a failed Start leaves the session Stopped exactly as it was (500).
 - **Stop** (`POST /api/training-mode/sessions/{id}/stop`) is the save point. The session is Stopping while
   the runs in flight are allowed a short drain time to finish and merge (the rest are discarded and their
-  seeds run again after the next start); then everything the session produced (its problems, runs,
+  seeds run again after the next start); then everything the session produced (its problems, runs, turns,
   Episodic Memory and a snapshot of it, and its configuration's journal entries and current state) is written in **one
   transaction** and the live part is dropped. If that write fails nothing is written, the session returns
   to **Paused** with its memory intact, `last_event` says why, and Stop may be retried (500).
@@ -1375,14 +1380,62 @@ A Training Mode Session is **Stopped**, **Starting**, **Running**, **Paused** or
 - **Cancel** (`POST /api/training-mode/sessions/{id}/cancel`) is an action, not a state. It cancels every
   queued and in-flight problem, keeps the finished runs and changes no state; problems can be
   added afterwards. There are no `closed` or `cancelled` Training Mode Sessions, and no `close` route.
-- **Inside Running** the summary's `activity` is `idle` (nothing left to run) or `stalled`
-  (the current engine configuration cannot start a run; `stalled_reason` says why) and is `null`
-  while there is work.
+- **Inside Running** the summary's `activity` is `idle` (nothing left to run), `stalled`
+  (the current engine configuration cannot start a run; `stalled_reason` says why) or `waiting` (every
+  run that is left is waiting for the teacher's next input, so no worker is busy; `runs.waiting` counts them),
+  and is `null` while there is work.
 - **Delete** removes everything: the Episodic Memory, the problems and runs and, for a live
   Training Mode Session, its live state (discarded with no Stop write). It leaves no tombstone.
 - **A graceful server shutdown** refuses new Starts and Stops every live session (`stop_reason`
   `shutdown`), several at a time. A shutdown that cannot finish in time loses the sessions it did not reach
   back to their last Stop, exactly as a crash does, and logs which ones and how much.
+
+### Multi-turn runs (chats)
+
+A problem with `multi_turn: true` (default `false`; it takes no `answer`) makes each of its runs a **chat**, the way
+the v2.0 milestone's second idea works. Its positions are named for what they are: the 1st is the **context**, the 3rd
+the **input**, and the 4th, which Petacat constructs, the **response**.
+
+- **A turn is one engine run**, a pure function of the session's configuration and Episodic Memory when it is
+  dispatched, the strings of its four positions, the run's seed and the turn number. Turn 1 uses the run's seed, so a
+  single-turn problem is exactly the run it always was; turn `n >= 2` uses `turn_seed(seed, n)` (the first eight bytes of
+  SHA-256 over `petacat-turn:<seed>:<n>`, low 63 bits; `server/services/turn_record.py`). Each turn starts a fresh Workspace
+  and Slipnet from the configuration, and is one `finish_run`: its memory merge and its in-worker learner batch land
+  before the next turn is dispatched, so later turns (and every other run) start under what earlier ones built.
+- **The window.** If a turn answers, the run **waits** for input and holds no worker. When the input arrives, the
+  next turn's context is the turn's context, second string and input joined with single spaces (U+0020), its second string
+  is the turn's response, and its input is the new one: `one:two::1:? => one two 1:2::3:?`. The space is a symbol like any
+  other (perception gives it a node of its own, through `novel-string-scout` and `node-instantiator`), nothing is trimmed or
+  normalised, and no length is limited.
+- **A turn with no answer** (gave up, or halted at `max_codelets`) **ends the run**; its proposals still apply. **The
+  teacher ends a run** with `end` and an optional label; a run nobody ends waits, with no limit on turns or window.
+- **The teacher** has one service door, `supply_input(session, problem, seed, turn, text | end)`, and two entrances:
+  `POST .../runs/{seed}/input` with `{turn, text}` or `{turn, end: true, label?}`, and, in process,
+  `set_teacher(session_id, fn)`, where `fn(conversation)` returns the next input (a string), `{"end": True, "label": ...}`
+  or `None` (the run waits); a teacher that raises or returns something the service refuses leaves the run waiting, with a
+  diagnostic. `turn` is the number of the turn the input is for (`waiting_for`); a duplicate, late or wrong-turn call, or one
+  for a run that is not waiting, is 409 `stale`. `scripts/session_client.py --teacher SERIES.json` drives a series file over
+  HTTP. A **series file** is plain JSON: `{"problems": [{"initial": "abc", "modified": "abd", "target": "ijk", "seeds": 5,
+  "inputs": ["xyz", "mno"], "end_label": "series over"}]}`, where `inputs` are the inputs of turns 2, 3, ... for every run of that
+  problem, after which the script ends the run (with `end_label`, optional); the script creates the session from the file's
+  problems (each multi-turn), starts it, follows by polling, and with `--out FILE` writes every run's conversation.
+- **The conversation.** `GET .../runs/{seed}` returns every turn in order (context, second string, input and response, who
+  supplied each, status, codelets, end reason, `evidence`) and the run's `state` (`running`, `waiting` for the input of turn
+  `waiting_for`, or `ended`: `single-turn`, `no-answer`, `teacher` with its label, `error` or `cancelled`). A client follows
+  along by polling; there is no push channel. `evidence` is a small summary of what the turn's Workspace built: its bonds and groups
+  by category, the rule the answer used, its snags, and how many symbols were still unperceived (a turn blocked on perception
+  is told apart from a cognitive give-up).
+- **Waiting is per run, not a session state.** Pause stops dispatch (an input that arrives while Paused is kept and
+  dispatched on Resume). Stop writes every waiting run with its turns to `training_mode_session_turns`, one row per turn
+  keyed by session, problem, seed and turn, and Start restores it; a turn dispatched but not finished at Stop is run
+  again from its stored strings (a `pending` row). A run is one outcome of its problem: its last turn's answer, with the
+  codelets summed.
+- **Every computation option.** A turn's outcome is identical on the serial child, the swarm and in process, on the
+  numeric backends `off`, `python` and `numpy`, given the same configuration and Episodic Memory to start from. What a turn
+  starts from depends on the order in which the session's turns finished before it. The serial child and a one-worker swarm,
+  driven by `set_teacher`, finish them in the same order. A swarm with more workers finishes them in another order, as it
+  already does for single-turn runs, and so does a teacher that answers over HTTP while other runs go on. The speculative
+  executor is not offered inside sessions.
 
 ### The Episodic Memory
 
@@ -1503,7 +1556,9 @@ worker, and the speculative executor is not yet available to Training Mode Sessi
 | POST | `/api/training-mode/sessions/{id}/problems` | Add problems, in any state |
 | GET | `/api/training-mode/sessions/{id}/problems` | Search, sort and page the problems |
 | GET | `/api/training-mode/sessions/{id}/problems/{pid}` | One problem with its full answer distribution |
-| GET | `/api/training-mode/sessions/{id}/problems/{pid}/runs` | Its runs in seed order, with `seq` and `memory_version` |
+| GET | `/api/training-mode/sessions/{id}/problems/{pid}/runs` | Its runs in seed order, with `seq` and `memory_version`, and each run's `state` (`ended`, or for a multi-turn run still going `running` or `waiting`), `turns` and `end_reason` |
+| GET | `/api/training-mode/sessions/{id}/problems/{pid}/runs/{seed}` | One run's whole conversation: every turn's context, second string, input and response, its codelets, end reason and `evidence`, and whether the run is running, waiting for input (`waiting_for`) or ended |
+| POST | `/api/training-mode/sessions/{id}/problems/{pid}/runs/{seed}/input` | The teacher's entrance: `{turn, text}` (the next turn's input) or `{turn, end: true, label?}`; 409 `stale` unless it is the exact next input of a waiting run |
 | POST | `/api/training-mode/sessions/{id}/problems/{pid}/cancel` | Cancel one problem, keeping its finished runs |
 | GET | `/api/training-mode/sessions/{id}/finished` | Problems finished after a cursor; `wait` (up to 60 s) long-polls |
 | GET | `/api/training-mode/sessions/{id}/memory` | The Training Mode Session's Episodic Memory (read-only), in the shape `GET /api/memory` uses |

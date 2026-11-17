@@ -1,8 +1,8 @@
 """Training Mode Sessions: named, long-lived, database-backed episodes of many problems over many seeds.
 
-A Training Mode Session holds letter-string problems.  Each problem runs over a number of seeds on every
-core, and problems can be inserted into a Training Mode Session while it runs (start with 25, add 5 more
-whenever problems finish).  It is the mode a future ML layer drives.
+A Training Mode Session holds context-response analogy problems (made of letters, or any Unicode text).  Each
+problem runs over a number of seeds on every core, and problems can be inserted into a Training Mode Session
+while it runs (start with 25, add 5 more whenever problems finish).  It is the mode a future ML layer drives.
 
 Exactness
 ---------
@@ -39,7 +39,8 @@ recording ``stopped_from`` (``running`` or ``paused``) and ``stop_reason`` (``us
 returns it to Paused with its memory intact.  ``cancel`` is an action, not a state: it
 cancels every queued and in-flight problem and changes no state.  Inside Running the
 activity is derived: ``idle`` (nothing unfinished) or ``stalled`` (it cannot run:
-``stalled_reason``).  Starting and Stopping are transient and refuse every mutation with
+``stalled_reason``) or ``waiting`` (every run that is left is a multi-turn run waiting for the teacher's
+input).  Starting and Stopping are transient and refuse every mutation with
 409 ``busy``.
 
 The database is written only when a session is Stopped
@@ -72,6 +73,27 @@ of problems already started first (so they finish steadily), then the oldest que
 problem, round-robin across sessions so a huge one cannot starve a small one.  Inserting
 a problem wakes it.  Nothing in its hot path (dispatch, merge, problem completion) reads
 or writes the database.
+
+Multi-turn runs (chats)
+-----------------------
+A problem with ``multi_turn`` makes each of its runs a chat (``turn_record`` holds the window, the turn seed and
+the evidence).  A **turn** is one engine run (one job to the executor), and each turn is one ``finish_run``: its
+memory merge and its in-worker learner batch land before the run's next turn is dispatched.  A turn that answers
+makes the run **wait**, holding no worker, for the teacher's next input; the input (or the end) arrives through
+``supply_input`` (the route) or ``set_teacher`` (in process), both of which come to ``_apply_input``; the next turn's
+strings are ``turn_record.next_window`` of the turn that answered and the input.  A turn with no answer, an error, or the
+teacher's end ends the run; only then is the run one outcome (``RunRec``) of its problem, so a problem finishes
+when every run has ended and a session whose only unfinished runs are waiting is ``waiting`` (the activity).
+A single-turn problem's run is the same machinery with one turn that ends it: it is exactly the run it always was.
+
+*Waiting is per run, not a session state.*  A ``LiveRun`` holds a run's turns since Start (or restored at Start),
+its ``pending`` turn (the strings of the turn that is queued or in flight) and its state (``running``, ``waiting``,
+``ended``).  A queued later turn is dispatched like a fresh seed (its seed goes back on its problem's ``todo``), so
+the retry, isolation and Stop paths need no case of their own.  Pause stops dispatch, and an input given while
+Paused is kept and dispatched on Resume.  The Stop write stores one row per turn of every run changed since Start
+(``training_mode_session_turns``), with a ``pending`` row for the turn that was queued or in flight; Start reads the
+rows of runs with no run row, queues each ``pending`` turn again from its stored strings and puts the others back
+to waiting.  ``set_teacher`` is consulted when a turn answers and, after a Start, for every run restored waiting.
 
 The session's own configuration
 -------------------------------
@@ -124,7 +146,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, AsyncIterator, Callable
 
-from sqlalchemy import case, cast, delete, false, func, insert, select, update
+from sqlalchemy import case, cast, delete, exists, false, func, insert, select, update
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -139,12 +161,13 @@ from server.models.journal import (
 )
 from server.models.training_mode_session import (
     SessionMemoryMerge, SessionMemorySnapshot, TrainingModeSession, TrainingModeSessionProblem,
-    TrainingModeSessionRun,
+    TrainingModeSessionRun, TrainingModeSessionTurn,
 )
 from server.services import config_document as cd
 from server.services import configuration_store as store
 from server.services import configurations, journal
 from server.services import training_mode_session_memory as tm
+from server.services import turn_record
 from server.services.problem_text import ProblemTextError, check_problem_mapping, check_string
 from server.services.session_live_config import ConfigRef, LiveConfiguration
 from server.services.training_mode_session_executor import (
@@ -204,6 +227,14 @@ class SessionError(Exception):
         super().__init__(detail)
         self.status = status
         self.detail = detail
+
+
+class StaleInput(SessionError):
+    """409 ``stale``: an input (or an end) for a run that is not waiting for that turn: a duplicate, a late
+    call, a run that has ended or never answered, or the wrong turn number."""
+
+    def __init__(self, detail: str) -> None:
+        super().__init__(409, f"stale: {detail}")
 
 
 def _busy(session_id: int, what: str, state: str) -> SessionError:
@@ -271,6 +302,78 @@ class RunRec:
     added_answers: int = 0
     added_snags: int = 0
     problem_id: int = 0
+
+
+@dataclass
+class TurnSpec:
+    """The four strings a turn runs on, before it has run: the turn number, its context, second string and
+    input, and who supplied the input.  Turn 1's are the problem's; a later turn's come from the window
+    (``turn_record.next_window``)."""
+
+    turn: int
+    context: str
+    second: str
+    input: str
+    input_from: str
+
+
+@dataclass
+class TurnRec:
+    """A finished turn (or, with ``status == "pending"``, one that is queued or in flight): one row of
+    ``training_mode_session_turns``.  ``answer`` is the Workspace's answer string; the **response** is it when
+    the turn's status is ``answer_found`` and it is not empty (:attr:`response`)."""
+
+    turn: int
+    turn_seed: int
+    context: str
+    second: str
+    input: str
+    input_from: str
+    status: str = "pending"
+    answer: str = ""
+    answers: list = field(default_factory=list)
+    answer_quality: float | None = None
+    codelets: int = 0
+    seconds: float = 0.0
+    temperature: float = 0.0
+    error: str | None = None
+    attempts: int = 1
+    end_reason: str | None = None
+    end_label: str | None = None
+    proposals: list = field(default_factory=list)
+    evidence: dict | None = None
+    seq: int | None = None
+    memory_version: int | None = None
+    configuration_revision: int | None = None
+    config_hash: str = ""
+    added_answers: int = 0
+    added_snags: int = 0
+
+    @property
+    def response(self) -> str | None:
+        """What Petacat constructed in the 4th position, or ``None`` when the turn gave no answer."""
+        return self.answer if self.status == STATUS_ANSWER_FOUND and self.answer else None
+
+
+@dataclass(eq=False)
+class LiveRun:
+    """One run (a problem at one seed) of a live session: its turns so far, and where it stands.
+
+    ``state`` is ``running`` (a turn is queued or in flight: ``pending`` holds its strings, except for turn 1,
+    which has none until it has run once), ``waiting`` (the last turn answered, and the run holds no worker
+    until the teacher sends the next input or ends it) or ``ended`` (``end_reason`` on the last turn says why).
+    A run exists in memory from its first finished turn."""
+
+    problem_id: int
+    seed: int
+    multi_turn: bool
+    turns: list = field(default_factory=list)
+    pending: TurnSpec | None = None
+    state: str = "running"
+
+    @property
+    def waiting_for(self) -> int | None:
+        return len(self.turns) + 1 if self.state == "waiting" else None
 
 
 def summarize(recs: list[RunRec]) -> dict[str, Any]:
@@ -346,11 +449,16 @@ class LiveProblem:
     seed_start: int
     tag: Any = None
     added_at: datetime = field(default_factory=_utcnow)
+    #: Each run is a chat: a turn per engine run while the teacher supplies inputs.
+    multi_turn: bool = False
+    #: Every run of the problem that has finished a turn since Start (or was restored at Start), by seed.
+    run_logs: dict = field(default_factory=dict)
     #: ``queued`` (which includes running: see ``started``), ``finished`` or ``cancelled``.
     status: str = "queued"
     #: The database holds a row for it (it existed at Start); otherwise the Stop write inserts it.
     stored: bool = False
-    #: Seeds not yet dispatched (a failed one goes back on the front).
+    #: Seeds with a turn not yet dispatched: a fresh seed (turn 1), or a run whose next turn is queued (its input
+    #: arrived, or it was put back by a failure or a Stop); a failed one goes back on the front.
     todo: deque = field(default_factory=deque)
     inflight: int = 0
     outcomes: dict[int, RunRec] = field(default_factory=dict)
@@ -388,6 +496,9 @@ class Sub:
     isolated: bool = False
     #: A Stop discarded it: its outcome is ignored when it arrives.
     dropped: bool = False
+    #: The turn this dispatch runs, and its strings.
+    turn: int = 1
+    spec: Any = None
     #: The configuration the run was dispatched under (a ``ConfigRef``'s revision and provider).
     configuration_revision: int | None = None
     provider: Any = None
@@ -457,6 +568,10 @@ class LiveSession:
     pending_runs: list = field(default_factory=list)   # RunRec committed in memory, not in the DB
     pending_merges: list = field(default_factory=list) # (seq, problem_id, seed, Additions)
     want_snapshot: set = field(default_factory=set)    # (pid, seed) whose worker needs one
+    #: Runs waiting for the teacher's next input (no worker held); runs changed since Start or the last
+    #: write, whose turn rows the Stop write stores.
+    waiting: int = 0
+    dirty_runs: set = field(default_factory=set)
 
     @property
     def meta(self) -> MetadataProvider | None:
@@ -570,6 +685,8 @@ class TrainingModeSessionService:
         #: The after-run seam, one optional callable per session (none ships): see
         #: :meth:`set_after_run`.
         self._after_run: dict[int, Callable[..., Any]] = {}
+        #: The teacher, one optional callable per session: see :meth:`set_teacher`.
+        self._teachers: dict[int, Callable[..., Any]] = {}
         #: Seconds a Stop waits for runs in flight before it discards them.
         self.drain_timeout = DRAIN_TIMEOUT
         #: Seconds a graceful shutdown waits for the live sessions to be stopped.
@@ -679,6 +796,7 @@ class TrainingModeSessionService:
             id=problem_id, session_id=lt.id, initial=get("initial"), modified=get("modified"),
             target=get("target"), answer=get("answer"), seeds=seeds, seed_start=seed_start,
             tag=get("tag"), added_at=get("added_at") or _utcnow(), stored=stored,
+            multi_turn=bool(get("multi_turn")),
         )
         if done:
             lp.outcomes.update(done)
@@ -740,16 +858,70 @@ class TrainingModeSessionService:
             )).scalars().all()
             for r in runs:
                 stored.setdefault(r.problem_id, {})[r.seed] = self._rec_from_row(r)
+        unfinished = await self._stored_unfinished_runs(s, t.id) if problems else {}
         for p in problems:
             lp = self._add_live_problem(lt, problem_id=p.problem_id, spec=p, stored=True,
                                         done=stored.get(p.problem_id))
             lt.errors_total += sum(1 for r in lp.outcomes.values() if r.error)
+            self._restore_runs(lt, lp, unfinished.get(p.problem_id, {}))
         totals = (await self._stored_totals(s, [t.id])).get(t.id, {})
         zero = (0,) * 7
         lt.base_fin, lt.base_can = totals.get("finished", zero), totals.get("cancelled", zero)
         lt.errors_total += lt.base_fin[3] + lt.base_can[3]
         await self._load_configuration(s, lt, t)
         return lt
+
+    @staticmethod
+    def _turn_from_row(r: Any) -> TurnRec:
+        return TurnRec(
+            turn=r.turn, turn_seed=r.turn_seed, context=r.context, second=r.second_string, input=r.input,
+            input_from=r.input_from, status=r.status, answer=r.answer or "", answers=list(r.answers or []),
+            answer_quality=r.answer_quality, codelets=r.codelets, seconds=r.seconds, temperature=r.temperature,
+            error=r.error, attempts=r.attempts, end_reason=r.end_reason, end_label=r.end_label,
+            proposals=list(r.proposals or []), evidence=r.evidence, seq=r.seq, memory_version=r.memory_version,
+            configuration_revision=r.configuration_revision, config_hash=r.config_hash,
+            added_answers=r.added_answers, added_snags=r.added_snags,
+        )
+
+    async def _stored_unfinished_runs(self, s: AsyncSession, session_id: int) -> dict[int, dict[int, list]]:
+        """The turn rows of the runs that have not ended (no run row yet): problem -> seed -> turns in order.
+        A run with a ``pending`` last row is run again from it; one whose last row answered is waiting."""
+        T, R = TrainingModeSessionTurn, TrainingModeSessionRun
+        rows = (await s.execute(
+            select(T).where(
+                T.session_id == session_id,
+                ~exists().where(
+                    R.session_id == T.session_id, R.problem_id == T.problem_id, R.seed == T.seed),
+            ).order_by(T.problem_id, T.seed, T.turn)
+        )).scalars().all()
+        out: dict[int, dict[int, list]] = {}
+        for r in rows:
+            out.setdefault(r.problem_id, {}).setdefault(r.seed, []).append(self._turn_from_row(r))
+        return out
+
+    def _restore_runs(self, lt: LiveSession, lp: LiveProblem, runs: dict[int, list]) -> None:
+        """Bring the unfinished runs of a problem back at Start: a run whose last turn was ``pending`` is
+        queued to run that turn again from its stored strings, and one whose last turn answered waits."""
+        for seed, turns in runs.items():
+            run = LiveRun(problem_id=lp.id, seed=seed, multi_turn=lp.multi_turn)
+            last = turns[-1]
+            if last.status == "pending":
+                run.turns = turns[:-1]
+                run.pending = TurnSpec(last.turn, last.context, last.second, last.input, last.input_from)
+                run.state = "running"
+                if seed in lp.todo:  # no outcome, so ``_add_live_problem`` queued it for turn 1
+                    lp.todo.remove(seed)
+                else:
+                    lt.unsubmitted += 1
+                lp.todo.appendleft(seed)  # a turn in progress is dispatched before a fresh seed
+            else:
+                run.turns = turns
+                run.state = "waiting"
+                if seed in lp.todo:  # no outcome, so ``_add_live_problem`` queued it for turn 1
+                    lp.todo.remove(seed)
+                    lt.unsubmitted -= 1
+                lt.waiting += 1
+            lp.run_logs[seed] = run
 
     @staticmethod
     async def _load_configuration(s: AsyncSession, lt: LiveSession, t: TrainingModeSession) -> None:
@@ -913,14 +1085,21 @@ class TrainingModeSessionService:
         self.task_memory_bytes[0] += blob
         self.task_memory_bytes[1] += 1
         fault = self.fault_hook(lp, seed, failures) if self.fault_hook else None
+        # The turn this dispatch runs: the next turn of a run that is part-way through (its strings come
+        # from the window, and it runs under ``turn_record.turn_seed``), else turn 1 of the problem.
+        run = lp.run_logs.get(seed)
+        spec = run.pending if run is not None and run.pending is not None else TurnSpec(
+            1, lp.initial, lp.modified, lp.target, turn_record.FROM_PROBLEM)
         # The task carries no parameter overrides: ``settings.parameters`` was folded into the
         # session's configuration at creation, and learning may have changed it since.
         task = SessionTask(
-            lp.initial, lp.modified, lp.target, lp.answer, seed, lt.max_codelets,
+            spec.context, spec.second, spec.input, lp.answer if spec.turn == 1 else None,
+            turn_record.turn_seed(seed, spec.turn), lt.max_codelets,
             None, lt.backend, memory=ref, fault=fault,
         )
         sub = Sub(lt, lp, seed, ref.version, cref.config_hash, failures, isolated,
-                  configuration_revision=cref.configuration_revision, provider=cref.provider)
+                  configuration_revision=cref.configuration_revision, provider=cref.provider,
+                  turn=spec.turn, spec=spec)
         lt.inflight_subs.add(sub)
         self._inflight_runs += 1
         if isolated:
@@ -1017,17 +1196,16 @@ class TrainingModeSessionService:
         self.wake()
 
     def _record(self, sub: Sub, o: Any) -> None:
+        """A turn finished: its one ``finish_run`` entry, its turn row, and what happens to the run.
+
+        The turn's memory merge and its in-worker learner batch land here, before anything of the run is
+        dispatched again, so the run's later turns (and every other run) start under what this turn left.
+        A turn that answers, in a multi-turn problem, makes the run wait for input (no worker held) and
+        consults the session's teacher; any other turn ends the run (``_end_run``)."""
         lt, lp = sub.lt, sub.lp
         lp.inflight -= 1
         if lp.cancelled or lt.cancelled:
             return  # the problem was cancelled while this run was in flight: dropped
-        rec = RunRec(
-            seed=o.seed, status=o.status, key=run_key(o, lt.max_codelets), answer=o.answer,
-            answers=list(o.answers), codelets=o.codelets, seconds=o.seconds,
-            temperature=o.temperature, answer_quality=o.answer_quality, error=o.error,
-            config_hash=sub.config_hash, attempts=sub.failures + 1, problem_id=lp.id,
-            memory_version=sub.version, configuration_revision=sub.configuration_revision,
-        )
         blob = o.additions
         adds = pickle.loads(blob) if blob else tm.Additions()
         # Entries, in completion order (the scheduler is one thread of control, so this is the
@@ -1036,36 +1214,226 @@ class TrainingModeSessionService:
         # after-run seam, if one is set and returned ops, is a second entry straight after,
         # so the journal names the learning source of every op (``learner:in-worker``
         # and ``learner:after-run``).  With no proposals the seam's batch rides the run-finish
-        # entry as it always did.
-        proposed = self._proposal_batch(o)
+        # entry as it always did.  The entry's run is the run's own seed, whatever turn it is.
+        proposed = self._proposal_batch(o, seed=sub.seed, turn=sub.turn)
         seam = self._learner_batch(sub, o)
         finished = lt.config.finish_run(
             memory_merge=lambda: tm.apply_merge(lt.memory, adds),
             batch=proposed if proposed is not None else seam,
-            run=(lp.id, o.seed), started_revision=sub.configuration_revision,
+            run=(lp.id, sub.seed), started_revision=sub.configuration_revision,
             learner=IN_WORKER_LEARNER if proposed is not None else AFTER_RUN_LEARNER,
         )
         n_a, n_s = finished.memory
         if proposed is not None and seam is not None:
             second = lt.config.finish_run(
-                memory_merge=None, batch=seam, run=(lp.id, o.seed),
+                memory_merge=None, batch=seam, run=(lp.id, sub.seed),
                 started_revision=sub.configuration_revision, learner=AFTER_RUN_LEARNER,
             )
             lt.version = second.version
         else:
             lt.version = finished.version
-        merged_at = finished.version  # the entry that holds this run's memory merge
-        rec.seq, rec.added_answers, rec.added_snags = merged_at, n_a, n_s
+        merged_at = finished.version  # the entry that holds this turn's memory merge
         lt.merge_blobs[merged_at] = blob or tm.dump_additions(adds)
         lt.merge_blobs.pop(merged_at - MERGE_KEEP, None)
-        lt.pending_merges.append((merged_at, lp.id, o.seed, adds))
-        lp.outcomes[o.seed] = rec
-        lp.failures.pop(o.seed, None)
+        lt.pending_merges.append((merged_at, lp.id, sub.seed, adds))
+        spec = sub.spec
+        turn = TurnRec(
+            turn=sub.turn, turn_seed=o.seed, context=spec.context, second=spec.second, input=spec.input,
+            input_from=spec.input_from, status=o.status, answer=o.answer, answers=list(o.answers),
+            answer_quality=o.answer_quality, codelets=o.codelets, seconds=o.seconds,
+            temperature=o.temperature, error=o.error, attempts=sub.failures + 1,
+            proposals=[dict(p) for p in (getattr(o, "proposals", None) or ())],
+            evidence=getattr(o, "evidence", None), seq=merged_at, memory_version=sub.version,
+            configuration_revision=sub.configuration_revision, config_hash=sub.config_hash,
+            added_answers=n_a, added_snags=n_s,
+        )
+        run = lp.run_logs.get(sub.seed)
+        if run is None:
+            run = lp.run_logs[sub.seed] = LiveRun(lp.id, sub.seed, lp.multi_turn)
+        run.turns.append(turn)
+        run.pending = None
+        lt.dirty_runs.add(run)
+        lp.failures.pop(sub.seed, None)
+        if lp.multi_turn and turn.response is not None and not o.error:
+            run.state = "waiting"
+            lt.waiting += 1
+            self._consult_teacher(lt, lp, run)
+            return
+        if o.error:
+            reason = turn_record.END_ERROR
+        elif turn.response is None:
+            reason = turn_record.END_NO_ANSWER
+        else:
+            reason = turn_record.END_SINGLE_TURN
+        self._end_run(lt, lp, run, reason)
+
+    @staticmethod
+    def _turn_key(t: TurnRec, max_codelets: int) -> str:
+        """The outcome key of a turn (``run_key``'s rule, on a turn)."""
+        if t.error:
+            return ERROR_KEY
+        if t.response is not None:
+            return t.answer
+        if t.codelets >= max_codelets:
+            return CAP_KEY
+        return NONE_KEY
+
+    def _end_run(self, lt: LiveSession, lp: LiveProblem, run: LiveRun, reason: str,
+                 label: str | None = None) -> None:
+        """The run ends: its last turn carries the reason (and the teacher's label), and, unless the problem
+        was cancelled, the run is one outcome of its problem.
+
+        The run's outcome is its last turn's (status, key, answer, answers, temperature, quality), with the
+        codelets, seconds and Episodic Memory additions summed over its turns, the first turn's configuration
+        and episode version (what the run started from) and the last turn's merge order.  For a single-turn
+        run that is exactly the one turn."""
+        last, first = run.turns[-1], run.turns[0]
+        last.end_reason, last.end_label = reason, label
+        if run.state == "waiting":
+            lt.waiting -= 1
+        run.state, run.pending = "ended", None
+        lt.dirty_runs.add(run)
+        if reason == turn_record.END_CANCELLED:
+            return
+        cap = lt.max_codelets
+        rec = RunRec(
+            seed=run.seed, status=last.status, key=self._turn_key(last, cap), answer=last.answer,
+            answers=list(last.answers), codelets=sum(t.codelets for t in run.turns),
+            seconds=sum(t.seconds for t in run.turns), temperature=last.temperature,
+            answer_quality=last.answer_quality, error=last.error, config_hash=first.config_hash,
+            attempts=max(t.attempts for t in run.turns), problem_id=lp.id,
+            memory_version=first.memory_version, configuration_revision=first.configuration_revision,
+            seq=last.seq, added_answers=sum(t.added_answers for t in run.turns),
+            added_snags=sum(t.added_snags for t in run.turns),
+        )
+        lp.outcomes[run.seed] = rec
         lt.pending_runs.append(rec)
         lt.note_completion()
         if len(lp.outcomes) >= lp.seeds and lp.status == "queued":
             self._finish_problem(lt, lp, "finished")
         self._apply_error_policy(lt, lp, rec)
+
+    # -- the teacher: the input of a multi-turn run's next turn ---------------------------------------
+
+    def set_teacher(self, session_id: int, teacher: Callable[[dict[str, Any]], Any] | None) -> None:
+        """Set (or, with ``None``, remove) a session's teacher: one callable per session, in process.
+
+        When a turn of a multi-turn run answers (and, after a Start, for every run still waiting) the
+        scheduler calls ``teacher(conversation)`` with the run's conversation exactly as
+        ``GET .../runs/{seed}`` returns it (the problem, the seed, every turn so far with its response, and
+        ``waiting_for``, the number of the turn the input is for).  It returns
+
+        * a ``str``: the next turn's input (empty is refused, as everywhere),
+        * ``{"end": True, "label": <text or None>}``: the teacher ends the run, or
+        * ``None``: nothing yet, and the run keeps waiting for ``supply_input`` (the route).
+
+        It runs on the scheduler, synchronously and between runs: it must be quick and must not wait for
+        anything.  A teacher that raises, returns something else, or returns an input the service refuses
+        never fails its run: the run keeps waiting, a diagnostic is kept on the session's configuration
+        (``teacher_raised``, ``teacher_malformed`` or ``teacher_refused``) and ``last_event`` says so.  The
+        teacher may be set before the session is started and lasts until it is removed or the session is
+        deleted."""
+        if teacher is None:
+            self._teachers.pop(session_id, None)
+        else:
+            self._teachers[session_id] = teacher
+
+    def _consult_teacher(self, lt: LiveSession, lp: LiveProblem, run: LiveRun) -> None:
+        teacher = self._teachers.get(lt.id)
+        if teacher is None or run.state != "waiting":
+            return
+        where = (lp.id, run.seed)
+        turn = run.waiting_for
+        try:
+            said = teacher(self._conversation_live(lt, lp, run))
+        except Exception as exc:  # noqa: BLE001 - a teacher never fails its run
+            lt.config.diagnose("teacher_raised", f"{type(exc).__name__}: {exc}", run=where)
+            lt.last_event = f"the teacher raised on problem {lp.id} seed {run.seed}: the run keeps waiting"
+            return
+        if said is None:
+            return
+        try:
+            if isinstance(said, str):
+                self._apply_input(lt, lp, run.seed, turn, said, False, None, turn_record.FROM_TEACHER)
+            elif isinstance(said, dict) and said.get("end") is True and set(said) <= {"end", "label"}:
+                self._apply_input(lt, lp, run.seed, turn, None, True, said.get("label"), turn_record.FROM_TEACHER)
+            else:
+                lt.config.diagnose(
+                    "teacher_malformed", "the teacher must return a string, {'end': True, 'label': ...} or None",
+                    run=where)
+        except SessionError as exc:
+            lt.config.diagnose("teacher_refused", exc.detail, run=where)
+            lt.last_event = f"the teacher's reply for problem {lp.id} seed {run.seed} was refused: {exc.detail}"
+
+    def _apply_input(self, lt: LiveSession, lp: LiveProblem, seed: int, turn: Any, text: Any, end: bool,
+                     label: Any, supplier: str) -> None:
+        """Take the input (or the end) of the run's next turn: the one place both entrances come to.
+
+        Refused: a malformed call (422), a seed the problem does not have (404), and anything but the exact
+        next input of a waiting run (409 ``stale``: a duplicate, a late call, a run that is not waiting, the
+        wrong turn).  An input becomes the next turn's strings (``turn_record.next_window``) and the run's seed
+        is queued; the turn is dispatched when the session is Running (an input given while it is Paused
+        waits for Resume)."""
+        if not isinstance(turn, int) or isinstance(turn, bool) or turn < 1:
+            raise SessionError(422, "turn must be a whole number from 1: the number of the turn the input is for")
+        if end:
+            if label is not None:
+                if not isinstance(label, str):
+                    raise SessionError(422, "label must be text")
+                self._check_text("label", label)
+        else:
+            if not isinstance(text, str):
+                raise SessionError(422, "an input is text (or the call ends the run)")
+            if text == "":
+                raise SessionError(422, "input must not be empty: send end, or leave the run waiting")
+            self._check_text("input", text)
+        if not lp.seed_start <= seed < lp.seed_start + lp.seeds:
+            raise SessionError(404, f"problem {lp.id} has no run with seed {seed}")
+        run = lp.run_logs.get(seed)
+        if run is None or run.state != "waiting":
+            state = "has not answered a turn yet" if run is None else f"is {run.state}"
+            raise StaleInput(f"the run of problem {lp.id} seed {seed} {state}, so it is not waiting for input")
+        if turn != run.waiting_for:
+            raise StaleInput(
+                f"the run of problem {lp.id} seed {seed} is waiting for the input of turn {run.waiting_for}, "
+                f"not turn {turn}")
+        if end:
+            self._end_run(lt, lp, run, turn_record.END_TEACHER, label)
+            return
+        last = run.turns[-1]
+        context, second, input_text = turn_record.next_window(
+            last.context, last.second, last.input, last.response, text)
+        run.pending = TurnSpec(turn, context, second, input_text, supplier)
+        run.state = "running"
+        lt.waiting -= 1
+        lt.dirty_runs.add(run)
+        lp.todo.appendleft(seed)
+        lt.unsubmitted += 1
+        self.wake()
+
+    async def supply_input(self, session_id: int, problem_id: int, seed: int, turn: int,
+                           text: str | None = None, *, end: bool = False,
+                           label: str | None = None) -> dict[str, Any]:
+        """The service door of the teacher: the input of turn *turn* of the run of problem *problem_id*
+        at *seed* (``text``), or the end of the run (``end=True``, with an optional ``label``).
+
+        *turn* is the number of the turn the input is for, so it is the number of turns the run has
+        finished plus one.  It returns the run's conversation (``conversation``).  A session that is Stopped
+        is 409 (start it first), Starting or Stopping 409 ``busy``, an unknown problem or seed 404, an empty
+        or non-text input 422, and an input that is not the exact next one of a waiting run, 409 ``stale``
+        (:class:`StaleInput`): a duplicate, a late call, a run that is not waiting, the wrong turn number.
+        An input given while the session is Paused is kept and dispatched on Resume."""
+        lt = self._live_or_409(session_id, "supply input to a run of")
+        lp = lt.problems.get(problem_id)
+        if lp is None:
+            async with self._factory() as s:  # a finished or cancelled stored problem: no run waits
+                await self._get_problem(s, session_id, problem_id)
+            raise StaleInput(f"problem {problem_id} is not running, so none of its runs is waiting for input")
+        if (text is None) == (not end):
+            raise SessionError(422, "send either text (the next input) or end: true")
+        self._apply_input(lt, lp, seed, turn, text, end, label, turn_record.FROM_TEACHER)
+        await self._announce(session_id)
+        return self._conversation_live(lt, lp, lp.run_logs[seed])
 
     def set_after_run(self, session_id: int, learner: Callable[..., Any] | None) -> None:
         """Set (or, with ``None``, remove) a session's after-run seam: one callable per session.
@@ -1084,22 +1452,25 @@ class TrainingModeSessionService:
             self._after_run[session_id] = learner
 
     @staticmethod
-    def _proposal_batch(outcome: Any) -> dict[str, Any] | None:
+    def _proposal_batch(outcome: Any, seed: int | None = None, turn: int = 1) -> dict[str, Any] | None:
         """The in-worker learner's batch: the run's ``proposals`` (the nodes and links its codelets
         built, and the ops they proposed), one op per row, with ``rebase`` and ``on_op_failure:
         skip`` (the ``finish_run`` defaults),
         so a node that several runs made is one row and the duplicates are skipped cleanly.
-        ``None`` when the run proposed nothing."""
+        ``None`` when the run proposed nothing.  *seed* is the run's own seed (the outcome's is the turn's
+        seed, which differs after turn 1) and *turn* the turn, named in the note from turn 2 on."""
         ops = [dict(p) for p in (getattr(outcome, "proposals", None) or ())]
         if not ops:
             return None
-        return {"ops": ops, "note": f"in-worker learner: made by the run of seed {outcome.seed}"}
+        who = outcome.seed if seed is None else seed
+        note = f"in-worker learner: made by the run of seed {who}" + (f", turn {turn}" if turn > 1 else "")
+        return {"ops": ops, "note": note}
 
     def _learner_batch(self, sub: Sub, outcome: Any) -> dict[str, Any] | None:
         learner = self._after_run.get(sub.lt.id)
         if learner is None:
             return None
-        where = (sub.lp.id, outcome.seed)
+        where = (sub.lp.id, sub.seed)
         try:
             batch = learner(outcome, sub.provider)
         except Exception as exc:  # noqa: BLE001 - a learner never fails its run
@@ -1157,7 +1528,7 @@ class TrainingModeSessionService:
     # -- problems finishing, in memory --------------------------------------
 
     def _finish_problem(self, lt: LiveSession, lp: LiveProblem, status: str) -> None:
-        """A problem finishes (all its seeds ran) or is cancelled.  Held in memory until the
+        """A problem finishes (every one of its runs ended) or is cancelled.  Held in memory until the
         Stop write: its tally, its place in the ``finished_seq`` order and its place in the
         session summary are fixed here."""
         if lp.status != "queued":
@@ -1174,6 +1545,9 @@ class TrainingModeSessionService:
             lp.cancelled = True
             lt.unsubmitted -= len(lp.todo)
             lp.todo.clear()
+            for run in lp.run_logs.values():  # a waiting or part-way run ends with its problem
+                if run.state != "ended":
+                    self._end_run(lt, lp, run, turn_record.END_CANCELLED)
         if status == "finished" or lp.started or recs:
             lt.finished_count += 1
             lp.finished_seq = lt.finished_count
@@ -1297,7 +1671,12 @@ class TrainingModeSessionService:
         state, stalled = lt.status, lt.stalled_reason
         activity = None
         if state == "running":
-            activity = "stalled" if stalled else ("idle" if unfinished == 0 else None)
+            if stalled:
+                activity = "stalled"
+            elif unfinished == 0:
+                activity = "idle"
+            elif lt.waiting and not lt.unsubmitted and not lt.inflight_subs:
+                activity = "waiting"  # every run that is left is waiting for the teacher's next input
         return self._shape(
             id=lt.id, name=lt.name, note=lt.note, state=state, activity=activity, stalled=stalled,
             settings={
@@ -1311,7 +1690,8 @@ class TrainingModeSessionService:
             problems={"total": queued + running + finished + fin[0] + cancelled + can[0],
                       "queued": queued, "running": running, "finished": fin[0] + finished,
                       "cancelled": can[0] + cancelled},
-            runs={"total": total, "done": done, "errors": errors, "capped": capped, "retries": retries},
+            runs={"total": total, "done": done, "errors": errors, "capped": capped, "retries": retries,
+                  "waiting": lt.waiting},
             memory={"answers": len(lt.memory.answers), "snags": len(lt.memory.snags)},
             codelets=codelets, rate=lt.rate(), memory_version=lt.version, cursor=lt.finished_count,
             last_event=lt.last_event, live=True, saved_version=lt.saved_version,
@@ -1356,6 +1736,22 @@ class TrainingModeSessionService:
             .where(SessionMemoryMerge.session_id.in_(ids)).group_by(SessionMemoryMerge.session_id)
         )).all())
         configs = await self._stored_configurations(s, ids)
+        T = TrainingModeSessionTurn
+        # A run is waiting when its last turn answered and the run has not ended (a run's reason is on its
+        # last row), in a multi-turn problem that is still unfinished.
+        last_turn = (
+            select(T.session_id, T.problem_id, T.seed, func.max(T.turn).label("last"))
+            .join(P, (P.session_id == T.session_id) & (P.problem_id == T.problem_id))
+            .where(T.session_id.in_(ids), P.multi_turn.is_(True), P.status == "queued")
+            .group_by(T.session_id, T.problem_id, T.seed).subquery()
+        )
+        waiting = dict((await s.execute(
+            select(T.session_id, func.count())
+            .join(last_turn, (T.session_id == last_turn.c.session_id) & (T.problem_id == last_turn.c.problem_id)
+                  & (T.seed == last_turn.c.seed) & (T.turn == last_turn.c.last))
+            .where(T.end_reason.is_(None), T.status != "pending")
+            .group_by(T.session_id)
+        )).all())
         zero = (0,) * 7
         out = []
         for t in sessions:
@@ -1380,7 +1776,7 @@ class TrainingModeSessionService:
                 problems={"total": q[0] + f[0] + x[0], "queued": q[0], "running": 0,
                           "finished": f[0], "cancelled": x[0]},
                 runs={"total": q[1] + f[1], "done": f[2] + n, "errors": f[3] + e, "capped": f[5] + cap,
-                      "retries": f[6] + rt},
+                      "retries": f[6] + rt, "waiting": waiting.get(t.id, 0)},
                 memory={"answers": a_n, "snags": s_n}, codelets=f[4] + cl, rate=None,
                 memory_version=version, cursor=t.finished_count, last_event=t.last_event,
                 live=False, saved_version=version, unsaved=None, saved_stopped_at=t.stopped_at,
@@ -1450,7 +1846,7 @@ class TrainingModeSessionService:
             "id": p.problem_id if hasattr(p, "problem_id") else p.id, "session_id": p.session_id,
             "initial": p.initial, "modified": p.modified, "target": p.target, "answer": p.answer,
             "seeds": p.seeds, "seed_start": p.seed_start, "tag": p.tag, "status": status,
-            "runs_done": done, "errors": t["errors"], "capped": t["capped"],
+            "multi_turn": bool(p.multi_turn), "runs_done": done, "errors": t["errors"], "capped": t["capped"],
             "mean_codelets": t["mean_codelets"], "top": _shares(t["distribution"], done, 3),
             "none_fraction": t["none_fraction"], "distinct": t["distinct_answers"] or 0,
             "statuses": t["statuses"] or {}, "finished_seq": finished_seq, "added_at": _iso(p.added_at),
@@ -1574,22 +1970,194 @@ class TrainingModeSessionService:
             return self._stored_problem_dict(await self._get_problem(s, session_id, pid), True)
 
     async def problem_runs(self, session_id: int, pid: int) -> list[dict[str, Any]]:
+        """A problem's runs in seed order: those that have ended, each with its ``state`` (``ended``), its
+        ``turns`` (how many it finished), ``end_reason`` and ``end_label``; for a multi-turn problem also
+        the runs still going (state ``running`` or ``waiting``, with ``waiting_for``, the number of the turn
+        the input is for), whose ``answer`` is their latest response.  The conversation of one run is
+        ``conversation``."""
         lt = self._live.get(session_id)
         lp = lt.problems.get(pid) if lt is not None else None
         if lp is not None:
-            return [self._run_dict(r) for r in sorted(lp.outcomes.values(), key=lambda r: r.seed)]
+            logs = dict(lp.run_logs)
+            stored = {}
+            if any(seed not in logs for seed in lp.outcomes):  # ended before this Start: the database knows
+                async with self._factory() as s:
+                    stored = await self._stored_turns(s, session_id, pid)
+            recs = [self._run_dict(r, self._run_extras(logs.get(r.seed) or stored.get(r.seed), "ended"))
+                    for r in sorted(lp.outcomes.values(), key=lambda r: r.seed)]
+            going = [self._unfinished_dict(run.seed, run.turns, run.state) for run in logs.values()
+                     if run.state != "ended"]
+            return sorted(recs + going, key=lambda d: d["seed"])
         async with self._factory() as s:
             await self._get_session(s, session_id)
-            await self._get_problem(s, session_id, pid)
+            problem = await self._get_problem(s, session_id, pid)
             rows = (await s.execute(
                 select(TrainingModeSessionRun).where(
                     TrainingModeSessionRun.session_id == session_id, TrainingModeSessionRun.problem_id == pid
                 ).order_by(TrainingModeSessionRun.seed)
             )).scalars().all()
-            return [self._run_dict(r) for r in rows]
+            turns = await self._stored_turns(s, session_id, pid)
+        out = [self._run_dict(r, self._run_extras(turns.get(r.seed), "ended")) for r in rows]
+        ended = {r.seed for r in rows}
+        if problem.status == "queued":
+            out += [self._unfinished_dict(seed, [t for t in ts if t.status != "pending"],
+                                          "running" if ts[-1].status == "pending" else "waiting")
+                    for seed, ts in turns.items() if seed not in ended]
+        return sorted(out, key=lambda d: d["seed"])
+
+    async def _stored_turns(self, s: AsyncSession, session_id: int, pid: int) -> dict[int, list[TurnRec]]:
+        T = TrainingModeSessionTurn
+        rows = (await s.execute(
+            select(T).where(T.session_id == session_id, T.problem_id == pid).order_by(T.seed, T.turn)
+        )).scalars().all()
+        out: dict[int, list[TurnRec]] = {}
+        for r in rows:
+            out.setdefault(r.seed, []).append(self._turn_from_row(r))
+        return out
 
     @staticmethod
-    def _run_dict(r: Any) -> dict[str, Any]:
+    def _run_extras(turns: Any, state: str) -> dict[str, Any]:
+        """The turn-related fields a run's listing entry gains (``turns`` is a ``LiveRun`` or a list of turns)."""
+        turns = turns.turns if isinstance(turns, LiveRun) else (turns or [])
+        done = [t for t in turns if t.status != "pending"]
+        last = turns[-1] if turns else None
+        return {
+            "state": state, "turns": len(done), "waiting_for": None,
+            "end_reason": last.end_reason if last is not None and state == "ended" else None,
+            "end_label": last.end_label if last is not None and state == "ended" else None,
+        }
+
+    @classmethod
+    def _unfinished_dict(cls, seed: int, turns: list[TurnRec], state: str) -> dict[str, Any]:
+        """A listing entry for a run that has not ended: ``answer`` is its latest response."""
+        done = [t for t in turns if t.status != "pending"]
+        first, last = (done[0], done[-1]) if done else (None, None)
+        return {
+            "seq": None, "memory_version": first.memory_version if first else None,
+            "episode_version": first.memory_version if first else None,
+            "configuration_revision": first.configuration_revision if first else None,
+            "seed": seed, "status": state, "key": None,
+            "answer": (last.response or "") if last else "", "answers": [],
+            "codelets": sum(t.codelets for t in done), "seconds": round(sum(t.seconds for t in done), 4),
+            "temperature": last.temperature if last else 0.0, "answer_quality": None, "error": None,
+            "config_hash": first.config_hash if first else "", "attempts": 1, "memory_added": None,
+            "state": state, "turns": len(done), "waiting_for": len(done) + 1 if state == "waiting" else None,
+            "end_reason": None, "end_label": None,
+        }
+
+    # -- the conversation of a run (the chat-shaped call) ---------------------------------------------
+
+    @staticmethod
+    def _turn_dict(t: TurnRec) -> dict[str, Any]:
+        """One turn of a conversation: its four positions (context, second string, input and the response
+        Petacat constructed), who supplied each, and what the turn did."""
+        first = t.turn == 1
+        return {
+            "turn": t.turn,
+            "positions": {"context": t.context, "second": t.second, "input": t.input, "response": t.response},
+            "supplied_by": {
+                "context": "problem" if first else "window", "second": "problem" if first else "petacat",
+                "input": t.input_from, "response": "petacat",
+            },
+            "status": t.status, "codelets": t.codelets, "seconds": round(t.seconds, 4),
+            "answers": list(t.answers), "answer_quality": t.answer_quality, "temperature": t.temperature,
+            "error": t.error, "turn_seed": t.turn_seed, "attempts": t.attempts,
+            "end_reason": t.end_reason, "end_label": t.end_label,
+            "proposals": list(t.proposals), "evidence": t.evidence,
+            "seq": t.seq, "episode_version": t.memory_version,
+            "configuration_revision": t.configuration_revision, "config_hash": t.config_hash,
+        }
+
+    @classmethod
+    def _conversation_body(cls, *, session_id: int, problem_id: int, problem: dict, seed: int,
+                           multi_turn: bool, state: str, turns: list[TurnRec], session_state: str,
+                           end_reason: str | None = None) -> dict[str, Any]:
+        done = [t for t in turns if t.status != "pending"]
+        last = turns[-1] if turns else None
+        return {
+            "session_id": session_id, "problem_id": problem_id, "seed": seed, "multi_turn": multi_turn,
+            "problem": problem, "session_state": session_state,
+            # ``queued`` (nothing run yet, or the next turn is queued while the session is Stopped), ``running``
+            # (a turn is queued or in flight), ``waiting`` (for the input of turn ``waiting_for``) or ``ended``.
+            "state": state,
+            "waiting_for": len(done) + 1 if state == "waiting" else None,
+            # True when ``POST .../input`` would be taken now for ``waiting_for``.
+            "accepts_input": state == "waiting" and session_state in ("running", "paused"),
+            "end_reason": end_reason if end_reason is not None else (last.end_reason if state == "ended" and last else None),
+            "end_label": last.end_label if state == "ended" and last else None,
+            "turn_count": len(turns), "turns": [cls._turn_dict(t) for t in turns],
+        }
+
+    @staticmethod
+    def _problem_block(p: Any) -> dict[str, Any]:
+        return {"initial": p.initial, "modified": p.modified, "target": p.target, "tag": p.tag}
+
+    def _conversation_live(self, lt: LiveSession, lp: LiveProblem, run: LiveRun | None,
+                           seed: int | None = None) -> dict[str, Any]:
+        turns = list(run.turns) if run is not None else []
+        state = run.state if run is not None else "running"
+        seed = run.seed if run is not None else seed
+        if run is not None and run.pending is not None:
+            p = run.pending
+            turns.append(TurnRec(
+                turn=p.turn, turn_seed=turn_record.turn_seed(run.seed, p.turn), context=p.context,
+                second=p.second, input=p.input, input_from=p.input_from))
+        elif run is None and seed in lp.todo:
+            state = "queued"
+        return self._conversation_body(
+            session_id=lt.id, problem_id=lp.id, problem=self._problem_block(lp), seed=seed,
+            multi_turn=lp.multi_turn, state=state, turns=turns, session_state=lt.status)
+
+    async def conversation(self, session_id: int, pid: int, seed: int) -> dict[str, Any]:
+        """A run's whole conversation, in order: for each turn its four positions (``context``, ``second``,
+        ``input`` and ``response``), who supplied each, its status, codelets, end reason and ``evidence``;
+        and for the run, whether it is ``running`` a turn, ``waiting`` for input (``waiting_for`` is the
+        number of the turn the input is for, ``accepts_input`` says the session would take it now) or
+        ``ended`` (``end_reason``: ``single-turn``, ``no-answer``, ``teacher`` with ``end_label``, ``error`` or
+        ``cancelled``).  A live session answers from memory, a Stopped one from its turn rows.  404 for an
+        unknown problem or a seed the problem does not have."""
+        lt = self._live.get(session_id)
+        lp = lt.problems.get(pid) if lt is not None else None
+        if lp is not None:
+            if not lp.seed_start <= seed < lp.seed_start + lp.seeds:
+                raise SessionError(404, f"problem {pid} has no run with seed {seed}")
+            run = lp.run_logs.get(seed)
+            if run is not None or seed not in lp.outcomes:
+                return self._conversation_live(lt, lp, run, seed)
+        T, R = TrainingModeSessionTurn, TrainingModeSessionRun
+        async with self._factory() as s:
+            await self._get_session(s, session_id)
+            problem = await self._get_problem(s, session_id, pid)
+            if not problem.seed_start <= seed < problem.seed_start + problem.seeds:
+                raise SessionError(404, f"problem {pid} has no run with seed {seed}")
+            rows = (await s.execute(
+                select(T).where(T.session_id == session_id, T.problem_id == pid, T.seed == seed).order_by(T.turn)
+            )).scalars().all()
+            ran = (await s.execute(
+                select(R.id).where(R.session_id == session_id, R.problem_id == pid, R.seed == seed)
+            )).first() is not None
+        turns = [self._turn_from_row(r) for r in rows]
+        reason = None
+        if ran:
+            state = "ended"
+        elif not turns:
+            state, reason = ("ended", turn_record.END_CANCELLED) if problem.status == "cancelled" else ("queued", None)
+        elif turns[-1].status == "pending":
+            state = "queued"
+        elif turns[-1].end_reason is not None:
+            state = "ended"
+        elif problem.status == "cancelled":
+            state, reason = "ended", turn_record.END_CANCELLED
+        else:
+            state = "waiting"
+        session_state = lt.status if lt is not None else ("starting" if session_id in self._starting else "stopped")
+        return self._conversation_body(
+            session_id=session_id, problem_id=pid, problem=self._problem_block(problem), seed=seed,
+            multi_turn=bool(problem.multi_turn), state=state, turns=turns, session_state=session_state,
+            end_reason=reason)
+
+    @staticmethod
+    def _run_dict(r: Any, extras: dict[str, Any] | None = None) -> dict[str, Any]:
         return {
             "seq": r.seq, "memory_version": r.memory_version,
             # The Training episode version the run started from (one counter over Episodic
@@ -1605,6 +2173,7 @@ class TrainingModeSessionService:
                 {"answers": r.added_answers, "snags": r.added_snags}
                 if r.added_answers is not None else None
             ),
+            **(extras or {}),
         }
 
     async def finished(self, session_id: int, after: int = 0, limit: int = 100,
@@ -1697,6 +2266,11 @@ class TrainingModeSessionService:
             n = p.get("seeds")
             if n is not None and not (1 <= n <= MAX_SEEDS_PER_PROBLEM):
                 raise SessionError(422, f"seeds must be 1..{MAX_SEEDS_PER_PROBLEM}")
+            if p.get("multi_turn") is not None and not isinstance(p["multi_turn"], bool):
+                raise SessionError(422, "multi_turn must be true or false")
+            if p.get("multi_turn") and p.get("answer") is not None:
+                raise SessionError(
+                    422, "a multi-turn problem has no answer: Petacat constructs the response of every turn")
 
     async def _insert_problems(self, s: AsyncSession, t: TrainingModeSession, problems: list[dict]) -> list[int]:
         """Store problems for a Stopped session, giving them the next per-session ordinals."""
@@ -1707,7 +2281,7 @@ class TrainingModeSessionService:
                 "session_id": t.id, "problem_id": first + i, "initial": p["initial"],
                 "modified": p["modified"], "target": p["target"], "answer": p.get("answer"),
                 "seeds": p.get("seeds") or t.seeds_per_problem, "seed_start": t.seed_start,
-                "tag": p.get("tag"), "status": "queued", "runs_done": 0, "errors": 0, "capped": 0,
+                "tag": p.get("tag"), "multi_turn": bool(p.get("multi_turn")), "status": "queued", "runs_done": 0, "errors": 0, "capped": 0,
                 "retries": 0, "codelets_total": 0, "distinct_answers": 0, "added_at": now,
             }
             for i, p in enumerate(problems)
@@ -1966,6 +2540,9 @@ class TrainingModeSessionService:
             self._starting.discard(session_id)
         self._check_configs()
         for lp in list(lt.problems.values()):
+            for run in list(lp.run_logs.values()):  # a run restored while waiting asks the teacher again
+                self._consult_teacher(lt, lp, run)
+        for lp in list(lt.problems.values()):
             # Every seed was stored: it only has to finish.  The test is the one ``_record`` uses.  An
             # empty ``lp.todo`` is not it: the block above yielded to the event loop with the session
             # already live, so the scheduler may have dispatched the last seeds meanwhile, and a
@@ -2161,7 +2738,8 @@ class TrainingModeSessionService:
         return {
             "session_id": lt.id, "problem_id": lp.id, "initial": lp.initial, "modified": lp.modified,
             "target": lp.target, "answer": lp.answer, "seeds": lp.seeds, "seed_start": lp.seed_start,
-            "tag": lp.tag, "status": lp.status, "runs_done": tally.get("runs_done", 0),
+            "tag": lp.tag, "multi_turn": lp.multi_turn, "status": lp.status,
+            "runs_done": tally.get("runs_done", 0),
             "errors": tally.get("errors", 0), "capped": tally.get("capped", 0),
             "retries": tally.get("retries", 0), "codelets_total": tally.get("codelets_total", 0),
             "mean_codelets": tally.get("mean_codelets"), "top_answer": tally.get("top_answer"),
@@ -2191,6 +2769,7 @@ class TrainingModeSessionService:
         new_rows = [self._problem_row(lt, lp) for lp in problems if not lp.stored]
         settled = [lp for lp in problems if lp.stored and lp.settled]
         run_rows = [self._run_row(lt, r) for r in lt.pending_runs]
+        turn_rows = self._turn_rows(lt)
         merge_rows = await asyncio.to_thread(self._merge_rows, lt, list(lt.pending_merges))
         config = lt.config
         entries = config.pending_entries()
@@ -2209,6 +2788,12 @@ class TrainingModeSessionService:
                         P.session_id == lt.id, P.problem_id == lp.id, P.status == "queued").values(**row))
                 for i in range(0, len(run_rows), RUN_ROW_CHUNK):
                     await s.execute(insert(R), run_rows[i:i + RUN_ROW_CHUNK])
+                for i in range(0, len(turn_rows), RUN_ROW_CHUNK):
+                    chunk = pg_insert(TrainingModeSessionTurn).values(turn_rows[i:i + RUN_ROW_CHUNK])
+                    keys = ("session_id", "problem_id", "seed", "turn")
+                    await s.execute(chunk.on_conflict_do_update(
+                        index_elements=list(keys),
+                        set_={c: chunk.excluded[c] for c in turn_rows[0] if c not in keys}))
                 for i in range(0, len(merge_rows), RUN_ROW_CHUNK):
                     await s.execute(insert(SessionMemoryMerge), merge_rows[i:i + RUN_ROW_CHUNK])
                 res = await s.execute(update(TrainingModeSession).where(TrainingModeSession.id == lt.id).values(
@@ -2241,6 +2826,38 @@ class TrainingModeSessionService:
             "memory_version": r.memory_version, "added_answers": r.added_answers,
             "added_snags": r.added_snags,
         }
+
+    @staticmethod
+    def _turn_rows(lt: LiveSession) -> list[dict[str, Any]]:
+        """The turn rows of every run changed since Start (or the last write): each finished turn, and the
+        next turn of a run that is queued or was in flight (``status`` ``pending``, with its stored strings,
+        so Start can run it again).  Written as upserts: a row that is already stored is replaced."""
+        rows = []
+        for run in sorted(lt.dirty_runs, key=lambda r: (r.problem_id, r.seed)):
+            for t in run.turns:
+                rows.append({
+                    "session_id": lt.id, "problem_id": run.problem_id, "seed": run.seed, "turn": t.turn,
+                    "turn_seed": t.turn_seed, "context": t.context, "second_string": t.second, "input": t.input,
+                    "input_from": t.input_from, "status": t.status, "answer": t.answer,
+                    "answers": list(t.answers), "answer_quality": t.answer_quality, "codelets": t.codelets,
+                    "seconds": t.seconds, "temperature": t.temperature, "error": t.error,
+                    "attempts": t.attempts, "added_answers": t.added_answers, "added_snags": t.added_snags,
+                    "end_reason": t.end_reason, "end_label": t.end_label, "proposals": list(t.proposals),
+                    "evidence": t.evidence, "seq": t.seq, "memory_version": t.memory_version,
+                    "configuration_revision": t.configuration_revision, "config_hash": t.config_hash,
+                })
+            p = run.pending
+            if p is not None:
+                rows.append({
+                    "session_id": lt.id, "problem_id": run.problem_id, "seed": run.seed, "turn": p.turn,
+                    "turn_seed": turn_record.turn_seed(run.seed, p.turn), "context": p.context,
+                    "second_string": p.second, "input": p.input, "input_from": p.input_from,
+                    "status": "pending", "answer": "", "answers": [], "answer_quality": None, "codelets": 0,
+                    "seconds": 0.0, "temperature": 0.0, "error": None, "attempts": 1, "added_answers": 0,
+                    "added_snags": 0, "end_reason": None, "end_label": None, "proposals": [], "evidence": None,
+                    "seq": None, "memory_version": None, "configuration_revision": None, "config_hash": "",
+                })
+        return rows
 
     @staticmethod
     def _merge_rows(lt: LiveSession, merges: list) -> list[dict[str, Any]]:
@@ -2313,6 +2930,7 @@ class TrainingModeSessionService:
             async with s.begin():
                 await s.execute(delete(TrainingModeSession).where(TrainingModeSession.id == session_id))
         self._after_run.pop(session_id, None)
+        self._teachers.pop(session_id, None)
         self._versions.pop(session_id, None)
         await self._announce(session_id)
         self._conds.pop(session_id, None)
