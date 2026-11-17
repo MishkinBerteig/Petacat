@@ -34,7 +34,9 @@ The evidence
 ------------
 :func:`gather_evidence` summarises what a turn's Workspace built, as plain data: the bonds and groups formed
 (counts by category), the rule the turn's answer used, the snags the turn recorded, and how many symbols were
-still unperceived at the end.  A turn blocked on perception (symbols with no node, so nothing to build on)
+still unperceived at the end, and the Coderack's pressure over the run: codelets posted while it was full,
+deferred batches that took it past its size, and codelets evicted to make room (counted by the Coderack, read
+here and never used by the engine).  A turn blocked on perception (symbols with no node, so nothing to build on)
 can be told apart from a cognitive give-up.
 """
 
@@ -96,6 +98,7 @@ def gather_evidence(ctx: Any, base_answers: int, base_snags: int) -> dict[str, A
         isinstance(obj, Letter) and obj.get_descriptor_for(dimension) is None
         for obj in (workspace.all_objects if dimension else ())
     )
+    coderack = ctx.coderack
     memory = ctx.memory
     new_answers = len(memory.answers) - base_answers
     rule = None
@@ -109,4 +112,9 @@ def gather_evidence(ctx: Any, base_answers: int, base_snags: int) -> dict[str, A
         "rule": rule,
         "snags": [s.explanation for s in memory.snags[:new_snags]],
         "unperceived": unperceived,
+        "coderack": {
+            "full_posts": coderack.full_posts,
+            "overflowing_batches": coderack.overflowing_batches,
+            "evicted": coderack.evicted,
+        },
     }

@@ -257,7 +257,7 @@ class TrainingModeSessionTurn(Base):
     #: The change-API ops the turn's codelets built or proposed (what the in-worker learner submitted).
     proposals = Column(JSONB, nullable=True)
     #: What the turn's Workspace built (``turn_record.gather_evidence``): bonds and groups by category, the
-    #: rule, the snags and the symbols still unperceived.
+    #: rule, the snags, the symbols still unperceived and the Coderack's pressure.
     evidence = Column(JSONB, nullable=True)
     #: The merge order, the Training episode version the turn started from, the configuration revision it
     #: ran under and that configuration's hash; ``NULL`` for a turn still ``pending``.

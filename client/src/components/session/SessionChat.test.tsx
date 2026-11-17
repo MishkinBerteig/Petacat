@@ -197,6 +197,7 @@ function turn(over: Partial<SessionTurn> = {}): SessionTurn {
       rule: { top_rule: 'replace the last letter by its successor', bottom_rule: 'replace the last letter by its successor' },
       snags: ['snag-one'],
       unperceived: 0,
+      coderack: { full_posts: 12, overflowing_batches: 3, evicted: 15 },
     },
     seq: 1,
     episode_version: 0,
@@ -558,6 +559,7 @@ describe('chat client: the chat', () => {
     expect(ev).toHaveTextContent('Rule: replace the last letter by its successor (top)')
     expect(ev).toHaveTextContent('Snags: snag-one')
     expect(ev).toHaveTextContent('Symbols still unperceived: 0')
+    expect(ev).toHaveTextContent('Coderack pressure: 12 full posts, 3 overflowing batches, 15 evicted')
     expect(within(details[0]).getByTestId('proposal-count')).toHaveTextContent('2 proposals.')
     expect(within(details[0]).getByTestId('proposal-list').children).toHaveLength(2)
     expect(within(details[0]).getByTestId('proposal-list')).toHaveTextContent('{"op":"add_node","name":"q"}')

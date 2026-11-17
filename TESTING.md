@@ -141,18 +141,18 @@ outside the matrix take it too and the run is entirely what it says it is.
 
 ```
 ============================= petacat test matrix ==============================
-  cpu  numpy    float64    1394 tests
-  gpu  mlx      float32    1394 tests
+  cpu  numpy    float64    1411 tests
+  gpu  mlx      float32    1411 tests
   whole suite requested: the full matrix is required of this run
 
-  unit          2129 collected   2129 run   2129 passed      0 failed      0 skipped  complete
+  unit          2147 collected   2147 run   2147 passed      0 failed      0 skipped  complete
   seed_unit     2234 collected   2234 run   2234 passed      0 failed      0 skipped  complete
   module        1087 collected   1087 run   1087 passed      0 failed      0 skipped  complete
   architecture   113 collected    113 run    113 passed      0 failed      0 skipped  complete
   integration    368 collected    368 run    368 passed      0 failed      0 skipped  complete
-  parallel       374 collected    374 run    364 passed      0 failed     10 skipped  complete
+  parallel       380 collected    380 run    370 passed      0 failed     10 skipped  complete
   lockstep       266 collected    266 run    266 passed      0 failed      0 skipped  complete
-  e2e            734 collected    734 run    733 passed      0 failed      1 skipped  complete
+  e2e            736 collected    736 run    735 passed      0 failed      1 skipped  complete
 
   run complete in 13.9 min against a 60 min ceiling
 ```
@@ -170,8 +170,8 @@ single file or node id. Such a run names what narrowed it, names the roles it
 exercised, and exits on whether its tests passed:
 
 ```
-  cpu  numpy    float64      1394 tests
-  gpu  mlx      float32     1394 tests
+  cpu  numpy    float64      1411 tests
+  gpu  mlx      float32     1411 tests
   cpu  numpy: no selected test ran on it
   narrowed by -k 'mlx': this run reports the roles it exercised and is not held to the full matrix
 ```
@@ -224,17 +224,17 @@ that allowance.
 
 | Layer | Directory | Scope | May depend on | Cases |
 |-------|-----------|-------|---------------|-------|
-| **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 2129 |
+| **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 2147 |
 | **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 2234 |
 | **module** | `tests/module/` | Several real components assembled and driven | Real engine objects and `seed_data/*.json`; no DB, no HTTP | 1087 |
 | **architecture** | `tests/architecture/` | How the source tree is allowed to depend on itself | The repository's source, `seed_data/*.json`, child interpreters | 113 |
 | **integration** | `tests/integration/` | Agreement between the repository's artifacts, and the harness's own rules | Real `seed_data/*.json`, the ORM declarations, the generated client files, the documentation, a real pytest session | 368 |
-| **parallel** | `tests/parallel/` | The detachable multi-core plugin (`server/parallel/`): each executor against the serial run it claims to equal | Real engine objects and `seed_data/*.json`, worker processes and threads; each test pins the backend it compares on | 374 |
+| **parallel** | `tests/parallel/` | The detachable multi-core plugin (`server/parallel/`): each executor against the serial run it claims to equal | Real engine objects and `seed_data/*.json`, worker processes and threads; each test pins the backend it compares on | 380 |
 | **lockstep** | `tests/lockstep/` | Petacat's decision traces against Metacat's: naming, helper conformance, tracing/replay RNGs, determinism guards, the comparer | Real engine in faithful mode (numeric backend off, or a named backend); recorded Metacat traces | 266 |
-| **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 734 |
+| **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 736 |
 
 Those counts are cases, so they include the second pass the numeric matrix makes
-over the 1394 backend-sensitive tests.
+over the 1411 backend-sensitive tests.
 
 One line decides each layer. Read them as a question about what a new test's
 subject is, and write the test where the answer lands:
@@ -267,7 +267,7 @@ first**, then move up toward the API and GUI.
 
 All eight layers run in one command — the
 [required command](#the-required-command) — and, since Petacat runs natively, all
-eight actually run: **7,305 cases**, every one of them executed. A layer that is
+eight actually run: **7,331 cases**, every one of them executed. A layer that is
 normally skipped is not a layer that is normally green, and none of these is.
 
 Wall-clock time depends heavily on the machine and on what else it is doing. The
@@ -440,6 +440,7 @@ changing what it records.
 | `test_arithmetic_fidelity.py` | 10 | Metacat's exact roundings and orders: spreading, urgencies and bins, jootser, descriptor support, single-letter groups |
 | `test_rationals.py` | 13 | The rational value kind: `n/m` parsed exactly, refused unless it is two integers over a positive denominator, and stored in lowest terms; the configuration hash follows it. The Metacat Standard Configuration holds `enclosed_group_importance_factor`, `edge_object_bond_factor` and `interior_object_bond_factor` as `2/3`, `1/3` and `1/6`, on the declared read list; under them importance and intra-string unhappiness are the old arithmetic, and a non-standard rational changes them as it implies |
 | `test_config_document.py` | 26 | S0: the pure `ConfigDocument` (`server/services/config_document.py`): identity with the files' provider and the engine's `config_hash`, order, structure sharing between versions, errors, codecs (int, float and rational typing), replay against a naive reference model, the incremental hash against the whole hash, and `diff` followed by `apply_resolved` |
+| `test_coderack_pressure.py` | 8 | Coderack pressure counters (numeric matrix): a new rack has counted nothing; posts below `max_size` count nothing; a post to a full rack is one full post and evicts one codelet; a deferred batch that fits is not overflowing, one that takes the rack past `max_size` is one overflowing batch and evicts the surplus, and one as large as the rack flushes it (one overflowing batch, and every codelet the rack held is evicted); `remove_old_codelets` counts what it removes; and reading the counters at every post changes no answer, codelet count, random draw or temperature of a run, on the Metacat Standard Configuration and on the v2.0 Base |
 | `test_config_registry.py` | 5 | C6: the configuration table registry (`server/services/config_registry.py`): natural keys, order columns, code and JSON columns, the 17 enum tables (the first 12, `link_types` having left them, and the string kinds, rule scopes, failure kinds, clamp types and progress focuses), a NULL link label read as `''`, the frozen spec |
 | `test_journal_replay.py` | 5 | C6: pure journal replay, reconstruction from before-images and inverse ops; an update and its undo keep the row's place |
 | `test_session_episodic_memory_always.py` | 4 | S11: a Training Mode Session always has an Episodic Memory: no memory, status or `closed_at` columns and non-null episode columns; no shared or independent branch and no `close`; no route clears the memory; the create request forbids extra fields |
@@ -745,6 +746,7 @@ changing what it records.
 | `test_step0_config_from_db.py` | 47 | Step 0's guard tests: a shipped value reproduces the run and a changed one moves it |
 | `test_v2_base_sessions.py` | 6 | Training Mode Sessions on the v2.0 Base through the service, on the serial child and the swarm: `1->1; 1->?` and `😀->😀; 😀->?` answer with the symbol, exactly one `plato-cp-<hex>` node reaches the session's configuration from `learner:in-worker`, runs dispatched after it propose nothing; serial and swarm give the same first run, proposals included; a repeated problem keeps answering across 30 seeds; creating v2.0 sessions leaves the global configuration's hash and revision unchanged, and the creation entry holds the delta with both hashes; the Admin compare reads `training-v2` as a read-only side; a session builds `adjacent` bonds, serial and swarm agree, and no `adjacent` link is written into its configuration |
 | `test_multi_turn_runs.py` | 17 | Multi-turn runs (chats) through the service and routes: a scripted executor answers `<input>!` so the mechanism is tested without the engine's cognition (the window joins context, second string and input with single spaces and the executor is given exactly those strings; turn 1 uses the run's seed, a later turn `turn_record.turn_seed`; each turn is one `finish_run`, so turn 2 is dispatched under what turn 1 built and the journal names the run's own seed and the turn); a run nobody ends waits holding no worker (`runs.waiting`, activity `waiting`) and the route drives it, ending it with a label; a turn with no answer ends the run and its proposals apply; a turn that raises ends it with the error; every stale or malformed input (duplicate, late, wrong turn, not waiting, unknown run, empty, NUL, both text and end) is refused with its status and changes nothing; a waiting run survives Stop and Start, a turn interrupted by Stop runs again from its stored `pending` row, an input during Pause is dispatched on Resume, cancelling a problem ends its waiting runs; `set_teacher` and the errors a teacher can make (raises, malformed, refused: the run keeps waiting with a diagnostic) and a teacher asked again for a run restored while waiting; the conversation call and the runs listing (live and from the stored rows); `multi_turn` is a per-problem flag; and, on the real engine, the serial child, the swarm (one worker) and in process give identical conversations that build nodes, and a single-turn problem's run equals a plain engine run of its seed |
+| `test_context_response_benchmark.py` | 2 | The context-response benchmark: the series file `measurements/context-response-benchmark/series.json` loads with `scripts/session_client.py`'s `load_series` and holds the five accepted series with 50 seeds and the label `series over`; `scripts/context_response_benchmark.py` run as a process of its own on one series, two seeds and a codelet cap of 300 on a scratch database of its own (the test database's name plus `_cr`, dropped afterwards) writes the conversations (the session's settings, the turns' four positions and `evidence.coderack`) and `SUMMARY.md`, and a second run into the same folder is refused |
 | `test_session_client_teacher.py` | 1 | `scripts/session_client.py --teacher` drives a series file end to end against a real `uvicorn` server on a free port and its own scratch database (serial child, the real engine): the script creates the session from the series file, supplies each waiting run's next input over HTTP, ends each run when its inputs are used up (with the series's label), prints and writes every conversation, and refuses to overwrite its `--out` file |
 | `test_session_proposals.py` | 1 | Every proposal reaches a Training Mode Session's configuration (service, serial child and swarm): a test configuration whose body proposes a link type, links, a count and a trigger; the learner (`learner:in-worker`) keeps each, duplicates are skipped, the pair's link is `90 * r ** (N - 1)` long (r = 1 - (1/16) / 90, to a relative error of 1e-12), and the first run is the same on both routes |
 | `test_fractional_link_api.py` | 5 | A link length can be a fraction over HTTP: the Admin routes and the change API take 89.875 and print a whole length as `90`; non-finite lengths are refused on every route; `noticings` is shown on the node, exported only when not 0 and changed by `adjust`; the schema's column types |
@@ -769,7 +771,7 @@ changing what it records.
 | `test_proposals_reach_the_session.py` | 9 | What a run proposes reaches the session: every op kind through the in-worker learner, a refused op dropped under `skip`, link and link-type merges (two runs, one row, both proposals on record), and the pair-link accounting (`L * r ** (N - 1)` with L = 90, s = 1/16 and r = 1 - s / L, to a relative error of 1e-12, never 0 or below) in any order (every permutation of four runs), with the link absent or already present, and serial child, swarm and in-process agreeing |
 | `test_instantiated_links_reach_the_session.py` | 8 | What an instantiator built in a run reaches the session (numeric matrix): a run records the pair once with the noticings whose changes were built (some proposals are dropped at the end of the turn), the run's own Slipnet holds the length the session will hold, and the session's link is `L * r ** (B - 1)` in any order (all orders of four runs, link absent or present at the start) and on the serial child, the swarm and in process, to a relative error of 1e-12 |
 | `test_consolidator_sessions.py` | 6 | `consolidator` over whole runs (numeric matrix): within a run the `noticings` adjust of a node equals the number of `consolidator` runs on it that did not fizzle, counted by instrumenting the run; across a session the configuration's count equals the sum over its runs, and the serial child, the swarm and the in-process run give the same outcomes (every seed against one frozen configuration, so that the swarm's timing cannot matter), whatever order the outcomes land in; a session that meets a new symbol makes it a trigger after the first run and `consolidator` runs on it from the second; a second run that proposes the same trigger is skipped cleanly and leaves one entry in each list; depth does not move over a session of many runs, and a discovered node's depth is `new_node_conceptual_depth`; a seed letter counts noticings and gains `adjacent` links |
-| `test_multi_turn_transport.py` | 4 | A multi-turn run's turns on every route and backend (numeric matrix): a chat of two turns that builds a node (turn 1 met a symbol with no node) is driven as the service drives it, and its conversation (strings, outcome fingerprints with proposals and `evidence`) is identical in process, on the serial child and on the swarm, on `off`, `python` and `numpy`; turn 1 is the run before turns existed; the joined strings reach the Workspace exactly, a space is perceived through its own node once the configuration has one, and any text passes through untouched; `evidence` tells a turn blocked on perception from a cognitive give-up and is in the fingerprint |
+| `test_multi_turn_transport.py` | 5 | A multi-turn run's turns on every route and backend (numeric matrix): a chat of two turns that builds a node (turn 1 met a symbol with no node) is driven as the service drives it, and its conversation (strings, outcome fingerprints with proposals and `evidence`) is identical in process, on the serial child and on the swarm, on `off`, `python` and `numpy`; turn 1 is the run before turns existed; the joined strings reach the Workspace exactly, a space is perceived through its own node once the configuration has one, and any text passes through untouched; `evidence` tells a turn blocked on perception from a cognitive give-up and is in the fingerprint; a turn's `evidence.coderack` (full posts, overflowing batches, evicted) is the same whole numbers in process, on the serial child and on the swarm, on every backend |
 | `test_proposals_speculative.py` | 2 | A run that calls `propose_ops` under the speculative executor equals the stream-serial reference, proposals included, at 2 and 4 workers and under forced aborts |
 
 **Collected by no layer**

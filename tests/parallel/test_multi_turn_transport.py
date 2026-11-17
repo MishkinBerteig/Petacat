@@ -150,8 +150,25 @@ def test_evidence_tells_a_turn_blocked_on_perception_from_a_cognitive_give_up():
     answered = run_task(SessionTask("abc", "abd", "ijk", None, 1, STEPS, None, "off", memory=MEMORY), meta)
     assert answered.status == "answer_found" and answered.evidence["unperceived"] == 0
     assert answered.evidence["rule"]["top_rule"] and answered.evidence["bonds"] and answered.evidence["groups"]
-    assert set(answered.evidence) == {"bonds", "groups", "rule", "snags", "unperceived"}
+    assert set(answered.evidence) == {"bonds", "groups", "rule", "snags", "unperceived", "coderack"}
+    assert set(answered.evidence["coderack"]) == {"full_posts", "overflowing_batches", "evicted"}
     # the evidence is in the fingerprint, so two routes that disagree on it disagree
     assert outcome_fingerprint(answered) != outcome_fingerprint(blocked)
     # a task with no Training Mode Session memory (as no session sends) reports none
     assert run_task(SessionTask("abc", "abd", "ijk", None, 1, STEPS, None, "off"), meta).evidence is None
+
+
+@pytest.mark.parametrize("backend", BACKENDS)
+def test_a_turns_coderack_pressure_is_the_same_on_every_route(backend, swarm_executor, serial_executor):
+    """The evidence's ``coderack`` (full posts, overflowing batches, evicted) through the serial child, the swarm and in
+    process: whole numbers, identical, and more than zero for a run long enough to fill the rack."""
+    pressure = {}
+    for name, submit in routes(swarm_executor, serial_executor).items():
+        task = SessionTask("abc", "abd", "ijk", None, 1, STEPS, None, backend, memory=MEMORY)
+        outcome = submit(task, cd.provider(live().document))
+        assert outcome.error is None, outcome.error
+        pressure[name] = outcome.evidence["coderack"]
+    first = pressure["in-process"]
+    assert all(type(v) is int and v >= 0 for v in first.values())
+    assert first["evicted"] > 0
+    assert pressure["serial child"] == first and pressure["swarm"] == first

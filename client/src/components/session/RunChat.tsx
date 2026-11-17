@@ -161,6 +161,10 @@ function Details({ turn }: { turn: SessionTurn }) {
             </li>
             <li>Snags: {ev.snags.length === 0 ? 'none' : ev.snags.join(', ')}</li>
             <li>Symbols still unperceived: {fmtInt(ev.unperceived)}</li>
+            <li>
+              Coderack pressure: {fmtInt(ev.coderack.full_posts)} full posts,{' '}
+              {fmtInt(ev.coderack.overflowing_batches)} overflowing batches, {fmtInt(ev.coderack.evicted)} evicted
+            </li>
           </ul>
         )}
         <div style={{ fontWeight: 700 }}>Proposals</div>

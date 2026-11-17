@@ -313,6 +313,14 @@ class Coderack:
             int(self._urgency_ceiling) if float(self._urgency_ceiling).is_integer() else None
         )
         self._total_count = 0
+        #: Coderack pressure over the run, counted and never read by the engine: codelets posted while
+        #: the rack was at ``max_size`` (:meth:`post`), deferred batches that took the rack past
+        #: ``max_size`` (:meth:`post_deferred`), and codelets evicted to make room
+        #: (:meth:`remove_old_codelets`, and the whole rack when a batch as large as the rack flushes
+        #: it).  Plain integers: no random draw, no branch on them.
+        self.full_posts = 0
+        self.overflowing_batches = 0
+        self.evicted = 0
         # Urgency clamping state
         self.clamped_urgencies: dict[str, int] = {}
         # Set by the runner so ``post`` can enforce ``max_size`` on its own.
@@ -380,6 +388,8 @@ class Coderack:
         rng = rng if rng is not None else self.rng
         if current_time is None:
             current_time = self.current_time
+        if self._total_count >= self.max_size:
+            self.full_posts += 1
         if rng is not None and self._total_count >= self.max_size:
             self.remove_old_codelets(
                 current_time, self._total_count - self.max_size + 1, rng, temperature
@@ -425,12 +435,15 @@ class Coderack:
         # so the Scheme's batch is newest first: ``random-pick`` over it, and the order the
         # codelets land in their bins, are the reverse of the order they were added in.
         batch = list(reversed(batch))
+        if self._total_count + len(batch) > self.max_size:
+            self.overflowing_batches += 1
         if len(batch) >= self.max_size:
             excess = len(batch) - self.max_size
             for _ in range(excess):
                 if not batch:
                     break
                 batch.remove(rng.pick(batch))
+            self.evicted += self._total_count  # the flush evicts the whole rack to make room
             self.clear()
         else:
             surplus = self._total_count + len(batch) - self.max_size
@@ -580,6 +593,7 @@ class Coderack:
             b.remove(codelet)
             self._total_count -= 1
             removed.append(codelet)
+        self.evicted += len(removed)
         return removed
 
     def _pick_codelet_to_remove(

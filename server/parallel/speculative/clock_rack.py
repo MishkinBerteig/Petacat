@@ -133,6 +133,9 @@ class ClockCoderack(Coderack):
         new.bins = rack.bins
         new.urgency_table = rack.urgency_table
         new._total_count = rack._total_count
+        new.full_posts = rack.full_posts
+        new.overflowing_batches = rack.overflowing_batches
+        new.evicted = rack.evicted
         new.clamped_urgencies = rack.clamped_urgencies
         new.current_time = rack.current_time
         new.current_temperature = rack.current_temperature

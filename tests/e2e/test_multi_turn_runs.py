@@ -439,7 +439,8 @@ async def test_the_conversation_and_the_listing_say_what_a_client_needs(chat, ap
     (t,) = c["turns"]
     assert set(t) >= {"turn", "positions", "supplied_by", "status", "codelets", "end_reason", "evidence",
                       "proposals", "turn_seed", "episode_version", "configuration_revision"}
-    assert t["evidence"] == {"bonds": {}, "groups": {}, "rule": None, "snags": [], "unperceived": 0}
+    assert t["evidence"] == {"bonds": {}, "groups": {}, "rule": None, "snags": [], "unperceived": 0,
+                            "coderack": {"full_posts": 0, "overflowing_batches": 0, "evicted": 0}}
     # a single-turn problem is a conversation of one turn that has ended
     s = await conversation(app_client, tid, pid=2)
     assert (s["multi_turn"], s["state"], s["end_reason"], s["turn_count"]) == (False, "ended", "single-turn", 1)

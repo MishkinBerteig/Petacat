@@ -100,7 +100,7 @@ class SessionOutcome:
     #: picklable dicts, identical ops removed.  The session's in-worker learner submits them.
     proposals: list = field(default_factory=list)
     #: What the run's Workspace built, as plain data (``turn_record.gather_evidence``): bonds and groups
-    #: by category, the rule the answer used, the snags, and how many symbols were still unperceived.
+    #: by category, the rule the answer used, the snags, how many symbols were still unperceived, and the Coderack's pressure.
     #: ``None`` for a task with no Training Mode Session memory and for a run that raised.
     evidence: dict | None = None
 

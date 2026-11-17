@@ -28,7 +28,7 @@ license change was authorised by Dr. Marshall directly (see
 > end-to-end. Episodic Memory (Metacat-Mode learning) shapes the runs that inherit it: a run
 > declines an answer already held for the same problem and rules, so repeating a
 > problem across Metacat Mode's [episodic runs](#persistence-modes-and-episodic-runs)
-> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 7,305 test cases covering the engine, the API, and the
+> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 7,331 test cases covering the engine, the API, and the
 > help/config system, run on both the CPU and the GPU numeric backends. Underneath the seven components sits an execution
 > substrate — three [persistence modes](#persistence-modes-and-episodic-runs),
 > a [GPU numeric substrate](#the-numeric-substrate), and
@@ -537,8 +537,8 @@ Petacat has two test suites:
   plugin against the serial runs it claims to equal), `lockstep` (Petacat's decision
   traces against Metacat's), and `e2e` (full HTTP
   stack against a running database). All eight run in a single command against
-  the local Postgres — 7,305 cases, which includes the numeric matrix's second
-  pass over the 1394 backend-sensitive tests. See
+  the local Postgres — 7,331 cases, which includes the numeric matrix's second
+  pass over the 1411 backend-sensitive tests. See
   [TESTING.md](TESTING.md) for the layer breakdown, the numeric backend matrix,
   the session ceiling, the unit-test rules, determinism requirements, test-double
   conventions, how to run the suite under the free-threaded interpreter, and what
@@ -1425,7 +1425,15 @@ the **input**, and the 4th, which Petacat constructs, the **response**.
   `waiting_for`, or `ended`: `single-turn`, `no-answer`, `teacher` with its label, `error` or `cancelled`). A client follows
   along by polling; there is no push channel. `evidence` is a small summary of what the turn's Workspace built: its bonds and groups
   by category, the rule the answer used, its snags, and how many symbols were still unperceived (a turn blocked on perception
-  is told apart from a cognitive give-up).
+  is told apart from a cognitive give-up), and the Coderack's pressure over the turn's run: `coderack` with `full_posts` (codelets
+  posted while the rack held its maximum, `max_coderack_size`), `overflowing_batches` (deferred batches that took the rack past it)
+  and `evicted` (codelets removed to make room). The Coderack only counts these; nothing in the engine reads them.
+- **The context-response benchmark.** `scripts/context_response_benchmark.py` runs five series of multi-turn context-response
+  analogy problems (`measurements/context-response-benchmark/series.json`, also readable by `scripts/session_client.py
+  --teacher`) through fresh Training Mode Sessions on the v2.0 Base (seeds 1 to 50, the serial child, backend `off`, the
+  session's default maximum codelets, the teacher `set_teacher` in process) and writes every run's conversation and a
+  `SUMMARY.md`. The reference results are kept in `measurements/context-response-benchmark/v2.0-increment-4/`, with a README
+  that says how to run it again.
 - **Waiting is per run, not a session state.** Pause stops dispatch (an input that arrives while Paused is kept and
   dispatched on Resume). Stop writes every waiting run with its turns to `training_mode_session_turns`, one row per turn
   keyed by session, problem, seed and turn, and Start restores it; a turn dispatched but not finished at Stop is run

@@ -1,0 +1,64 @@
+{
+ "problems": [
+  {
+   "initial": "one",
+   "modified": "two",
+   "target": "1",
+   "seeds": 50,
+   "inputs": [
+    "2",
+    "3"
+   ],
+   "end_label": "series over",
+   "tag": "series 1: one:two::1:?"
+  },
+  {
+   "initial": "bad",
+   "modified": "good",
+   "target": "less",
+   "seeds": 50,
+   "inputs": [
+    "more",
+    "old"
+   ],
+   "end_label": "series over",
+   "tag": "series 2: bad:good::less:?"
+  },
+  {
+   "initial": "1",
+   "modified": "2",
+   "target": "3",
+   "seeds": 50,
+   "inputs": [
+    "1234",
+    "12345"
+   ],
+   "end_label": "series over",
+   "tag": "series 3: 1:2::3:?"
+  },
+  {
+   "initial": "up",
+   "modified": "down",
+   "target": "in",
+   "seeds": 50,
+   "inputs": [
+    "on",
+    "yes"
+   ],
+   "end_label": "series over",
+   "tag": "series 4: up:down::in:?"
+  },
+  {
+   "initial": "cat",
+   "modified": "cats",
+   "target": "dog",
+   "seeds": 50,
+   "inputs": [
+    "pig",
+    "cow"
+   ],
+   "end_label": "series over",
+   "tag": "series 5: cat:cats::dog:?"
+  }
+ ]
+}

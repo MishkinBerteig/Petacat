@@ -98,7 +98,8 @@ class ScriptedExecutor:
         return SessionOutcome(
             seed=task.seed, status="answer_found", answer=answer, answers=[answer], codelets=10 + len(task.initial),
             seconds=0.0, stopping_state=f"answer_found:{answer}", temperature=1.0, answer_quality=50.0,
-            proposals=[node], evidence={"bonds": {}, "groups": {}, "rule": None, "snags": [], "unperceived": 0})
+            proposals=[node], evidence={"bonds": {}, "groups": {}, "rule": None, "snags": [], "unperceived": 0,
+                                          "coderack": {"full_posts": 0, "overflowing_batches": 0, "evicted": 0}})
 
     def submit(self, tasks: list, meta: Any) -> Future:
         future: Future = Future()

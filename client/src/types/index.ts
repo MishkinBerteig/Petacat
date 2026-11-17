@@ -1246,6 +1246,8 @@ export interface TurnEvidence {
   snags: string[];
   /** Symbols still unperceived at the end: a turn blocked on perception, not a cognitive give-up. */
   unperceived: number;
+  /** The Coderack's pressure over the turn's run: codelets posted while it was full, deferred batches that took it past its size, codelets evicted. */
+  coderack: { full_posts: number; overflowing_batches: number; evicted: number };
 }
 
 /** One turn of a conversation. Its 1st position is the context, its 3rd the input and its 4th the response. */

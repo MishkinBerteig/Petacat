@@ -363,7 +363,7 @@ The turns build a context history. A later turn's context is the previous turn's
 
 Strings are shown exactly as given: nothing is trimmed, collapsed or normalised. Each string sits in its own box, with line breaks and runs of spaces kept, so you can see where it starts and ends (the joining spaces of the window are part of a context). A string that holds anything other than words separated by single spaces (a tab, a line break, a combining mark, an unusual space) also gets an 'as written' line that spells those characters out.
 
-Per turn the chat shows its status, its codelets, and, when the turn ended the run, why (no answer, the teacher, an error), with the teacher's label if there is one. 'Details', closed until you open it, shows the turn's evidence (bonds and groups by category, the rule, the snags and the number of symbols still unperceived) and its proposals (how many, and the list).
+Per turn the chat shows its status, its codelets, and, when the turn ended the run, why (no answer, the teacher, an error), with the teacher's label if there is one. 'Details', closed until you open it, shows the turn's evidence (bonds and groups by category, the rule, the snags, the number of symbols still unperceived, and the Coderack's pressure: full posts, overflowing batches and evictions) and its proposals (how many, and the list).
 
 The heading says where the run stands: running a turn, waiting for the input of turn N, or ended and why. While a turn runs and while the run waits, the chat refreshes by itself (every second and a half while a turn runs, every five seconds while it waits) and it stops when the run ends or you close the chat.
 
